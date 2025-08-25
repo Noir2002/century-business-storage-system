@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>数据管理系统 - 首页导航</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 0;
+      margin: 0;
+    }
+    .main-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .header-section {
+      text-align: center;
+      color: white;
+      margin-bottom: 50px;
+    }
+    .header-section h1 {
+      font-size: 48px;
+      margin: 0 0 15px 0;
+      font-weight: 300;
+    }
+    .header-section p {
+      font-size: 18px;
+      opacity: 0.9;
+      margin: 0;
+    }
+    
+    .nav-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+    .nav-card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      padding: 30px;
+      text-align: center;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+      transition: transform 0.3s, box-shadow 0.3s;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+    }
+    .nav-card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+      text-decoration: none;
+      color: inherit;
+    }
+    .nav-card .card-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      display: block;
+    }
+    .nav-card .card-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    .nav-card .card-desc {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .nav-card .card-button {
+      background: linear-gradient(135deg, #16baaa 0%, #52c41a 100%);
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 25px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: opacity 0.3s;
+    }
+    .nav-card .card-button:hover {
+      opacity: 0.9;
+    }
+    
+    .demo-section {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      padding: 30px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+      margin-bottom: 30px;
+    }
+    .demo-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #333;
+      text-align: center;
+    }
+    .demo-accounts {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .demo-account {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      flex: 1;
+      min-width: 200px;
+    }
+    .demo-account h4 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .demo-account p {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 15px;
+    }
+    .demo-account .account-info {
+      background: white;
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 15px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    
+    .features-section {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      padding: 30px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+    }
+    .features-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #333;
+      text-align: center;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    .feature-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 10px;
+    }
+    .feature-icon {
+      font-size: 24px;
+      margin-right: 15px;
+      width: 40px;
+      text-align: center;
+    }
+    .feature-text {
+      flex: 1;
+    }
+    .feature-text h5 {
+      margin: 0 0 5px 0;
+      color: #333;
+    }
+    .feature-text p {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="main-container">
+    <div class="header-section">
+      <h1>📊 数据管理系统</h1>
+      <p>企业级表格数据管理平台 - 基于Layui构建</p>
+    </div>
+    
+    <div class="nav-cards">
+      <a href="login.html" class="nav-card">
+        <div class="card-icon">🔐</div>
+        <div class="card-title">用户登录</div>
+        <div class="card-desc">
+          已有账号？立即登录系统<br>
+          支持管理员和分析员两种角色
+        </div>
+        <button class="card-button">立即登录</button>
+      </a>
+      
+      <a href="virtual-inventory.html" class="nav-card">
+        <div class="card-icon">⚙️</div>
+        <div class="card-title">虚拟库存</div>
+        <div class="card-desc">
+          查看所有已上架商品的虚拟库存（固定=2），
+          自动标记当日有订单的SKU为“需要补货”
+        </div>
+        <button class="card-button">进入虚拟库存</button>
+      </a>
+
+      <a href="register.html" class="nav-card">
+        <div class="card-icon">🚀</div>
+        <div class="card-title">用户注册</div>
+        <div class="card-desc">
+          还没有账号？快速注册<br>
+          创建您的数据管理系统账号
+        </div>
+        <button class="card-button">立即注册</button>
+      </a>
+    </div>
+    
+    <div class="demo-section">
+      <div class="demo-title">🎮 演示账号</div>
+      <div class="demo-accounts">
+        <div class="demo-account">
+          <h4>👑 超级管理员</h4>
+          <p>拥有所有权限，可以查看、编辑、删除、导入导出数据</p>
+          <div class="account-info">
+            用户名: admin<br>
+            密码: 123456<br>
+            角色: 超级管理员
+          </div>
+          <button class="layui-btn layui-btn-normal" onclick="quickLogin('admin')">
+            快速登录
+          </button>
+        </div>
+        
+        <div class="demo-account">
+          <h4>📊 数据分析员</h4>
+          <p>只能查看和导出数据，无法修改数据内容</p>
+          <div class="account-info">
+            用户名: analyst<br>
+            密码: 123456<br>
+            角色: 数据分析员
+          </div>
+          <button class="layui-btn layui-btn-warm" onclick="quickLogin('analyst')">
+            快速登录
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="features-section">
+      <div class="features-title">✨ 系统特性</div>
+      <div class="features-grid">
+        <div class="feature-item">
+          <div class="feature-icon">🔐</div>
+          <div class="feature-text">
+            <h5>角色权限管理</h5>
+            <p>支持管理员和分析员两种角色</p>
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-icon">📊</div>
+          <div class="feature-text">
+            <h5>表格数据管理</h5>
+            <p>支持SKU库存销售数据的管理</p>
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-icon">🔍</div>
+          <div class="feature-text">
+            <h5>高级搜索筛选</h5>
+            <p>支持多条件搜索和数据筛选</p>
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-icon">✏️</div>
+          <div class="feature-text">
+            <h5>在线编辑功能</h5>
+            <p>双击单元格即可在线编辑数据</p>
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-icon">📤</div>
+          <div class="feature-text">
+            <h5>数据导入导出</h5>
+            <p>支持Excel文件的导入和导出</p>
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-icon">📱</div>
+          <div class="feature-text">
+            <h5>响应式设计</h5>
+            <p>完美适配PC、平板和手机设备</p>
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-icon">🎨</div>
+          <div class="feature-text">
+            <h5>美观的界面</h5>
+            <p>基于Layui的现代化UI设计</p>
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-text">
+            <h5>高性能表格</h5>
+            <p>支持大数据量的表格展示和操作</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['layer'], function(){
+      var layer = layui.layer;
+      
+      // 快速登录功能
+      window.quickLogin = function(userType) {
+        var userInfo = {};
+        
+        if (userType === 'admin') {
+          userInfo = {
+            username: 'admin',
+            role: 'admin',
+            roleName: '超级管理员',
+            permissions: ['view', 'edit', 'delete', 'import', 'export', 'manage']
+          };
+        } else if (userType === 'analyst') {
+          userInfo = {
+            username: 'analyst',
+            role: 'analyst',
+            roleName: '数据分析员',
+            permissions: ['view', 'export']
+          };
+        }
+        
+        // 保存用户信息
+        localStorage.setItem('currentUser', JSON.stringify(userInfo));
+        
+        // 显示登录成功消息并跳转
+        layer.msg('登录成功！正在跳转到系统...', {icon: 1, time: 1500}, function(){
+          window.location.href = 'dashboard.html';
+        });
+      };
+      
+      // 页面加载完成提示
+      layer.msg('欢迎使用数据管理系统！', {icon: 6, time: 2000});
+    });
+  </script>
+</body>
+</html> 

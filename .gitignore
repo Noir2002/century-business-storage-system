@@ -1,31 +1,13 @@
-*~
-~*
-
-*.bak
-*.bat
-*.diff
-*.err
-*.log
-*.patch
-*.swo
-*.swp
-*.zip
-
-.DS_Store
-.env
-.nojekyll
-.project
-.settings
-package-lock.json
-Thumbs.db
-
-.idea/
-.svn/
-_site/
-.vscode/
+﻿# Node
 node_modules/
+npm-debug.log*
+yarn.lock
+package-lock.json
 
+# Local data and uploads
+data/**/*.json
+data/uploads/
+*.xlsx
 
-# Published folders
-/release/
-/v/
+# Env
+.env

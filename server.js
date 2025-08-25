@@ -2065,6 +2065,192 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`3. 默认管理员账号：admin / 123456`);
 });
 
+// ============= 数据分析API接口 =============
+
+// 获取分析概览数据
+app.get('/api/analysis/overview', authenticateToken, async (req, res) => {
+  try {
+    const data = await getAnalysisOverview();
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('获取分析概览失败:', error);
+    res.status(500).json({ error: '获取分析概览失败' });
+  }
+});
+
+// 获取库存趋势数据
+app.get('/api/analysis/stock-trend', authenticateToken, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const data = await getStockTrendData(days);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('获取库存趋势失败:', error);
+    res.status(500).json({ error: '获取库存趋势失败' });
+  }
+});
+
+// 获取销售趋势数据
+app.get('/api/analysis/sales-trend', authenticateToken, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const data = await getSalesTrendData(days);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('获取销售趋势失败:', error);
+    res.status(500).json({ error: '获取销售趋势失败' });
+  }
+});
+
+// 获取SKU详细分析
+app.get('/api/analysis/sku-details', authenticateToken, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const data = await getSkuDetailsData(limit);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('获取SKU分析失败:', error);
+    res.status(500).json({ error: '获取SKU分析失败' });
+  }
+});
+
+// ============= 上下架管理API接口 =============
+
+// 获取待上架商品
+app.get('/api/listing/candidates', authenticateToken, async (req, res) => {
+  try {
+    const data = await getListingCandidates();
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('获取待上架商品失败:', error);
+    res.status(500).json({ error: '获取待上架商品失败' });
+  }
+});
+
+// 获取待下架商品
+app.get('/api/delisting/candidates', authenticateToken, async (req, res) => {
+  try {
+    const data = await getDelistingCandidates();
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('获取待下架商品失败:', error);
+    res.status(500).json({ error: '获取待下架商品失败' });
+  }
+});
+
+// 确认上架商品
+app.post('/api/listing/confirm', authenticateToken, async (req, res) => {
+  try {
+    const { skus } = req.body;
+    if (!skus || !Array.isArray(skus) || skus.length === 0) {
+      return res.status(400).json({ error: '请提供有效的SKU列表' });
+    }
+    
+    const count = await confirmListing(skus);
+    res.json({ success: true, count });
+  } catch (error) {
+    console.error('确认上架失败:', error);
+    res.status(500).json({ error: '确认上架失败' });
+  }
+});
+
+// 确认下架商品
+app.post('/api/delisting/confirm', authenticateToken, async (req, res) => {
+  try {
+    const { skus } = req.body;
+    if (!skus || !Array.isArray(skus) || skus.length === 0) {
+      return res.status(400).json({ error: '请提供有效的SKU列表' });
+    }
+    
+    const count = await confirmDelisting(skus);
+    res.json({ success: true, count });
+  } catch (error) {
+    console.error('确认下架失败:', error);
+    res.status(500).json({ error: '确认下架失败' });
+  }
+});
+
+// ============= 虚拟库存 API =============
+
+// 获取虚拟库存概览（所有在线商品，虚拟库存固定为2；按今日订单聚合并标注补货提醒）
+app.get('/api/virtual-inventory/overview', authenticateToken, (req, res) => {
+  try {
+    const { wideTableData } = readLocalData();
+    const tmallRows = readTmallOrders();
+
+    const todayYmd = new Date().toISOString().split('T')[0];
+    const todayOrderBySku = new Map();
+
+    // 统计今日天猫订单数量（按SKU汇总）
+    if (Array.isArray(tmallRows)) {
+      tmallRows.forEach(row => {
+        const sku = row.SKU || row['SKU'] || row['sku'] || '';
+        if (!sku) return;
+        const timeStr = row['店铺订单时间'] || row['订单时间'] || row['时间'] || row['date'] || row['日期'] || '';
+        const ymd = toYmd(timeStr);
+        if (ymd === todayYmd) {
+          const qty = parseInt(row['商品数量'] || row['数量'] || row['商品数'] || row['数量（件）'] || 0) || 0;
+          const prev = todayOrderBySku.get(sku) || 0;
+          todayOrderBySku.set(sku, prev + qty);
+        }
+      });
+    }
+
+    // 使用本地数据库的所有商品（不再按状态过滤）
+    const allLocalItems = Array.isArray(wideTableData) ? wideTableData : [];
+    let items = allLocalItems.map(item => {
+      // 只从明确字段获取，避免回退为 0 导致前端显示空
+      const sku = String(item.SKU || item['SKU'] || item.sku || '').trim();
+      const name = String(item['产品中文名'] || item['产品名称'] || item['商品名称'] || item.name || '').trim();
+      const url = String(item['网页链接'] || item['链接'] || item['URL'] || item.url || '').trim();
+      const todayQty = todayOrderBySku.get(sku) || 0;
+      return {
+        sku,
+        name,
+        url,
+        virtualStock: 2,
+        todayOrderCount: todayQty,
+        needReplenish: todayQty > 0
+      };
+    });
+
+    // 过滤掉完全空白的记录（既无sku也无name）
+    items = items.filter(it => (it.sku && it.sku.trim() !== '') || (it.name && it.name.trim() !== ''));
+
+    // 排序：需补货优先，其次今日订单数降序，再按SKU
+    items.sort((a, b) => {
+      const byNeed = Number(b.needReplenish) - Number(a.needReplenish);
+      if (byNeed !== 0) return byNeed;
+      const byOrders = (b.todayOrderCount || 0) - (a.todayOrderCount || 0);
+      if (byOrders !== 0) return byOrders;
+      return String(a.sku || '').localeCompare(String(b.sku || ''));
+    });
+
+    // 分页
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 100);
+    const total = items.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const startIndex = (page - 1) * limit;
+    const pagedItems = items.slice(startIndex, startIndex + limit);
+
+    const totalOnline = total;
+    const withOrdersToday = items.filter(x => x.todayOrderCount > 0).length;
+
+    res.json({
+      success: true,
+      data: {
+        summary: { totalOnline, withOrdersToday, virtualStockPerSku: 2, date: todayYmd },
+        items: pagedItems,
+        pagination: { page, limit, total, totalPages, hasPrev: page > 1, hasNext: page < totalPages }
+      }
+    });
+  } catch (error) {
+    console.error('虚拟库存概览失败:', error);
+    res.status(500).json({ error: '获取虚拟库存失败: ' + error.message });
+  }
+});
+
 module.exports = app; 
 
 // 抓取网页内容（处理最多5次重定向）
@@ -2342,6 +2528,368 @@ function getCell(row, ...keys) {
   // 兜底：返回第一个非空字段
   const values = Object.values(row).filter(v => v !== undefined && v !== null && v !== '');
   return values.length > 0 ? values[0] : '';
+}
+
+// ============= 数据分析相关函数 =============
+
+// 读取本地数据文件
+function readLocalData() {
+  try {
+    const wideTablePath = path.join(__dirname, 'data', 'wide-table.json');
+    const recordsPath = path.join(__dirname, 'data', 'records.json');
+    
+    let wideTableData = [];
+    let recordsData = [];
+    
+    if (fs.existsSync(wideTablePath)) {
+      const rawData = fs.readFileSync(wideTablePath, 'utf8');
+      wideTableData = JSON.parse(rawData);
+    }
+    
+    if (fs.existsSync(recordsPath)) {
+      const rawData = fs.readFileSync(recordsPath, 'utf8');
+      recordsData = JSON.parse(rawData);
+    }
+    
+    return { wideTableData, recordsData };
+  } catch (error) {
+    console.error('读取本地数据失败:', error);
+    return { wideTableData: [], recordsData: [] };
+  }
+}
+
+// 保存宽表数据
+function saveWideTableData(data) {
+  try {
+    const wideTablePath = path.join(__dirname, 'data', 'wide-table.json');
+    fs.writeFileSync(wideTablePath, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('保存宽表数据失败:', error);
+    return false;
+  }
+}
+
+// 获取分析概览数据
+async function getAnalysisOverview() {
+  const { wideTableData, recordsData } = readLocalData();
+  
+  // 计算统计指标
+  const totalSku = wideTableData.length;
+  const onlineSkus = wideTableData.filter(item => !item.status || item.status === 'online');
+  const zeroStockSkus = wideTableData.filter(item => parseFloat(getCurrentStock(item)) === 0);
+  const lowStockSkus = wideTableData.filter(item => {
+    const stock = parseFloat(getCurrentStock(item));
+    return stock > 0 && stock <= 10;
+  });
+  
+  const healthRate = totalSku > 0 ? Math.round(((totalSku - zeroStockSkus.length) / totalSku) * 100) : 0;
+  const avgTurnover = calculateAverageTurnover(wideTableData);
+  const warningCount = zeroStockSkus.length + lowStockSkus.length;
+  const totalRecords = recordsData.length;
+  
+  return {
+    totalSku,
+    healthRate,
+    avgTurnover,
+    warningCount,
+    totalRecords
+  };
+}
+
+// 计算平均周转率
+function calculateAverageTurnover(data) {
+  if (!data || data.length === 0) return 0;
+  
+  let totalTurnover = 0;
+  let validCount = 0;
+  
+  data.forEach(item => {
+    const currentStock = parseFloat(getCurrentStock(item));
+    const totalSales = parseFloat(calculateTotalSales(item));
+    
+    if (currentStock > 0 && totalSales > 0) {
+      const turnover = totalSales / currentStock;
+      totalTurnover += turnover;
+      validCount++;
+    }
+  });
+  
+  return validCount > 0 ? Math.round((totalTurnover / validCount) * 10) / 10 : 0;
+}
+
+// 获取库存趋势数据
+async function getStockTrendData(days) {
+  const { wideTableData } = readLocalData();
+  
+  // 生成模拟日期数据（实际应用中应该基于历史数据）
+  const dates = [];
+  const totalSeries = [];
+  const healthySeries = [];
+  const warningSeries = [];
+  const outOfStockSeries = [];
+  
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    dates.push(date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }));
+    
+    // 基于当前数据模拟历史趋势
+    const variation = Math.random() * 0.2 - 0.1; // ±10%变化
+    const totalStock = Math.round(wideTableData.length * (1 + variation));
+    const healthyStock = Math.round(totalStock * 0.7);
+    const warningStock = Math.round(totalStock * 0.2);
+    const outOfStock = Math.round(totalStock * 0.1);
+    
+    totalSeries.push(totalStock);
+    healthySeries.push(healthyStock);
+    warningSeries.push(warningStock);
+    outOfStockSeries.push(outOfStock);
+  }
+  
+  return {
+    dates,
+    series: {
+      total: totalSeries,
+      healthy: healthySeries,
+      warning: warningSeries,
+      outOfStock: outOfStockSeries
+    }
+  };
+}
+
+// 获取销售趋势数据
+async function getSalesTrendData(days) {
+  const { recordsData } = readLocalData();
+  
+  const dates = [];
+  const quantitySeries = [];
+  
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    dates.push(date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }));
+    
+    // 模拟销售数据（实际应用中应该统计当日销量）
+    const baseSales = recordsData.length / days;
+    const variation = Math.random() * 0.5 - 0.25; // ±25%变化
+    const dailySales = Math.max(0, Math.round(baseSales * (1 + variation)));
+    
+    quantitySeries.push(dailySales);
+  }
+  
+  return {
+    dates,
+    series: {
+      quantity: quantitySeries
+    }
+  };
+}
+
+// 获取SKU详细分析
+async function getSkuDetailsData(limit) {
+  const { wideTableData } = readLocalData();
+  
+  const skuAnalysis = wideTableData.map(item => {
+    const currentStock = parseFloat(getCurrentStock(item));
+    const totalSales = parseFloat(calculateTotalSales(item));
+    const sku = item.SKU || item.sku || '';
+    const status = item.status || 'online';
+    
+    let itemStatus = 'healthy';
+    let suggestion = '维持现状';
+    
+    if (status === 'offline') {
+      itemStatus = 'offline';
+      suggestion = '已下架';
+    } else if (currentStock === 0) {
+      itemStatus = 'outOfStock';
+      suggestion = '紧急补货';
+    } else if (currentStock <= 10) {
+      itemStatus = 'warning';
+      suggestion = '考虑补货';
+    } else if (currentStock > 50 && totalSales < 10) {
+      itemStatus = 'warning';
+      suggestion = '促销清库';
+    }
+    
+    const turnover = currentStock > 0 ? Math.round((totalSales / currentStock) * 10) / 10 : '-';
+    const trend = Math.random() > 0.5 ? 'up' : (Math.random() > 0.5 ? 'down' : 'stable');
+    
+    return {
+      sku,
+      currentStock,
+      totalSales,
+      turnover,
+      status: itemStatus,
+      trend,
+      suggestion
+    };
+  });
+  
+  // 按库存状态排序：缺货 > 预警 > 正常
+  skuAnalysis.sort((a, b) => {
+    const priority = { outOfStock: 3, warning: 2, healthy: 1, offline: 0 };
+    return (priority[b.status] || 0) - (priority[a.status] || 0);
+  });
+  
+  return skuAnalysis.slice(0, limit);
+}
+
+// ============= 上下架管理相关函数 =============
+
+// 获取待上架商品（已下架且库存>10）
+async function getListingCandidates() {
+  const { wideTableData } = readLocalData();
+  
+  const candidates = wideTableData.filter(item => {
+    // 获取最新库存数据（假设是今天的库存字段）
+    const currentStock = parseFloat(getCurrentStock(item));
+    const status = item.status || 'online';
+    return status === 'offline' && currentStock > 10;
+  });
+  
+  return candidates.map(item => ({
+    sku: item.SKU || item.sku || '',
+    name: item['产品中文名'] || item['产品名称'] || item['商品名称'] || '未知商品',
+    currentStock: parseFloat(getCurrentStock(item)),
+    totalSales: calculateTotalSales(item),
+    delistedDate: item.delistedDate || '未知',
+    url: item['网页链接'] || item['链接'] || item['URL'] || ''
+  }));
+}
+
+// 获取待下架商品（在线且库存=0）
+async function getDelistingCandidates() {
+  const { wideTableData } = readLocalData();
+  
+  const candidates = wideTableData.filter(item => {
+    const currentStock = parseFloat(getCurrentStock(item));
+    const status = item.status || 'online';
+    const sku = item.SKU || item.sku || '';
+    const name = item['产品中文名'] || item['产品名称'] || item['商品名称'] || '';
+    
+    // 只返回有效的商品：有SKU、有名称、在线状态、库存为0
+    return status === 'online' && 
+           currentStock === 0 && 
+           sku.trim() !== '' && 
+           name.trim() !== '' && 
+           name !== '未知商品';
+  });
+  
+  return candidates.map(item => ({
+    sku: item.SKU || item.sku || '',
+    name: item['产品中文名'] || item['产品名称'] || item['商品名称'] || '',
+    currentStock: parseFloat(getCurrentStock(item)),
+    totalSales: calculateTotalSales(item),
+    outOfStockDays: Math.floor(Math.random() * 30) + 1, // 模拟缺货天数
+    url: item['网页链接'] || item['链接'] || item['URL'] || ''
+  }));
+}
+
+// 确认上架
+async function confirmListing(skus) {
+  const { wideTableData } = readLocalData();
+  let count = 0;
+  
+  const updatedData = wideTableData.map(item => {
+    const itemSku = item.SKU || item.sku || '';
+    if (skus.includes(itemSku) && item.status === 'offline') {
+      count++;
+      return { ...item, status: 'online', listedDate: new Date().toISOString() };
+    }
+    return item;
+  });
+  
+  if (count > 0) {
+    saveWideTableData(updatedData);
+  }
+  
+  return count;
+}
+
+// 确认下架
+async function confirmDelisting(skus) {
+  const { wideTableData } = readLocalData();
+  let count = 0;
+  
+  const updatedData = wideTableData.map(item => {
+    const itemSku = item.SKU || item.sku || '';
+    if (skus.includes(itemSku) && (!item.status || item.status === 'online')) {
+      count++;
+      return { ...item, status: 'offline', delistedDate: new Date().toISOString() };
+    }
+    return item;
+  });
+  
+  if (count > 0) {
+    saveWideTableData(updatedData);
+  }
+  
+  return count;
+}
+
+// 辅助函数：获取当前库存（从动态日期字段中获取最新库存）
+function getCurrentStock(item) {
+  // 获取当前日期的库存字段，格式如"2025-07-24"
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  
+  // 尝试获取今天的库存，如果没有则获取昨天的
+  if (item[today] !== undefined) {
+    return item[today] || 0;
+  } else if (item[yesterday] !== undefined) {
+    return item[yesterday] || 0;
+  }
+  
+  // 如果没有找到日期字段，尝试其他库存字段
+  return item['当前库存'] || item['库存'] || item['初始库存'] || 0;
+}
+
+// 辅助函数：计算总销量（从所有销量字段累加）
+function calculateTotalSales(item) {
+  let totalSales = 0;
+  
+  // 遍历所有字段，找到以"_销量"结尾的字段并累加
+  for (const key in item) {
+    if (key.includes('_销量') && typeof item[key] === 'number') {
+      totalSales += item[key];
+    }
+  }
+  
+  // 如果没有找到销量字段，返回0
+  return totalSales || 0;
+}
+
+// 工具：将任意常见时间字符串转为 YYYY-MM-DD（无法解析则返回空字符串）
+function toYmd(input) {
+  if (!input) return '';
+  try {
+    // 1) 已是 YYYY-MM-DD
+    const s = String(input).trim();
+    const m = s.match(/(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+    if (m) {
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      const mm = mo < 10 ? '0' + mo : String(mo);
+      const dd = d < 10 ? '0' + d : String(d);
+      return `${y}-${mm}-${dd}`;
+    }
+    // 2) 兜底用Date解析
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      const y = dt.getFullYear();
+      const mo = dt.getMonth() + 1;
+      const d = dt.getDate();
+      const mm = mo < 10 ? '0' + mo : String(mo);
+      const dd = d < 10 ? '0' + d : String(d);
+      return `${y}-${mm}-${dd}`;
+    }
+  } catch (_) {}
+  return '';
 }
 
 function convertTmallRowsToWideTable(rows) {

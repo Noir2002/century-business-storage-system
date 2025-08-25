@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>数据管理系统 - 仪表板</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <style>
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header .layui-nav {
+      background: transparent;
+    }
+    .header .layui-nav .layui-nav-item a {
+      color: rgba(255,255,255,0.9);
+    }
+    .header .layui-nav .layui-nav-item a:hover {
+      color: white;
+    }
+    .header .logo {
+      font-size: 18px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    
+    /* 主导航样式 */
+    .main-nav {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      margin: 0 20px;
+    }
+    .main-nav .layui-nav-item {
+      margin: 0 5px;
+    }
+    .main-nav .layui-nav-item a {
+      padding: 0 20px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+    .main-nav .layui-nav-item a:hover,
+    .main-nav .layui-nav-item.layui-this a {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+    .main-nav .layui-nav-item a i {
+      margin-right: 6px;
+    }
+    
+    .header .user-info {
+      white-space: nowrap;
+    }
+    
+    /* 用户下拉菜单样式 */
+    .user-info .layui-nav-child dd a {
+      padding: 10px 15px;
+      color: #666;
+      transition: all 0.3s ease;
+    }
+    .user-info .layui-nav-child dd a:hover {
+      background: #f8f9fa;
+      color: #16baaa;
+    }
+    .user-info .layui-nav-child dd a i {
+      margin-right: 8px;
+      font-size: 14px;
+    }
+    
+    .layui-side {
+      background: #2f4056;
+    }
+    .layui-side .layui-nav {
+      background: transparent;
+    }
+    .layui-side .layui-nav .layui-nav-item a {
+      color: #c2c2c2;
+      border-radius: 6px;
+      margin: 5px 10px;
+      padding: 0 15px;
+    }
+    .layui-side .layui-nav .layui-nav-item a:hover,
+    .layui-side .layui-nav .layui-this a {
+      background: rgba(22, 186, 170, 0.8);
+      color: white;
+    }
+    .layui-side .layui-nav .layui-nav-child {
+      background: #1e2d3f;
+    }
+    
+    .layui-body {
+      background: #f8f9fa;
+      padding: 15px;
+    }
+    
+    .dashboard-cards {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .dashboard-card {
+      flex: 1;
+      min-width: 200px;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      position: relative;
+      overflow: hidden;
+    }
+    .dashboard-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--card-color, #16baaa);
+    }
+    .dashboard-card.card-blue::before { background: #16baaa; }
+    .dashboard-card.card-green::before { background: #52c41a; }
+    .dashboard-card.card-orange::before { background: #fa8c16; }
+    .dashboard-card.card-red::before { background: #f5222d; }
+    
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      font-size: 14px;
+      color: #666;
+      font-weight: normal;
+    }
+    .card-icon {
+      font-size: 24px;
+      opacity: 0.7;
+    }
+    .card-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    .card-trend {
+      font-size: 12px;
+      color: #52c41a;
+    }
+    .card-trend.down {
+      color: #f5222d;
+    }
+    
+    .layui-tab {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .layui-tab .layui-tab-title {
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .layui-tab .layui-tab-content {
+      padding: 20px;
+    }
+    
+    .welcome-section {
+      background: linear-gradient(135deg, #16baaa 0%, #52c41a 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .welcome-section h2 {
+      margin: 0 0 10px 0;
+      font-weight: 300;
+    }
+    .welcome-section p {
+      margin: 0;
+      opacity: 0.9;
+    }
+    
+    .quick-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .recent-activity {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-top: 20px;
+    }
+    .activity-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .activity-item:last-child {
+      border-bottom: none;
+    }
+    .activity-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 15px;
+      font-size: 16px;
+      color: white;
+    }
+    .activity-icon.edit { background: #16baaa; }
+    .activity-icon.upload { background: #52c41a; }
+    .activity-icon.export { background: #fa8c16; }
+    .activity-icon.delete { background: #f5222d; }
+    
+    .activity-content {
+      flex: 1;
+    }
+    .activity-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    .activity-time {
+      font-size: 12px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="layui-layout layui-layout-admin">
+    <div class="layui-header header">
+      <div class="logo">
+        📊 数据管理系统
+      </div>
+      
+      <!-- 主导航按钮 -->
+      <ul class="layui-nav main-nav">
+        <li class="layui-nav-item layui-this">
+          <a href="dashboard.html">
+            <i class="layui-icon layui-icon-home"></i> 数据仪表盘
+          </a>
+        </li>
+        <li class="layui-nav-item">
+          <a href="table-management.html">
+            <i class="layui-icon layui-icon-table"></i> 表格管理
+          </a>
+        </li>
+        <li class="layui-nav-item">
+          <a href="data-upload.html">
+            <i class="layui-icon layui-icon-upload-drag"></i> 数据导入
+          </a>
+        </li>
+        <li class="layui-nav-item">
+          <a href="data-analysis.html">
+            <i class="layui-icon layui-icon-chart"></i> 数据分析
+          </a>
+        </li>
+        <li class="layui-nav-item">
+          <a href="virtual-inventory.html">
+            <i class="layui-icon layui-icon-engine"></i> 虚拟库存
+          </a>
+        </li>
+        <li class="layui-nav-item"><a href="tmall-database.html"><i class="layui-icon layui-icon-cart"></i> 天猫数据库</a></li>
+        <li class="layui-nav-item"><a href="tmall-order.html"><i class="layui-icon layui-icon-list"></i> 天猫订单</a></li>
+        <li class="layui-nav-item" id="adminOnlyTopNav" style="display: none;">
+          <a href="user-management.html">
+            <i class="layui-icon layui-icon-username"></i> 用户管理
+          </a>
+        </li>
+      </ul>
+      
+      <ul class="layui-nav layui-layout-right user-info">
+        <li class="layui-nav-item">
+          <a href="javascript:;">
+            <img src="//t.cn/RCzsdCq" class="layui-nav-img">
+            <span id="currentUser">用户</span>
+          </a>
+          <dl class="layui-nav-child">
+            <dd><a href="profile.html"><i class="layui-icon layui-icon-username"></i> 个人信息</a></dd>
+            <dd><a href="javascript:;" onclick="switchAccount()"><i class="layui-icon layui-icon-refresh-3"></i> 切换账户</a></dd>
+            <dd><a href="javascript:;" onclick="logout()"><i class="layui-icon layui-icon-logout"></i> 登出</a></dd>
+          </dl>
+        </li>
+      </ul>
+    </div>
+    
+    <div class="layui-side layui-bg-black">
+      <div class="layui-side-scroll">
+        <ul class="layui-nav layui-nav-tree" lay-filter="nav">
+          <li class="layui-nav-item layui-this">
+            <a href="javascript:;" onclick="loadPage('dashboard')">
+              <i class="layui-icon layui-icon-home"></i> 数据仪表板
+            </a>
+          </li>
+          <li class="layui-nav-item">
+            <a href="javascript:;" onclick="loadPage('tables')">
+              <i class="layui-icon layui-icon-table"></i> 表格管理
+            </a>
+          </li>
+          <li class="layui-nav-item">
+            <a href="javascript:;" onclick="loadPage('upload')">
+              <i class="layui-icon layui-icon-upload-drag"></i> 数据导入
+            </a>
+          </li>
+          <li class="layui-nav-item">
+            <a href="javascript:;" onclick="loadPage('analysis')">
+              <i class="layui-icon layui-icon-chart"></i> 数据分析
+            </a>
+          </li>
+          <li class="layui-nav-item">
+            <a href="virtual-inventory.html">
+              <i class="layui-icon layui-icon-engine"></i> 虚拟库存
+            </a>
+          </li>
+          <li class="layui-nav-item">
+            <a href="javascript:;" onclick="loadPage('localdb')">
+              <i class="layui-icon layui-icon-database"></i> 本地数据库
+            </a>
+          </li>
+          <li class="layui-nav-item">
+            <a href="tmall-database.html">
+              <i class="layui-icon layui-icon-cart"></i> 天猫数据库
+            </a>
+          </li>
+          <li class="layui-nav-item">
+            <a href="tmall-order.html">
+              <i class="layui-icon layui-icon-list"></i> 天猫订单
+            </a>
+          </li>
+          <li class="layui-nav-item" id="adminOnlyMenu" style="display: none;">
+            <a href="javascript:;">
+              <i class="layui-icon layui-icon-set"></i> 系统管理
+            </a>
+            <dl class="layui-nav-child">
+              <dd><a href="javascript:;" onclick="loadPage('users')">用户管理</a></dd>
+              <dd><a href="javascript:;" onclick="loadPage('settings')">系统设置</a></dd>
+              <dd><a href="javascript:;" onclick="loadPage('logs')">操作日志</a></dd>
+            </dl>
+          </li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="layui-body">
+      <div id="mainContent">
+        <!-- 欢迎区域 -->
+        <div class="welcome-section">
+          <h2>🎉 欢迎回来，<span id="welcomeUser">用户</span>！</h2>
+          <p>您的角色：<span id="userRole">角色</span> | 今天是 <span id="currentDate"></span></p>
+          <div class="quick-actions">
+            <button class="layui-btn layui-btn-sm" onclick="loadPage('tables')">
+              <i class="layui-icon layui-icon-table"></i> 查看表格
+            </button>
+            <button class="layui-btn layui-btn-sm layui-btn-normal" onclick="loadPage('upload')" id="uploadBtn">
+              <i class="layui-icon layui-icon-upload"></i> 导入数据
+            </button>
+            <button class="layui-btn layui-btn-sm layui-btn-warm" onclick="loadPage('analysis')">
+              <i class="layui-icon layui-icon-chart"></i> 数据分析
+            </button>
+          </div>
+        </div>
+        
+        <!-- 数据卡片 -->
+        <div class="dashboard-cards">
+          <div class="dashboard-card card-blue">
+            <div class="card-header">
+              <div class="card-title">总记录数</div>
+              <div class="card-icon">📊</div>
+            </div>
+            <div class="card-value">1,234</div>
+            <div class="card-trend">↗ +12% 较上周</div>
+          </div>
+          
+          <div class="dashboard-card card-green">
+            <div class="card-header">
+              <div class="card-title">活跃SKU</div>
+              <div class="card-icon">📦</div>
+            </div>
+            <div class="card-value">856</div>
+            <div class="card-trend">↗ +8% 较上周</div>
+          </div>
+          
+          <div class="dashboard-card card-orange">
+            <div class="card-header">
+              <div class="card-title">今日更新</div>
+              <div class="card-icon">🔄</div>
+            </div>
+            <div class="card-value">42</div>
+            <div class="card-trend">↗ +15% 较昨日</div>
+          </div>
+          
+          <div class="dashboard-card card-red">
+            <div class="card-header">
+              <div class="card-title">库存预警</div>
+              <div class="card-icon">⚠️</div>
+            </div>
+            <div class="card-value">12</div>
+            <div class="card-trend down">↘ 需要关注</div>
+          </div>
+        </div>
+        
+        <!-- 选项卡内容区域 -->
+        <div class="layui-tab" lay-filter="mainTab">
+          <ul class="layui-tab-title">
+            <li class="layui-this">📈 数据概览</li>
+            <li>📋 最近操作</li>
+            <li>📊 统计分析</li>
+          </ul>
+          <div class="layui-tab-content">
+            <div class="layui-tab-item layui-show">
+              <div class="layui-row layui-col-space15">
+                <div class="layui-col-md8">
+                  <h3>数据趋势图</h3>
+                  <div style="height: 300px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;">
+                    <div style="text-align: center;">
+                      <i class="layui-icon layui-icon-chart" style="font-size: 48px; display: block; margin-bottom: 10px;"></i>
+                      图表区域<br>
+                      <small>（可集成 ECharts 等图表库）</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="layui-col-md4">
+                  <h3>数据分布</h3>
+                  <div style="height: 300px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;">
+                    <div style="text-align: center;">
+                      <i class="layui-icon layui-icon-chart-screen" style="font-size: 48px; display: block; margin-bottom: 10px;"></i>
+                      饼图区域
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="layui-tab-item">
+              <div class="recent-activity">
+                <h3>最近操作记录</h3>
+                <div class="activity-item">
+                  <div class="activity-icon edit">✏️</div>
+                  <div class="activity-content">
+                    <div class="activity-title">编辑了库存数据表</div>
+                    <div class="activity-time">2小时前</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-icon upload">📤</div>
+                  <div class="activity-content">
+                    <div class="activity-title">导入了新的销售数据</div>
+                    <div class="activity-time">4小时前</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-icon export">📥</div>
+                  <div class="activity-content">
+                    <div class="activity-title">导出了月度报表</div>
+                    <div class="activity-time">1天前</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-icon delete">🗑️</div>
+                  <div class="activity-content">
+                    <div class="activity-title">删除了过期数据记录</div>
+                    <div class="activity-time">2天前</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="layui-tab-item">
+              <h3>📊 数据统计分析</h3>
+              <div class="layui-row layui-col-space15">
+                <div class="layui-col-md6">
+                  <div style="padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <h4>月度销售趋势</h4>
+                    <div style="height: 200px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;">
+                      趋势图表区域
+                    </div>
+                  </div>
+                </div>
+                <div class="layui-col-md6">
+                  <div style="padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <h4>库存分布情况</h4>
+                    <div style="height: 200px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;">
+                      分布图表区域
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+          layui.use(['element', 'layer'], function(){
+        var element = layui.element;
+        var layer = layui.layer;
+      
+      // 初始化页面
+      initPage();
+      
+      function initPage() {
+        // 直接检查登录状态，localStorage已验证正常
+        var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        console.log('Dashboard检查用户信息:', userInfo); // 调试信息
+        
+        if (!userInfo || !userInfo.username) {
+          console.log('用户信息检查失败，跳转到登录页面');
+          layer.msg('请先登录！', {icon: 2}, function(){
+            window.location.href = 'login.html';
+          });
+          return;
+        }
+        
+        console.log('用户信息检查通过，初始化界面');
+        // 继续初始化页面
+        initUserInterface(userInfo);
+      }
+      
+             function initUserInterface(userInfo) {
+        // 显示用户信息
+        document.getElementById('currentUser').textContent = userInfo.realname || userInfo.username;
+        document.getElementById('welcomeUser').textContent = userInfo.username;
+        document.getElementById('userRole').textContent = userInfo.role === 'admin' ? '超级管理员' : '数据分析员';
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString();
+        
+        // 根据角色显示菜单
+        if (userInfo.role === 'admin') {
+          document.getElementById('adminOnlyMenu').style.display = 'block';
+          document.getElementById('adminOnlyTopNav').style.display = 'block';
+        } else {
+          // 数据分析员隐藏上传按钮
+          var uploadBtn = document.getElementById('uploadBtn');
+          if (uploadBtn) {
+            uploadBtn.style.display = 'none';
+          }
+        }
+        
+        // 显示欢迎消息
+        setTimeout(function(){
+          layer.msg('欢迎进入数据管理系统！', {icon: 6, time: 2000});
+        }, 500);
+      }
+    });
+    
+    // 页面跳转函数
+    function loadPage(page) {
+      var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      
+      // 检查权限
+      if (page === 'upload' && userInfo.role === 'analyst') {
+        layer.msg('您没有权限访问此页面！', {icon: 2});
+        return;
+      }
+      
+      switch(page) {
+        case 'tables':
+          window.location.href = 'table-management.html';
+          break;
+        case 'upload':
+          window.location.href = 'data-upload.html';
+          break;
+        case 'analysis':
+          window.location.href = 'data-analysis.html';
+          break;
+        case 'localdb':
+          window.location.href = 'local-database.html';
+          break;
+        case 'users':
+          window.location.href = 'user-management.html';
+          break;
+        case 'settings':
+        case 'logs':
+          layer.msg('该功能正在开发中...', {icon: 0});
+          break;
+        default:
+          // 保持在仪表板
+          break;
+      }
+    }
+    
+    // 退出登录
+    function logout() {
+      layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index){
+        localStorage.removeItem('currentUser');
+        layer.close(index);
+        layer.msg('已安全退出！', {icon: 1}, function(){
+          window.location.href = 'login.html';
+        });
+      });
+    }
+    
+    // 切换账户
+    function switchAccount() {
+      layer.confirm('切换账户将退出当前登录，是否继续？', {
+        icon: 3, 
+        title: '切换账户',
+        btn: ['确定', '取消']
+      }, function(index) {
+        localStorage.removeItem('currentUser');
+        layer.close(index);
+        layer.msg('正在切换账户...', {icon: 16, time: 1000}, function(){
+          window.location.href = 'login.html';
+        });
+      });
+    }
+  </script>
+</body>
+</html> 

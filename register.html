@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>用户注册 - 数据管理系统</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      margin: 0;
+    }
+    .register-container {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      padding: 40px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(10px);
+      width: 100%;
+      max-width: 450px;
+    }
+    .register-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .register-header h1 {
+      color: #333;
+      font-size: 28px;
+      margin: 0 0 10px 0;
+    }
+    .register-header p {
+      color: #666;
+      margin: 0;
+    }
+    .form-item {
+      margin-bottom: 20px;
+    }
+    .form-item label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 500;
+    }
+    .layui-input, .layui-select {
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      padding: 12px 15px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+    .layui-input:focus, .layui-select:focus {
+      border-color: #16baaa;
+      box-shadow: 0 0 0 2px rgba(22, 186, 170, 0.1);
+    }
+    .register-btn {
+      width: 100%;
+      height: 45px;
+      background: linear-gradient(135deg, #16baaa 0%, #52c41a 100%);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      margin-bottom: 20px;
+      transition: opacity 0.3s;
+    }
+    .register-btn:hover {
+      opacity: 0.9;
+    }
+    .register-links {
+      text-align: center;
+    }
+    .register-links a {
+      color: #16baaa;
+      text-decoration: none;
+      margin: 0 10px;
+    }
+    .register-links a:hover {
+      text-decoration: underline;
+    }
+    .role-desc {
+      font-size: 12px;
+      color: #999;
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+    .password-strength {
+      height: 4px;
+      background: #f0f0f0;
+      border-radius: 2px;
+      margin-top: 5px;
+      overflow: hidden;
+    }
+    .password-strength-bar {
+      height: 100%;
+      transition: width 0.3s, background-color 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <div class="register-container">
+    <div class="register-header">
+      <h1>🚀 用户注册</h1>
+      <p>创建您的数据管理系统账号</p>
+    </div>
+    
+    <form class="layui-form" lay-filter="registerForm">
+      <div class="form-item">
+        <label>用户名</label>
+        <input type="text" name="username" lay-verify="required|username" 
+               placeholder="请输入用户名" class="layui-input" autocomplete="off">
+      </div>
+      
+      <div class="form-item">
+        <label>真实姓名</label>
+        <input type="text" name="realname" lay-verify="required" 
+               placeholder="请输入真实姓名" class="layui-input" autocomplete="off">
+      </div>
+      
+      <div class="form-item">
+        <label>邮箱地址</label>
+        <input type="email" name="email" lay-verify="required|email" 
+               placeholder="请输入邮箱地址" class="layui-input" autocomplete="off">
+      </div>
+      
+      <div class="form-item">
+        <label>用户角色</label>
+        <select name="role" lay-verify="required" class="layui-select">
+          <option value="">请选择用户角色</option>
+          <option value="analyst">数据分析员</option>
+          <option value="admin">超级管理员</option>
+        </select>
+        <div class="role-desc">
+          <strong>数据分析员：</strong>只能查看和导出数据，无法修改数据内容<br>
+          <strong>超级管理员：</strong>拥有所有权限，可以查看、编辑、删除、导入导出数据
+        </div>
+      </div>
+      
+      <div class="form-item">
+        <label>登录密码</label>
+        <input type="password" name="password" lay-verify="required|password" 
+               placeholder="请输入登录密码" class="layui-input" autocomplete="off">
+        <div class="password-strength">
+          <div class="password-strength-bar"></div>
+        </div>
+      </div>
+      
+      <div class="form-item">
+        <label>确认密码</label>
+        <input type="password" name="confirmPassword" lay-verify="required|confirmPassword" 
+               placeholder="请再次输入密码" class="layui-input" autocomplete="off">
+      </div>
+      
+      <div class="form-item">
+        <input type="checkbox" name="agreement" lay-verify="required" lay-skin="primary" title="我已阅读并同意用户协议和隐私政策">
+      </div>
+      
+      <button class="register-btn" lay-submit lay-filter="registerSubmit">立即注册</button>
+      
+      <div class="register-links">
+        <a href="index.html">返回首页</a>
+        <a href="login.html">已有账号？立即登录</a>
+      </div>
+    </form>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['form', 'layer'], function(){
+      var form = layui.form;
+      var layer = layui.layer;
+      
+      // 自定义验证规则
+      form.verify({
+        username: function(value) {
+          if(value.length < 3) {
+            return '用户名至少3个字符';
+          }
+          if(!/^[a-zA-Z0-9_]+$/.test(value)) {
+            return '用户名只能包含字母、数字和下划线';
+          }
+        },
+        password: function(value) {
+          if(value.length < 6) {
+            return '密码至少6个字符';
+          }
+          updatePasswordStrength(value);
+        },
+        confirmPassword: function(value) {
+          var password = document.querySelector('input[name="password"]').value;
+          if(value !== password) {
+            return '两次输入的密码不一致';
+          }
+        }
+      });
+      
+      // 密码强度检测
+      function updatePasswordStrength(password) {
+        var strength = 0;
+        var strengthBar = document.querySelector('.password-strength-bar');
+        
+        if(password.length >= 6) strength += 25;
+        if(password.length >= 8) strength += 25;
+        if(/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 25;
+        if(/\d/.test(password)) strength += 25;
+        
+        strengthBar.style.width = strength + '%';
+        
+        if(strength < 50) {
+          strengthBar.style.backgroundColor = '#ff4d4f';
+        } else if(strength < 75) {
+          strengthBar.style.backgroundColor = '#faad14';
+        } else {
+          strengthBar.style.backgroundColor = '#52c41a';
+        }
+      }
+      
+      // 监听密码输入
+      document.querySelector('input[name="password"]').addEventListener('input', function(e) {
+        updatePasswordStrength(e.target.value);
+      });
+      
+      // 监听注册提交
+      form.on('submit(registerSubmit)', function(data) {
+        var formData = data.field;
+        
+        // 检查用户名是否已存在
+        var existingUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+        var userExists = existingUsers.some(user => user.username === formData.username);
+        
+        if(userExists) {
+          layer.msg('用户名已存在，请选择其他用户名', {icon: 2});
+          return false;
+        }
+        
+        // 检查邮箱是否已存在
+        var emailExists = existingUsers.some(user => user.email === formData.email);
+        if(emailExists) {
+          layer.msg('邮箱已被使用，请选择其他邮箱', {icon: 2});
+          return false;
+        }
+        
+        // 创建新用户
+        var newUser = {
+          id: 'user_' + Date.now(),
+          username: formData.username,
+          realname: formData.realname,
+          email: formData.email,
+          role: formData.role,
+          password: formData.password, // 实际项目中应该加密
+          status: 'active',
+          createTime: new Date().toLocaleString(),
+          loginHistory: []
+        };
+        
+        // 保存用户
+        existingUsers.push(newUser);
+        localStorage.setItem('registeredUsers', JSON.stringify(existingUsers));
+        
+        // 注册成功
+        layer.msg('注册成功！正在跳转到登录页面...', {icon: 1, time: 2000}, function(){
+          window.location.href = 'login.html';
+        });
+        
+        return false; // 阻止表单默认提交
+      });
+    });
+  </script>
+</body>
+</html> 

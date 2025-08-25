@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>数据导入 - 数据管理系统</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <link href="./src/css/app-header.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f8f9fa;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header .layui-nav {
+      background: transparent;
+    }
+    .header .layui-nav .layui-nav-item a {
+      color: rgba(255,255,255,0.9);
+    }
+    .header .layui-nav .layui-nav-item a:hover {
+      color: white;
+    }
+    .header .logo {
+      font-size: 18px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    
+    /* 主导航样式 */
+    .main-nav {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      margin: 0 20px;
+    }
+    .main-nav .layui-nav-item {
+      margin: 0 5px;
+    }
+    .main-nav .layui-nav-item a {
+      padding: 0 20px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+    .main-nav .layui-nav-item a:hover,
+    .main-nav .layui-nav-item.layui-this a {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+    .main-nav .layui-nav-item a i {
+      margin-right: 6px;
+    }
+    
+    .header .user-info {
+      white-space: nowrap;
+    }
+    
+    /* 用户下拉菜单样式 */
+    .user-info .layui-nav-child dd a {
+      padding: 10px 15px;
+      color: #666;
+      transition: all 0.3s ease;
+    }
+    .user-info .layui-nav-child dd a:hover {
+      background: #f8f9fa;
+      color: #16baaa;
+    }
+    .user-info .layui-nav-child dd a i {
+      margin-right: 8px;
+      font-size: 14px;
+    }
+    
+    .content-wrapper {
+      padding: 20px;
+    }
+    
+    .page-header {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .page-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin: 0;
+    }
+    .page-subtitle {
+      color: #666;
+      margin-top: 5px;
+    }
+    .breadcrumb {
+      color: #999;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .breadcrumb a {
+      color: #16baaa;
+      text-decoration: none;
+    }
+    
+    .upload-section {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .upload-header {
+      padding: 20px;
+      border-bottom: 1px solid #f0f0f0;
+      background: #fafafa;
+    }
+    .upload-content {
+      padding: 30px;
+    }
+    
+    .upload-area {
+      border: 2px dashed #d9d9d9;
+      border-radius: 10px;
+      padding: 60px 20px;
+      text-align: center;
+      transition: border-color 0.3s;
+      cursor: pointer;
+      background: #fafafa;
+    }
+    .upload-area:hover {
+      border-color: #16baaa;
+      background: #f0fff4;
+    }
+    .upload-area.dragover {
+      border-color: #16baaa;
+      background: #e6f7ff;
+    }
+    .upload-icon {
+      font-size: 48px;
+      color: #16baaa;
+      margin-bottom: 15px;
+    }
+    .upload-text {
+      font-size: 16px;
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .upload-hint {
+      font-size: 14px;
+      color: #999;
+      margin-bottom: 20px;
+    }
+    
+    .file-list {
+      margin-top: 20px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .file-icon {
+      font-size: 24px;
+      color: #52c41a;
+      margin-right: 15px;
+    }
+    .file-info {
+      flex: 1;
+    }
+    .file-name {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    .file-size {
+      font-size: 12px;
+      color: #999;
+    }
+    .file-progress {
+      margin: 10px 0;
+    }
+    .file-actions {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .preview-section {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      display: none;
+    }
+    .preview-header {
+      padding: 20px;
+      border-bottom: 1px solid #f0f0f0;
+      background: #fafafa;
+    }
+    .preview-content {
+      padding: 20px;
+    }
+    .preview-table {
+      width: 100%;
+      font-size: 13px;
+      border-collapse: collapse;
+    }
+    .preview-table th,
+    .preview-table td {
+      border: 1px solid #e6e6e6;
+      padding: 8px;
+      text-align: center;
+    }
+    .preview-table th {
+      background: #f8f9fa;
+      font-weight: bold;
+    }
+    
+    .settings-section {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      display: none;
+    }
+    .settings-header {
+      padding: 20px;
+      border-bottom: 1px solid #f0f0f0;
+      background: #fafafa;
+    }
+    .settings-content {
+      padding: 20px;
+    }
+    
+    .action-buttons {
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .tips-section {
+      background: #fff7e6;
+      border: 1px solid #ffd591;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .tips-title {
+      font-weight: bold;
+      color: #d46b08;
+      margin-bottom: 10px;
+    }
+    .tips-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .tips-list li {
+      color: #ad6800;
+      margin-bottom: 5px;
+      padding-left: 20px;
+      position: relative;
+    }
+    .tips-list li:before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: #fa8c16;
+    }
+  </style>
+</head>
+<body>
+  <div class="layui-header header">
+    <div class="logo">
+      📊 数据管理系统
+    </div>
+    
+    <!-- 主导航按钮 -->
+    <ul class="layui-nav main-nav">
+      <li class="layui-nav-item">
+        <a href="dashboard.html">
+          <i class="layui-icon layui-icon-home"></i> 数据仪表盘
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="table-management.html">
+          <i class="layui-icon layui-icon-table"></i> 表格管理
+        </a>
+      </li>
+      <li class="layui-nav-item layui-this">
+        <a href="data-upload.html">
+          <i class="layui-icon layui-icon-upload-drag"></i> 数据导入
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="data-analysis.html">
+          <i class="layui-icon layui-icon-chart"></i> 数据分析
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="local-database.html">
+          <i class="layui-icon layui-icon-database"></i> 本地数据库
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="tmall-database.html">
+          <i class="layui-icon layui-icon-cart"></i> 天猫数据库
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="tmall-order.html">
+          <i class="layui-icon layui-icon-list"></i> 天猫订单
+        </a>
+      </li>
+      <li class="layui-nav-item" id="adminOnlyTopNav" style="display: none;">
+        <a href="user-management.html">
+          <i class="layui-icon layui-icon-username"></i> 用户管理
+        </a>
+      </li>
+    </ul>
+    
+    
+  </div>
+  
+  <div class="content-wrapper">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <h1 class="page-title">📤 数据导入</h1>
+      <p class="page-subtitle">导入Excel文件，批量管理您的SKU库存销售数据</p>
+      <div class="breadcrumb">
+        <a href="dashboard.html">首页</a> / 数据导入
+      </div>
+    </div>
+    
+    <!-- 使用提示 -->
+    <div class="tips-section">
+      <div class="tips-title">💡 导入提示</div>
+      <ul class="tips-list">
+        <li>支持 .xlsx、.xls 格式的Excel文件</li>
+        <li>建议文件大小不超过50MB，支持几千行数据</li>
+        <li>第一行应为列标题，系统会自动识别</li>
+        <li>支持拖拽上传，也可点击选择文件</li>
+        <li>上传前会提供数据预览，确认无误后再导入</li>
+      </ul>
+    </div>
+    
+    <!-- 文件上传区域 -->
+    <div class="upload-section">
+      <div class="upload-header">
+        <h3>📁 选择Excel文件</h3>
+      </div>
+      <div class="upload-content">
+        <div class="upload-area" id="uploadArea">
+          <div class="upload-icon">📊</div>
+          <div class="upload-text">拖拽Excel文件到此处，或点击选择文件</div>
+          <div class="upload-hint">支持 .xlsx、.xls 格式，最大50MB</div>
+          <button class="layui-btn layui-btn-normal" id="selectFileBtn">
+            <i class="layui-icon layui-icon-upload"></i> 选择文件
+          </button>
+          <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+        </div>
+        
+        <div class="file-list" id="fileList">
+          <!-- 动态生成文件列表 -->
+        </div>
+      </div>
+    </div>
+    
+    <!-- 数据预览区域 -->
+    <div class="preview-section" id="previewSection">
+      <div class="preview-header">
+        <h3>👁️ 数据预览</h3>
+        <p>请确认数据格式正确，显示前10行数据</p>
+      </div>
+      <div class="preview-content">
+        <div style="overflow-x: auto;">
+          <table class="preview-table" id="previewTable">
+            <!-- 动态生成预览表格 -->
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 导入设置 -->
+    <div class="settings-section" id="settingsSection">
+      <div class="settings-header">
+        <h3>⚙️ 导入设置</h3>
+      </div>
+      <div class="settings-content">
+        <form class="layui-form" lay-filter="importSettings">
+          <div class="layui-row layui-col-space15">
+            <div class="layui-col-md6">
+              <div class="layui-form-item">
+                <label class="layui-form-label">导入方式</label>
+                <div class="layui-input-block">
+                  <input type="radio" name="importMode" value="replace" title="替换现有数据" checked>
+                  <input type="radio" name="importMode" value="append" title="追加到现有数据">
+                </div>
+              </div>
+            </div>
+            <div class="layui-col-md6">
+              <div class="layui-form-item">
+                <label class="layui-form-label">首行处理</label>
+                <div class="layui-input-block">
+                  <input type="radio" name="headerMode" value="skip" title="跳过首行（作为标题）" checked>
+                  <input type="radio" name="headerMode" value="import" title="导入首行（作为数据）">
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="layui-form-item">
+            <label class="layui-form-label">数据验证</label>
+            <div class="layui-input-block">
+              <input type="checkbox" name="validateData" title="启用数据验证" checked lay-skin="primary">
+              <input type="checkbox" name="skipErrors" title="跳过错误数据" lay-skin="primary">
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- 操作按钮 -->
+    <div class="action-buttons" id="actionButtons" style="display: none;">
+      <button class="layui-btn layui-btn-lg" onclick="startImport()">
+        <i class="layui-icon layui-icon-ok"></i> 开始导入
+      </button>
+      <button class="layui-btn layui-btn-primary layui-btn-lg" onclick="cancelImport()">
+        取消
+      </button>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['form', 'layer', 'upload'], function(){
+      var form = layui.form;
+      var layer = layui.layer;
+      var upload = layui.upload;
+      
+              var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      var currentFile = null;
+      
+      // 初始化页面
+      initPage();
+      
+      function initPage() {
+        // 检查登录状态和权限
+        if (!userInfo.username) {
+          layer.msg('请先登录！', {icon: 2}, function(){
+            window.location.href = 'login.html';
+          });
+          return;
+        }
+        
+        if (userInfo.role !== 'admin') {
+          layer.msg('您没有权限访问此页面！', {icon: 2}, function(){
+            window.location.href = 'dashboard.html';
+          });
+          return;
+        }
+        
+        // 显示用户信息（可选）
+        var cu = document.getElementById('currentUser');
+        if (cu) cu.textContent = userInfo.realname || userInfo.username;
+        
+        // 显示管理员专用导航
+        if (userInfo.role === 'admin') {
+          document.getElementById('adminOnlyTopNav').style.display = 'block';
+        }
+        
+        // 初始化拖拽上传
+        initDragUpload();
+        
+        // 绑定文件选择
+        document.getElementById('selectFileBtn').onclick = function() {
+          document.getElementById('fileInput').click();
+        };
+        
+        document.getElementById('fileInput').onchange = function(e) {
+          handleFileSelect(e.target.files);
+        };
+      }
+      
+      function initDragUpload() {
+        var uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+          e.preventDefault();
+          uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+          e.preventDefault();
+          uploadArea.classList.remove('dragover');
+          handleFileSelect(e.dataTransfer.files);
+        });
+      }
+      
+      function handleFileSelect(files) {
+        if (!files || files.length === 0) return;
+        
+        var file = files[0];
+        
+        // 检查文件类型
+        var allowedTypes = [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+          'application/vnd.ms-excel' // .xls
+        ];
+        
+        if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+          layer.msg('请选择Excel文件（.xlsx或.xls格式）', {icon: 2});
+          return;
+        }
+        
+        // 检查文件大小（50MB）
+        if (file.size > 50 * 1024 * 1024) {
+          layer.msg('文件大小不能超过50MB', {icon: 2});
+          return;
+        }
+        
+        currentFile = file;
+        displayFileInfo(file);
+        
+        // 模拟文件读取和预览
+        setTimeout(function() {
+          showPreview();
+        }, 1000);
+      }
+      
+      function displayFileInfo(file) {
+        var fileList = document.getElementById('fileList');
+        var fileSize = (file.size / 1024 / 1024).toFixed(2) + 'MB';
+        
+        fileList.innerHTML = `
+          <div class="file-item">
+            <div class="file-icon">📊</div>
+            <div class="file-info">
+              <div class="file-name">${file.name}</div>
+              <div class="file-size">大小: ${fileSize} | 类型: Excel文件</div>
+              <div class="file-progress">
+                <div class="layui-progress" lay-showpercent="yes">
+                  <div class="layui-progress-bar layui-bg-blue" lay-percent="100%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="file-actions">
+              <button class="layui-btn layui-btn-xs layui-btn-normal" onclick="showPreview()">预览</button>
+              <button class="layui-btn layui-btn-xs layui-btn-danger" onclick="removeFile()">删除</button>
+            </div>
+          </div>
+        `;
+      }
+      
+      function showPreview() {
+        if (!currentFile) return;
+        
+        // 显示预览区域
+        document.getElementById('previewSection').style.display = 'block';
+        document.getElementById('settingsSection').style.display = 'block';
+        document.getElementById('actionButtons').style.display = 'block';
+        
+        // 模拟Excel数据解析和预览
+        var mockPreviewData = [
+          ['SKU', '最新库存', '动态库存', '最新库存', '动态库存', '销售数量', '06/25初始值', '07/07 11h3', '07/07 14h3', '07/08 11h3'],
+          ['X00000567301XL', '0', '0', '0', '0', '0', '0', '10', '8', ''],
+          ['X00000567302L', '0', '0', '0', '0', '32', '32', '10', '8', ''],
+          ['X00000567302S', '0', '0', '0', '0', '0', '0', '', '', ''],
+          ['X00000604404NA', '0', '0', '0', '0', '0', '0', '', '', ''],
+          ['X00000604405NA', '24', '24', '24', '32', '19', '43', '36', '35', '33']
+        ];
+        
+        var tableHtml = '';
+        mockPreviewData.forEach(function(row, index) {
+          var rowClass = index === 0 ? ' style="background: #f0f0f0; font-weight: bold;"' : '';
+          tableHtml += '<tr' + rowClass + '>';
+          row.forEach(function(cell) {
+            var tag = index === 0 ? 'th' : 'td';
+            tableHtml += '<' + tag + '>' + (cell || '') + '</' + tag + '>';
+          });
+          tableHtml += '</tr>';
+        });
+        
+        document.getElementById('previewTable').innerHTML = tableHtml;
+        
+        layer.msg('文件解析完成，请检查数据预览', {icon: 1});
+      }
+      
+      window.removeFile = function() {
+        currentFile = null;
+        document.getElementById('fileList').innerHTML = '';
+        document.getElementById('previewSection').style.display = 'none';
+        document.getElementById('settingsSection').style.display = 'none';
+        document.getElementById('actionButtons').style.display = 'none';
+        document.getElementById('fileInput').value = '';
+      };
+      
+      window.startImport = function() {
+        if (!currentFile) {
+          layer.msg('请先选择文件', {icon: 2});
+          return;
+        }
+        
+        var formSettings = form.val('importSettings');
+        
+        layer.confirm('确定要开始导入数据吗？<br><small>导入方式：' + 
+          (formSettings.importMode === 'replace' ? '替换现有数据' : '追加到现有数据') + '</small>', 
+          {icon: 3, title: '确认导入'}, function(index){
+          
+          // 显示导入进度
+          var loadIndex = layer.load(2, {content: '正在上传文件，请稍候...'});
+          
+          // 创建FormData对象
+          var formData = new FormData();
+          formData.append('file', currentFile);
+          formData.append('description', '通过数据导入页面上传');
+          
+          // 获取JWT令牌
+          var token = userInfo.token || localStorage.getItem('token');
+          var headers = {};
+          
+          if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+          }
+          
+          // 真实的文件上传
+          fetch('/api/files/upload', {
+            method: 'POST',
+            headers: headers,
+            body: formData
+          })
+          .then(response => response.json())
+          .then(data => {
+            layer.close(loadIndex);
+            layer.close(index);
+            
+            if (data.success) {
+              layer.alert('文件上传成功！<br>' +
+                '• 文件名：<strong>' + data.file.originalName + '</strong><br>' +
+                '• 工作表数：<strong>' + data.file.sheetNames.length + '</strong><br>' +
+                '• 数据行数：<strong>' + data.file.rowCount + '</strong><br>' +
+                '• 数据列数：<strong>' + data.file.colCount + '</strong>', 
+                {icon: 1, title: '上传完成'}, function(){
+                  // 跳转到表格管理页面
+                  window.location.href = 'table-management.html';
+                });
+            } else {
+              layer.msg('上传失败: ' + data.error, {icon: 2});
+            }
+          })
+          .catch(error => {
+            layer.close(loadIndex);
+            layer.close(index);
+            console.error('上传错误:', error);
+            layer.msg('网络错误，上传失败', {icon: 2});
+          });
+        });
+      };
+      
+      window.cancelImport = function() {
+        window.location.href = 'dashboard.html';
+      };
+    });
+    
+    // 退出登录
+          function logout() {
+        layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index){
+          localStorage.removeItem('currentUser');
+          layer.close(index);
+          layer.msg('已安全退出！', {icon: 1}, function(){
+            window.location.href = 'login.html';
+          });
+        });
+      }
+      
+      // 切换账户
+      function switchAccount() {
+        layer.confirm('切换账户将退出当前登录，是否继续？', {
+          icon: 3, 
+          title: '切换账户',
+          btn: ['确定', '取消']
+        }, function(index) {
+          localStorage.removeItem('currentUser');
+          layer.close(index);
+          layer.msg('正在切换账户...', {icon: 16, time: 1000}, function(){
+            window.location.href = 'login.html';
+          });
+        });
+      }
+  </script>
+</body>
+</html> 

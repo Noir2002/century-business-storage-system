@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>个人资料 - 数据管理系统</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <link href="./src/css/app-header.css" rel="stylesheet">
+  <style>
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header .layui-nav {
+      background: transparent;
+    }
+    .header .layui-nav .layui-nav-item a {
+      color: rgba(255,255,255,0.9);
+    }
+    .header .layui-nav .layui-nav-item a:hover {
+      color: white;
+    }
+    .header .logo {
+      font-size: 18px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    
+    /* 主导航样式 */
+    .main-nav {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      margin: 0 20px;
+    }
+    .main-nav .layui-nav-item {
+      margin: 0 5px;
+    }
+    .main-nav .layui-nav-item a {
+      padding: 0 20px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+    .main-nav .layui-nav-item a:hover,
+    .main-nav .layui-nav-item.layui-this a {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+    .main-nav .layui-nav-item a i {
+      margin-right: 6px;
+    }
+    
+    .header .user-info {
+      white-space: nowrap;
+    }
+    
+    /* 用户下拉菜单样式 */
+    .user-info .layui-nav-child dd a {
+      padding: 10px 15px;
+      color: #666;
+      transition: all 0.3s ease;
+    }
+    .user-info .layui-nav-child dd a:hover {
+      background: #f8f9fa;
+      color: #16baaa;
+    }
+    .user-info .layui-nav-child dd a i {
+      margin-right: 8px;
+      font-size: 14px;
+    }
+    
+    .layui-body {
+      background: #f8f9fa;
+      padding: 15px;
+    }
+    
+    .profile-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .profile-header {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .avatar-container {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 20px;
+    }
+    
+    .avatar {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: 4px solid #fff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      object-fit: cover;
+    }
+    
+    .avatar-upload {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 36px;
+      height: 36px;
+      background: #16baaa;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .avatar-upload:hover {
+      background: #14a085;
+      transform: scale(1.1);
+    }
+    
+    .profile-info {
+      margin-top: 20px;
+    }
+    
+    .profile-name {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    
+    .profile-role {
+      color: #16baaa;
+      font-size: 14px;
+      padding: 4px 12px;
+      background: rgba(22, 186, 170, 0.1);
+      border-radius: 15px;
+      display: inline-block;
+    }
+    
+    .profile-stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 20px;
+    }
+    
+    .stat-item {
+      text-align: center;
+    }
+    
+    .stat-number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #16baaa;
+      display: block;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #999;
+      margin-top: 5px;
+    }
+    
+    .profile-tabs {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .layui-tab-title {
+      background: #f8f9fa;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .layui-tab-content {
+      padding: 30px;
+    }
+    
+    .form-section {
+      margin-bottom: 30px;
+    }
+    
+    .section-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #16baaa;
+      display: inline-block;
+    }
+    
+    .layui-form-item {
+      margin-bottom: 20px;
+    }
+    
+    .activity-item {
+      display: flex;
+      align-items: center;
+      padding: 15px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .activity-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 15px;
+      color: white;
+      font-size: 16px;
+    }
+    
+    .activity-icon.login { background: #16baaa; }
+    .activity-icon.upload { background: #52c41a; }
+    .activity-icon.export { background: #fa8c16; }
+    .activity-icon.edit { background: #1890ff; }
+    
+    .activity-content {
+      flex: 1;
+    }
+    
+    .activity-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    
+    .activity-time {
+      font-size: 12px;
+      color: #999;
+    }
+    
+    .password-strength {
+      margin-top: 5px;
+    }
+    
+    .strength-bar {
+      height: 4px;
+      background: #f0f0f0;
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 5px 0;
+    }
+    
+    .strength-fill {
+      height: 100%;
+      transition: all 0.3s ease;
+      border-radius: 2px;
+    }
+    
+    .strength-weak { background: #f5222d; width: 33%; }
+    .strength-medium { background: #fa8c16; width: 66%; }
+    .strength-strong { background: #52c41a; width: 100%; }
+    
+    .strength-text {
+      font-size: 12px;
+      margin-top: 2px;
+    }
+    
+    .text-weak { color: #f5222d; }
+    .text-medium { color: #fa8c16; }
+    .text-strong { color: #52c41a; }
+  </style>
+</head>
+<body>
+  <div class="layui-layout layui-layout-admin">
+    <div class="layui-header header">
+      <div class="logo">
+        📊 数据管理系统
+      </div>
+      
+      <!-- 主导航按钮 -->
+      <ul class="layui-nav main-nav">
+        <li class="layui-nav-item">
+          <a href="dashboard.html">
+            <i class="layui-icon layui-icon-home"></i> 数据仪表盘
+          </a>
+        </li>
+        <li class="layui-nav-item">
+          <a href="table-management.html">
+            <i class="layui-icon layui-icon-table"></i> 表格管理
+          </a>
+        </li>
+        <li class="layui-nav-item">
+          <a href="data-upload.html">
+            <i class="layui-icon layui-icon-upload-drag"></i> 数据导入
+          </a>
+        </li>
+        <li class="layui-nav-item">
+          <a href="data-analysis.html">
+            <i class="layui-icon layui-icon-chart"></i> 数据分析
+          </a>
+        </li>
+        <li class="layui-nav-item">
+          <a href="local-database.html">
+            <i class="layui-icon layui-icon-database"></i> 本地数据库
+          </a>
+        </li>
+        <li class="layui-nav-item">
+          <a href="tmall-database.html">
+            <i class="layui-icon layui-icon-cart"></i> 天猫数据库
+          </a>
+        </li>
+        <li class="layui-nav-item">
+          <a href="tmall-order.html">
+            <i class="layui-icon layui-icon-list"></i> 天猫订单
+          </a>
+        </li>
+        <li class="layui-nav-item" id="adminOnlyTopNav" style="display: none;">
+          <a href="user-management.html">
+            <i class="layui-icon layui-icon-username"></i> 用户管理
+          </a>
+        </li>
+      </ul>
+      
+      <ul class="layui-nav layui-layout-right user-info">
+        
+      </ul>
+    </div>
+    
+    <div class="layui-body">
+      <div class="profile-container">
+        <!-- 个人资料头部 -->
+        <div class="profile-header">
+          <div class="avatar-container">
+            <img src="//t.cn/RCzsdCq" alt="头像" class="avatar" id="userAvatar">
+            <div class="avatar-upload" onclick="uploadAvatar()">
+              <i class="layui-icon layui-icon-camera"></i>
+            </div>
+          </div>
+          <div class="profile-info">
+            <div class="profile-name" id="profileName">张三</div>
+            <div class="profile-role" id="profileRole">超级管理员</div>
+            <div class="profile-stats">
+              <div class="stat-item">
+                <span class="stat-number">156</span>
+                <div class="stat-label">数据导入次数</div>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number">89</span>
+                <div class="stat-label">报表生成次数</div>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number">24</span>
+                <div class="stat-label">在线天数</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 详细信息标签页 -->
+        <div class="profile-tabs">
+          <div class="layui-tab layui-tab-brief" lay-filter="profileTab">
+            <ul class="layui-tab-title">
+              <li class="layui-this">基本信息</li>
+              <li>修改密码</li>
+              <li>登录历史</li>
+            </ul>
+            <div class="layui-tab-content">
+              <!-- 基本信息 -->
+              <div class="layui-tab-item layui-show">
+                <form class="layui-form" action="">
+                  <div class="form-section">
+                    <div class="section-title">个人信息</div>
+                    <div class="layui-row layui-col-space15">
+                      <div class="layui-col-md6">
+                        <div class="layui-form-item">
+                          <label class="layui-form-label">用户名</label>
+                          <div class="layui-input-block">
+                            <input type="text" name="username" value="admin" readonly class="layui-input layui-disabled">
+                          </div>
+                        </div>
+                      </div>
+                      <div class="layui-col-md6">
+                        <div class="layui-form-item">
+                          <label class="layui-form-label">真实姓名</label>
+                          <div class="layui-input-block">
+                            <input type="text" name="realname" value="张三" placeholder="请输入真实姓名" class="layui-input">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="layui-row layui-col-space15">
+                      <div class="layui-col-md6">
+                        <div class="layui-form-item">
+                          <label class="layui-form-label">邮箱</label>
+                          <div class="layui-input-block">
+                            <input type="email" name="email" value="admin@company.com" placeholder="请输入邮箱" class="layui-input">
+                          </div>
+                        </div>
+                      </div>
+                      <div class="layui-col-md6">
+                        <div class="layui-form-item">
+                          <label class="layui-form-label">手机号</label>
+                          <div class="layui-input-block">
+                            <input type="tel" name="phone" value="13800138000" placeholder="请输入手机号" class="layui-input">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="layui-row layui-col-space15">
+                      <div class="layui-col-md6">
+                        <div class="layui-form-item">
+                          <label class="layui-form-label">部门</label>
+                          <div class="layui-input-block">
+                            <select name="department">
+                              <option value="it">IT部门</option>
+                              <option value="finance">财务部门</option>
+                              <option value="sales">销售部门</option>
+                              <option value="hr">人事部门</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="layui-col-md6">
+                        <div class="layui-form-item">
+                          <label class="layui-form-label">职位</label>
+                          <div class="layui-input-block">
+                            <input type="text" name="position" value="系统管理员" placeholder="请输入职位" class="layui-input">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="form-section">
+                    <div class="section-title">系统信息</div>
+                    <div class="layui-row layui-col-space15">
+                      <div class="layui-col-md6">
+                        <div class="layui-form-item">
+                          <label class="layui-form-label">注册时间</label>
+                          <div class="layui-input-block">
+                            <input type="text" value="2024-01-15 09:30:00" readonly class="layui-input layui-disabled">
+                          </div>
+                        </div>
+                      </div>
+                      <div class="layui-col-md6">
+                        <div class="layui-form-item">
+                          <label class="layui-form-label">最后登录</label>
+                          <div class="layui-input-block">
+                            <input type="text" value="2024-01-20 14:25:00" readonly class="layui-input layui-disabled">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="layui-row layui-col-space15">
+                      <div class="layui-col-md6">
+                        <div class="layui-form-item">
+                          <label class="layui-form-label">用户状态</label>
+                          <div class="layui-input-block">
+                            <input type="checkbox" name="status" checked title="启用" lay-skin="switch">
+                          </div>
+                        </div>
+                      </div>
+                      <div class="layui-col-md6">
+                        <div class="layui-form-item">
+                          <label class="layui-form-label">角色权限</label>
+                          <div class="layui-input-block">
+                            <input type="text" value="超级管理员" readonly class="layui-input layui-disabled">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="layui-form-item">
+                    <div class="layui-input-block">
+                      <button class="layui-btn" lay-submit lay-filter="profileForm">保存修改</button>
+                      <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+              
+              <!-- 修改密码 -->
+              <div class="layui-tab-item">
+                <form class="layui-form" action="">
+                  <div class="form-section">
+                    <div class="section-title">密码设置</div>
+                    <div class="layui-form-item">
+                      <label class="layui-form-label">当前密码</label>
+                      <div class="layui-input-block">
+                        <input type="password" name="currentPassword" placeholder="请输入当前密码" class="layui-input" lay-verify="required">
+                      </div>
+                    </div>
+                    <div class="layui-form-item">
+                      <label class="layui-form-label">新密码</label>
+                      <div class="layui-input-block">
+                        <input type="password" name="newPassword" placeholder="请输入新密码" class="layui-input" lay-verify="required" onkeyup="checkPasswordStrength(this.value)">
+                        <div class="password-strength">
+                          <div class="strength-bar">
+                            <div class="strength-fill" id="strengthFill"></div>
+                          </div>
+                          <div class="strength-text" id="strengthText">密码强度：请输入密码</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="layui-form-item">
+                      <label class="layui-form-label">确认密码</label>
+                      <div class="layui-input-block">
+                        <input type="password" name="confirmPassword" placeholder="请再次输入新密码" class="layui-input" lay-verify="required">
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="layui-form-item">
+                    <div class="layui-input-block">
+                      <button class="layui-btn" lay-submit lay-filter="passwordForm">修改密码</button>
+                      <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+              
+              <!-- 登录历史 -->
+              <div class="layui-tab-item">
+                <div class="form-section">
+                  <div class="section-title">最近登录记录</div>
+                  <div id="loginHistory">
+                    <div class="activity-item">
+                      <div class="activity-icon login">
+                        <i class="layui-icon layui-icon-login-qq"></i>
+                      </div>
+                      <div class="activity-content">
+                        <div class="activity-title">登录系统</div>
+                        <div class="activity-time">IP: 192.168.1.100 | 2024-01-20 14:25:33</div>
+                      </div>
+                    </div>
+                    <div class="activity-item">
+                      <div class="activity-icon upload">
+                        <i class="layui-icon layui-icon-upload"></i>
+                      </div>
+                      <div class="activity-content">
+                        <div class="activity-title">上传Excel文件</div>
+                        <div class="activity-time">文件: 销售数据.xlsx | 2024-01-20 13:45:12</div>
+                      </div>
+                    </div>
+                    <div class="activity-item">
+                      <div class="activity-icon export">
+                        <i class="layui-icon layui-icon-download-circle"></i>
+                      </div>
+                      <div class="activity-content">
+                        <div class="activity-title">导出报表</div>
+                        <div class="activity-time">报表: 月度库存分析 | 2024-01-20 12:30:45</div>
+                      </div>
+                    </div>
+                    <div class="activity-item">
+                      <div class="activity-icon edit">
+                        <i class="layui-icon layui-icon-edit"></i>
+                      </div>
+                      <div class="activity-content">
+                        <div class="activity-title">修改个人信息</div>
+                        <div class="activity-time">更新邮箱信息 | 2024-01-19 16:20:11</div>
+                      </div>
+                    </div>
+                    <div class="activity-item">
+                      <div class="activity-icon login">
+                        <i class="layui-icon layui-icon-login-qq"></i>
+                      </div>
+                      <div class="activity-content">
+                        <div class="activity-title">登录系统</div>
+                        <div class="activity-time">IP: 192.168.1.100 | 2024-01-19 09:15:22</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['element', 'form', 'layer', 'nav'], function(){
+      var element = layui.element;
+      var form = layui.form;
+      var layer = layui.layer;
+      var nav = layui.nav;
+      
+      // 初始化用户信息
+      function initUserInfo() {
+        const userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        if (userInfo.username) {
+          var cu = document.getElementById('currentUser');
+          if (cu) cu.textContent = userInfo.realname || userInfo.username;
+          document.getElementById('profileName').textContent = userInfo.realname || userInfo.username;
+          document.getElementById('profileRole').textContent = userInfo.role === 'admin' ? '超级管理员' : '数据分析员';
+          
+          // 填充表单
+          form.val('', {
+            username: userInfo.username,
+            realname: userInfo.realname || '',
+            email: userInfo.email || '',
+            phone: userInfo.phone || '',
+            department: userInfo.department || 'it',
+            position: userInfo.position || ''
+          });
+          
+          // 管理员权限控制
+          if (userInfo.role === 'admin') {
+            document.getElementById('adminOnlyTopNav').style.display = 'block';
+          }
+        }
+      }
+      
+      // 个人信息表单提交
+      form.on('submit(profileForm)', function(data){
+        const userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        
+        // 更新用户信息
+        Object.assign(userInfo, data.field);
+        localStorage.setItem('currentUser', JSON.stringify(userInfo));
+        
+        // 更新显示
+        document.getElementById('currentUser').textContent = userInfo.realname || userInfo.username;
+        document.getElementById('profileName').textContent = userInfo.realname || userInfo.username;
+        
+        layer.msg('个人信息更新成功！', {icon: 1});
+        return false;
+      });
+      
+      // 密码修改表单提交
+      form.on('submit(passwordForm)', function(data){
+        const field = data.field;
+        
+        // 验证密码
+        if (field.newPassword !== field.confirmPassword) {
+          layer.msg('两次输入的密码不一致！', {icon: 2});
+          return false;
+        }
+        
+        if (field.newPassword.length < 6) {
+          layer.msg('新密码长度不能少于6位！', {icon: 2});
+          return false;
+        }
+        
+        // 模拟密码修改
+        layer.msg('密码修改成功！', {icon: 1});
+        
+        // 清空表单
+        document.querySelector('form').reset();
+        
+        return false;
+      });
+      
+      // 初始化
+      initUserInfo();
+    });
+    
+    // 头像上传
+    function uploadAvatar() {
+      // 创建文件输入
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      
+      input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            document.getElementById('userAvatar').src = e.target.result;
+            // 这里可以将头像上传到服务器
+            layer.msg('头像更新成功！', {icon: 1});
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      
+      input.click();
+    }
+    
+    // 密码强度检测
+    function checkPasswordStrength(password) {
+      const strengthFill = document.getElementById('strengthFill');
+      const strengthText = document.getElementById('strengthText');
+      
+      if (!password) {
+        strengthFill.className = 'strength-fill';
+        strengthText.textContent = '密码强度：请输入密码';
+        strengthText.className = 'strength-text';
+        return;
+      }
+      
+      let strength = 0;
+      let strengthLabel = '';
+      let strengthClass = '';
+      
+      // 长度检查
+      if (password.length >= 6) strength++;
+      if (password.length >= 10) strength++;
+      
+      // 复杂性检查
+      if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+      if (/\d/.test(password)) strength++;
+      if (/[^a-zA-Z0-9]/.test(password)) strength++;
+      
+      if (strength <= 2) {
+        strengthLabel = '弱';
+        strengthClass = 'strength-weak text-weak';
+      } else if (strength <= 4) {
+        strengthLabel = '中等';
+        strengthClass = 'strength-medium text-medium';
+      } else {
+        strengthLabel = '强';
+        strengthClass = 'strength-strong text-strong';
+      }
+      
+      strengthFill.className = 'strength-fill ' + strengthClass.split(' ')[0];
+      strengthText.textContent = '密码强度：' + strengthLabel;
+      strengthText.className = 'strength-text ' + strengthClass.split(' ')[1];
+    }
+    
+    // 退出登录
+    function logout() {
+      layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index) {
+        localStorage.removeItem('currentUser');
+        layer.close(index);
+        layer.msg('已安全退出！', {icon: 1}, function(){
+          window.location.href = 'login.html';
+        });
+      });
+    }
+    
+    // 切换账户
+    function switchAccount() {
+      layer.confirm('切换账户将退出当前登录，是否继续？', {
+        icon: 3, 
+        title: '切换账户',
+        btn: ['确定', '取消']
+      }, function(index) {
+        localStorage.removeItem('currentUser');
+        layer.close(index);
+        layer.msg('正在切换账户...', {icon: 16, time: 1000}, function(){
+          window.location.href = 'login.html';
+        });
+      });
+    }
+  </script>
+</body>
+</html> 

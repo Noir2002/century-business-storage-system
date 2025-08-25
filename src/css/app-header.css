@@ -1,0 +1,65 @@
+/* 统一头部导航样式（全站通用） */
+.header {
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	color: #fff;
+	padding: 0 15px;
+	box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	position: relative;
+	z-index: 10;
+}
+.header .logo {
+	font-size: 18px;
+	font-weight: 700;
+	white-space: nowrap;
+	flex: 0 0 auto;
+}
+.header .main-nav {
+	flex: 1 1 auto;
+	display: flex;
+	justify-content: center;
+	margin: 0 12px;
+	min-width: 0;
+	white-space: nowrap;
+}
+.header .main-nav .layui-nav-item a {
+	padding: 0 18px;
+	border-radius: 6px;
+	transition: all .2s ease;
+	color: rgba(255,255,255,.9);
+}
+.header .main-nav .layui-nav-item a:hover,
+.header .main-nav .layui-nav-item.layui-this a {
+	background: rgba(255,255,255,.2);
+	color: #fff;
+}
+.header .user-info {
+	flex: 0 0 auto;
+	margin-left: auto;
+	white-space: nowrap;
+}
+.header .user-info .layui-nav-item > a {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.header .user-info .layui-nav-img {
+	width: 28px;
+	height: 28px;
+	object-fit: cover;
+}
+.header .layui-nav { background: transparent; }
+
+@media (max-width: 1200px) {
+	.header .main-nav .layui-nav-item a { padding: 0 12px; }
+}
+
+@media (max-width: 992px) {
+	.header { padding: 0 10px; }
+	.header .logo { font-size: 16px; }
+	.header .main-nav { margin: 0 6px; }
+}
+
+

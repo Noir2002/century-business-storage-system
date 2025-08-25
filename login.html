@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>数据管理系统 - 用户登录</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      height: 100vh;
+      overflow: hidden;
+    }
+    .login-container {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 400px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 15px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+      padding: 40px;
+    }
+    .login-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .login-header h1 {
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 10px;
+      font-weight: 300;
+    }
+    .login-header p {
+      color: #666;
+      font-size: 14px;
+    }
+    .login-form .layui-form-item {
+      margin-bottom: 20px;
+    }
+    .login-form .layui-input {
+      height: 45px;
+      line-height: 45px;
+      border-radius: 8px;
+      border: 1px solid #e6e6e6;
+      padding-left: 15px;
+    }
+    .login-form .layui-input:focus {
+      border-color: #16baaa;
+      box-shadow: 0 0 0 2px rgba(22, 186, 170, 0.2);
+    }
+    .login-btn {
+      width: 100%;
+      height: 45px;
+      line-height: 45px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #16baaa 0%, #1e9cbb 100%);
+      border: none;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+    .role-tips {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+      font-size: 12px;
+      color: #666;
+    }
+    .role-tips h4 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    .demo-accounts {
+      margin-top: 15px;
+      font-size: 11px;
+      color: #999;
+      text-align: center;
+    }
+    .demo-accounts span {
+      display: inline-block;
+      margin: 0 10px;
+      cursor: pointer;
+      color: #16baaa;
+    }
+    .demo-accounts span:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <h1>📊 数据管理系统</h1>
+      <p>企业级表格数据管理平台</p>
+    </div>
+    
+    <form class="layui-form login-form" lay-filter="loginForm">
+      <div class="layui-form-item">
+        <input type="text" name="username" placeholder="请输入用户名" class="layui-input" lay-verify="required" autocomplete="off">
+      </div>
+      
+      <div class="layui-form-item">
+        <input type="password" name="password" placeholder="请输入密码" class="layui-input" lay-verify="required" autocomplete="off">
+      </div>
+      
+      <div class="layui-form-item">
+        <select name="role" lay-verify="required">
+          <option value="">请选择登录角色</option>
+          <option value="admin">👑 超级管理员</option>
+          <option value="analyst">📊 数据分析员</option>
+        </select>
+      </div>
+      
+      <div class="layui-form-item">
+        <input type="checkbox" name="remember" title="记住我" lay-skin="primary">
+      </div>
+      
+      <div class="layui-form-item">
+        <button class="layui-btn login-btn" lay-submit lay-filter="login">立即登录</button>
+      </div>
+    </form>
+    
+    <div class="role-tips">
+      <h4>🔐 角色权限说明：</h4>
+      <p><strong>👑 超级管理员：</strong>拥有所有权限，可以查看、编辑、删除、导入导出数据</p>
+      <p><strong>📊 数据分析员：</strong>只能查看和导出数据，无法修改</p>
+    </div>
+    
+    <div class="demo-accounts">
+      演示账号：
+      <span onclick="fillDemo('admin')">管理员登录</span> | 
+      <span onclick="fillDemo('analyst')">分析员登录</span>
+    </div>
+    
+    <div class="register-link" style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+      <p style="color: #666; margin-bottom: 10px;">还没有账号？</p>
+      <a href="register.html" style="color: #16baaa; text-decoration: none; font-weight: 500;">
+        🚀 立即注册
+      </a>
+      <span style="margin: 0 10px; color: #ccc;">|</span>
+      <a href="index.html" style="color: #666; text-decoration: none;">
+        返回首页
+      </a>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['form', 'layer'], function(){
+      var form = layui.form;
+      var layer = layui.layer;
+      
+      // 监听登录提交
+      form.on('submit(login)', function(data){
+        var field = data.field;
+        
+        // 登录验证
+        var isValid = false;
+        var userInfo = {};
+        
+        // 首先检查注册用户
+        var registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+        var registeredUser = registeredUsers.find(user => 
+          user.username === field.username && 
+          user.password === field.password && 
+          user.role === field.role &&
+          user.status === 'active'
+        );
+        
+        if(registeredUser) {
+          isValid = true;
+          userInfo = {
+            username: registeredUser.username,
+            realname: registeredUser.realname,
+            email: registeredUser.email,
+            role: registeredUser.role,
+            roleName: registeredUser.role === 'admin' ? '超级管理员' : '数据分析员',
+            permissions: registeredUser.role === 'admin' ? 
+              ['view', 'edit', 'delete', 'import', 'export', 'manage'] : 
+              ['view', 'export']
+          };
+          
+          // 记录登录历史
+          registeredUser.loginHistory.push({
+            time: new Date().toLocaleString(),
+            ip: '本地登录'
+          });
+          localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
+        }
+        // 演示账号验证（保持兼容性）
+        else if(field.username === 'admin' && field.password === '123456' && field.role === 'admin') {
+          isValid = true;
+          userInfo = {
+            username: 'admin',
+            role: 'admin',
+            roleName: '超级管理员',
+            permissions: ['view', 'edit', 'delete', 'import', 'export', 'manage']
+          };
+        } else if(field.username === 'analyst' && field.password === '123456' && field.role === 'analyst') {
+          isValid = true;
+          userInfo = {
+            username: 'analyst',
+            role: 'analyst',
+            roleName: '数据分析员',
+            permissions: ['view', 'export']
+          };
+        }
+        
+        if(isValid) {
+          // 调用后端API获取JWT令牌
+          fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              username: field.username,
+              password: field.password,
+              role: field.role
+            })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              // 保存完整的用户信息和令牌
+              var completeUserInfo = {
+                ...userInfo,
+                ...data.user,
+                token: data.token
+              };
+              
+              localStorage.setItem('currentUser', JSON.stringify(completeUserInfo));
+              localStorage.setItem('token', data.token);
+              
+              layer.msg('登录成功！正在跳转...', {icon: 1, time: 800}, function(){
+                window.location.href = 'dashboard.html';
+              });
+            } else {
+              layer.msg('后端认证失败: ' + data.error, {icon: 2});
+              // 如果后端认证失败，仍然使用前端认证
+              localStorage.setItem('currentUser', JSON.stringify(userInfo));
+              window.location.href = 'dashboard.html';
+            }
+          })
+          .catch(error => {
+            console.warn('后端API调用失败，使用前端认证:', error);
+            // 如果后端不可用，仍然使用前端认证
+            localStorage.setItem('currentUser', JSON.stringify(userInfo));
+            layer.msg('登录成功！正在跳转...', {icon: 1, time: 800}, function(){
+              window.location.href = 'dashboard.html';
+            });
+          });
+        } else {
+          layer.msg('用户名、密码或角色不正确！', {icon: 2});
+        }
+        
+        return false;
+      });
+    });
+    
+    // 快速填充演示账号
+    function fillDemo(type) {
+      if(type === 'admin') {
+        document.querySelector('input[name="username"]').value = 'admin';
+        document.querySelector('input[name="password"]').value = '123456';
+        document.querySelector('select[name="role"]').value = 'admin';
+      } else if(type === 'analyst') {
+        document.querySelector('input[name="username"]').value = 'analyst';
+        document.querySelector('input[name="password"]').value = '123456';
+        document.querySelector('select[name="role"]').value = 'analyst';
+      }
+      layui.form.render('select');
+    }
+  </script>
+</body>
+</html> 
