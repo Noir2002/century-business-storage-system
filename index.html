@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>数据管理系统 - 首页导航</title>
+  <title>Century Business System - 企业数据管理平台</title>
   <link href="./src/css/layui.css" rel="stylesheet">
   <style>
     body {
@@ -183,8 +183,8 @@
 <body>
   <div class="main-container">
     <div class="header-section">
-      <h1>📊 数据管理系统</h1>
-      <p>企业级表格数据管理平台 - 基于Layui构建</p>
+      <h1>🏢 Century Business System</h1>
+      <p>企业级数据管理平台 - 整合库存管理与文件存储</p>
     </div>
     
     <div class="nav-cards">
@@ -208,6 +208,16 @@
         <button class="card-button">进入虚拟库存</button>
       </a>
 
+      <a href="r2-manager.html" class="nav-card">
+        <div class="card-icon">☁️</div>
+        <div class="card-title">云存储管理</div>
+        <div class="card-desc">
+          Cloudflare R2 对象存储<br>
+          管理文件上传、下载和清理
+        </div>
+        <button class="card-button">进入云存储</button>
+      </a>
+      
       <a href="register.html" class="nav-card">
         <div class="card-icon">🚀</div>
         <div class="card-title">用户注册</div>
@@ -321,6 +331,7 @@
   </div>
 
   <script src="./src/layui.js"></script>
+  <script src="api-config.js"></script>
   <script>
     layui.use(['layer'], function(){
       var layer = layui.layer;

@@ -4,10 +4,10 @@ class CloudflareR2Config {
     // 这些值需要从您的Cloudflare仪表板获取
     this.config = {
       // API Token - 从Cloudflare API Tokens页面创建
-      apiToken: 'fysQ3WfSzf6LLArZpQ5ifp8YpicsIiX-u3eQ_1mJ',
+      apiToken: 'ucKoqfP3F3w38eAlDj-12hqCBAEG10S5SpcijzC3',
       
       // Account ID - 在Cloudflare仪表板右侧边栏可以找到
-      accountId: 'anthonin815@gmail.com',
+      accountId: '23441d4f7734b84186c4c20ddefef8e7',
       
       // 存储桶名称
       bucketName: 'century-business-system',
