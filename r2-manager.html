@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudflare R2 存储管理</title>
+    <link href="./src/css/layui.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        .control-panel {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .file-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease;
+        }
+        .file-card:hover {
+            transform: translateY(-2px);
+        }
+        .file-icon {
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .file-name {
+            font-weight: bold;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+        .file-size {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .file-date {
+            color: #999;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
+        }
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background: #f8f9ff;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background: #e6f3ff;
+        }
+        .status-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>☁️ Cloudflare R2 存储管理</h1>
+        <p>Century Business System - 文件存储管理</p>
+    </div>
+
+    <div class="container">
+        <!-- 连接状态面板 -->
+        <div class="status-panel">
+            <h3>🔌 连接状态</h3>
+            <div id="connectionStatus">
+                <div class="loading">🔄 检查连接状态...</div>
+            </div>
+        </div>
+
+        <!-- 控制面板 -->
+        <div class="control-panel">
+            <h3>🎛️ 操作面板</h3>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
+                <button class="btn btn-primary" onclick="refreshFiles()">🔄 刷新文件列表</button>
+                <button class="btn btn-success" onclick="testConnection()">🧪 测试连接</button>
+                <button class="btn btn-danger" onclick="cleanupFiles()">🗑️ 清理过期文件</button>
+                <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)">
+                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📤 选择文件上传</button>
+            </div>
+
+            <!-- 文件上传区域 -->
+            <div class="upload-area" id="uploadArea">
+                <div style="font-size: 48px; margin-bottom: 15px;">📁</div>
+                <p><strong>拖拽文件到此处上传</strong></p>
+                <p>或点击"选择文件上传"按钮</p>
+            </div>
+        </div>
+
+        <!-- 文件列表 -->
+        <div class="control-panel">
+            <h3>📂 文件列表</h3>
+            <div id="filesList">
+                <div class="loading">🔄 加载文件列表...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="cloudflare-config.js"></script>
+    <script src="cloudflare-storage.js"></script>
+    <script>
+        let r2Storage;
+
+        // 页面加载时初始化
+        window.onload = async function() {
+            try {
+                r2Storage = new CloudflareR2Storage();
+                await checkConnection();
+                await loadFiles();
+                initUploadArea();
+            } catch (error) {
+                showError('初始化失败: ' + error.message);
+            }
+        };
+
+        // 检查连接状态
+        async function checkConnection() {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.innerHTML = '<div class="loading">🔄 检查连接...</div>';
+
+            try {
+                const result = await r2Storage.testConnection();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = `
+                        <div class="success">
+                            ✅ R2连接正常<br>
+                            存储桶: ${r2Storage.config.bucketName}<br>
+                            总存储桶数: ${result.totalBuckets}
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="error">
+                            ❌ 连接失败: ${result.error}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="error">
+                        ❌ 连接错误: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // 测试连接
+        async function testConnection() {
+            await checkConnection();
+        }
+
+        // 加载文件列表
+        async function loadFiles() {
+            const filesDiv = document.getElementById('filesList');
+            filesDiv.innerHTML = '<div class="loading">🔄 加载文件...</div>';
+
+            try {
+                const result = await r2Storage.listFiles();
+                
+                if (result.success) {
+                    if (result.files.length === 0) {
+                        filesDiv.innerHTML = '<p style="text-align: center; color: #666;">📭 暂无文件</p>';
+                    } else {
+                        displayFiles(result.files);
+                    }
+                } else {
+                    filesDiv.innerHTML = `<div class="error">❌ 加载失败: ${result.error}</div>`;
+                }
+            } catch (error) {
+                filesDiv.innerHTML = `<div class="error">❌ 加载错误: ${error.message}</div>`;
+            }
+        }
+
+        // 显示文件列表
+        function displayFiles(files) {
+            const filesDiv = document.getElementById('filesList');
+            const fileGrid = document.createElement('div');
+            fileGrid.className = 'file-grid';
+
+            files.forEach(file => {
+                const fileCard = createFileCard(file);
+                fileGrid.appendChild(fileCard);
+            });
+
+            filesDiv.innerHTML = '';
+            filesDiv.appendChild(fileGrid);
+        }
+
+        // 创建文件卡片
+        function createFileCard(file) {
+            const card = document.createElement('div');
+            card.className = 'file-card';
+
+            const fileType = getFileType(file.key);
+            const fileSize = formatFileSize(file.size || 0);
+            const uploadDate = new Date(file.uploaded || Date.now()).toLocaleString();
+
+            card.innerHTML = `
+                <div class="file-icon">${getFileIcon(fileType)}</div>
+                <div class="file-name">${file.key}</div>
+                <div class="file-size">大小: ${fileSize}</div>
+                <div class="file-date">上传: ${uploadDate}</div>
+                <div class="file-actions">
+                    <button class="btn btn-primary" onclick="downloadFile('${file.key}')">📥 下载</button>
+                    <button class="btn btn-danger" onclick="deleteFile('${file.key}')">🗑️ 删除</button>
+                </div>
+            `;
+
+            return card;
+        }
+
+        // 获取文件类型
+        function getFileType(fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(ext)) return 'image';
+            if (['mp4', 'avi', 'mov', 'wmv'].includes(ext)) return 'video';
+            if (['pdf'].includes(ext)) return 'pdf';
+            if (['doc', 'docx'].includes(ext)) return 'word';
+            if (['xls', 'xlsx'].includes(ext)) return 'excel';
+            return 'file';
+        }
+
+        // 获取文件图标
+        function getFileIcon(fileType) {
+            switch (fileType) {
+                case 'image': return '🖼️';
+                case 'video': return '🎬';
+                case 'pdf': return '📄';
+                case 'word': return '📝';
+                case 'excel': return '📊';
+                default: return '📄';
+            }
+        }
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 刷新文件列表
+        async function refreshFiles() {
+            await loadFiles();
+        }
+
+        // 清理过期文件
+        async function cleanupFiles() {
+            if (!confirm('确定要清理超过30天的过期文件吗？此操作不可撤销！')) {
+                return;
+            }
+
+            try {
+                const result = await r2Storage.cleanupExpiredFiles();
+                
+                if (result.success) {
+                    showSuccess(result.message);
+                    await loadFiles(); // 刷新文件列表
+                } else {
+                    showError('清理失败: ' + result.error);
+                }
+            } catch (error) {
+                showError('清理错误: ' + error.message);
+            }
+        }
+
+        // 文件选择处理
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                uploadFiles(files);
+            }
+        }
+
+        // 初始化拖拽上传
+        function initUploadArea() {
+            const uploadArea = document.getElementById('uploadArea');
+
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    uploadFiles(files);
+                }
+            });
+        }
+
+        // 上传文件
+        async function uploadFiles(files) {
+            showSuccess(`准备上传 ${files.length} 个文件...`);
+            
+            // 注意：实际的文件上传需要在服务器端实现
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileName = `${Date.now()}-${file.name}`;
+                
+                try {
+                    const result = await r2Storage.uploadFile(file, fileName);
+                    console.log('上传结果:', result);
+                } catch (error) {
+                    console.error('上传失败:', error);
+                }
+            }
+            
+            showSuccess('⚠️ 注意：文件上传功能需要在服务器端实现。当前只是生成了上传URL。');
+        }
+
+        // 下载文件
+        function downloadFile(fileName) {
+            const url = r2Storage.getPublicUrl(fileName);
+            window.open(url, '_blank');
+        }
+
+        // 删除文件
+        async function deleteFile(fileName) {
+            if (!confirm(`确定要删除文件 "${fileName}" 吗？此操作不可撤销！`)) {
+                return;
+            }
+
+            try {
+                const result = await r2Storage.deleteFile(fileName);
+                
+                if (result.success) {
+                    showSuccess('文件删除成功');
+                    await loadFiles(); // 刷新文件列表
+                } else {
+                    showError('删除失败: ' + result.error);
+                }
+            } catch (error) {
+                showError('删除错误: ' + error.message);
+            }
+        }
+
+        // 显示成功消息
+        function showSuccess(message) {
+            const div = document.createElement('div');
+            div.className = 'success';
+            div.textContent = message;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 5000);
+        }
+
+        // 显示错误消息
+        function showError(message) {
+            const div = document.createElement('div');
+            div.className = 'error';
+            div.textContent = message;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 8000);
+        }
+    </script>
+</body>
+</html>
