@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel文件列表 - R2存储</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4a5568, #2d3748);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 10px;
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .files-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .file-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            background: white;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .file-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+        
+        .file-icon {
+            font-size: 40px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .file-name {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+            word-break: break-word;
+        }
+        
+        .file-info {
+            color: #718096;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .file-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .action-btn:hover {
+            background: #f7fafc;
+            border-color: #667eea;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #718096;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: #718096;
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        .back-button {
+            display: inline-block;
+            margin: 20px;
+            padding: 10px 20px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 8px;
+            border: 2px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status-error {
+            background: #fed7d7;
+            border: 1px solid #fc8181;
+            color: #742a2a;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            color: #718096;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-button">← 返回主页</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>📊 Excel文件列表</h1>
+            <p>查看R2存储中的所有Excel文件</p>
+        </div>
+        
+        <div class="content">
+            <div class="toolbar">
+                <div class="stats">
+                    <span id="fileCount">文件数量: 加载中...</span>
+                    <span id="totalSize">总大小: 计算中...</span>
+                </div>
+                <button class="refresh-btn" id="refreshBtn">🔄 刷新列表</button>
+            </div>
+
+            <div id="statusMessage" class="status-message status-error"></div>
+            
+            <div id="loadingState" class="loading">
+                <div>🔄 正在加载文件列表...</div>
+            </div>
+            
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-icon">📁</div>
+                <div>还没有上传任何Excel文件</div>
+                <div style="margin-top: 10px;">
+                    <a href="excel-upload-new.html" style="color: #667eea;">立即上传第一个文件</a>
+                </div>
+            </div>
+            
+            <div id="filesGrid" class="files-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        class ExcelFilesList {
+            constructor() {
+                this.workerUrl = 'https://century-business-api.anthonin815.workers.dev';
+                this.initializeElements();
+                this.setupEventListeners();
+                this.loadFiles();
+            }
+
+            initializeElements() {
+                this.loadingState = document.getElementById('loadingState');
+                this.emptyState = document.getElementById('emptyState');
+                this.filesGrid = document.getElementById('filesGrid');
+                this.refreshBtn = document.getElementById('refreshBtn');
+                this.fileCount = document.getElementById('fileCount');
+                this.totalSize = document.getElementById('totalSize');
+                this.statusMessage = document.getElementById('statusMessage');
+            }
+
+            setupEventListeners() {
+                this.refreshBtn.addEventListener('click', () => {
+                    this.loadFiles();
+                });
+            }
+
+            async loadFiles() {
+                this.showLoading();
+                this.hideStatus();
+
+                try {
+                    const response = await fetch(`${this.workerUrl}/api/files`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.displayFiles(result.files || []);
+                    } else {
+                        throw new Error(result.error || '获取文件列表失败');
+                    }
+                } catch (error) {
+                    console.error('加载文件列表失败:', error);
+                    this.showStatus(`❌ 加载失败: ${error.message}`);
+                    this.showEmpty();
+                }
+            }
+
+            displayFiles(files) {
+                this.hideLoading();
+
+                if (files.length === 0) {
+                    this.showEmpty();
+                    return;
+                }
+
+                // 更新统计信息
+                const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
+                this.fileCount.textContent = `文件数量: ${files.length}`;
+                this.totalSize.textContent = `总大小: ${this.formatFileSize(totalSize)}`;
+
+                // 显示文件列表
+                this.filesGrid.innerHTML = files.map(file => this.createFileCard(file)).join('');
+                this.filesGrid.style.display = 'grid';
+            }
+
+            createFileCard(file) {
+                const uploadTime = new Date(file.uploadTime).toLocaleString();
+                const fileSize = this.formatFileSize(file.size || 0);
+                
+                return `
+                    <div class="file-card">
+                        <div class="file-icon">📄</div>
+                        <div class="file-name">${file.originalName || file.fileName}</div>
+                        <div class="file-info">
+                            📊 大小: ${fileSize}<br>
+                            ⏰ 上传: ${uploadTime}<br>
+                            👤 上传者: ${file.uploadedBy || 'admin'}<br>
+                            🗂️ 路径: ${file.r2Path || 'arc/' + file.fileName}
+                        </div>
+                        <div class="file-actions">
+                            <button class="action-btn" onclick="window.open('${file.publicUrl || this.getPublicUrl(file)}', '_blank')">
+                                📥 下载
+                            </button>
+                            <button class="action-btn" onclick="navigator.clipboard.writeText('${file.publicUrl || this.getPublicUrl(file)}')">
+                                🔗 复制链接
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            getPublicUrl(file) {
+                const filePath = file.r2Path || `arc/${file.fileName}`;
+                return `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${filePath}`;
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            showLoading() {
+                this.loadingState.style.display = 'block';
+                this.emptyState.style.display = 'none';
+                this.filesGrid.style.display = 'none';
+            }
+
+            showEmpty() {
+                this.loadingState.style.display = 'none';
+                this.emptyState.style.display = 'block';
+                this.filesGrid.style.display = 'none';
+                this.fileCount.textContent = '文件数量: 0';
+                this.totalSize.textContent = '总大小: 0 B';
+            }
+
+            hideLoading() {
+                this.loadingState.style.display = 'none';
+            }
+
+            showStatus(message) {
+                this.statusMessage.textContent = message;
+                this.statusMessage.style.display = 'block';
+            }
+
+            hideStatus() {
+                this.statusMessage.style.display = 'none';
+            }
+        }
+
+        // 初始化文件列表
+        document.addEventListener('DOMContentLoaded', () => {
+            new ExcelFilesList();
+        });
+    </script>
+</body>
+</html>

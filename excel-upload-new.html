@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel文件上传 - R2存储</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4a5568, #2d3748);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        
+        .upload-area {
+            padding: 40px;
+        }
+        
+        .file-drop-zone {
+            border: 3px dashed #cbd5e0;
+            border-radius: 10px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f7fafc;
+        }
+        
+        .file-drop-zone:hover {
+            border-color: #667eea;
+            background: #edf2f7;
+        }
+        
+        .file-drop-zone.dragover {
+            border-color: #667eea;
+            background: #e6fffa;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            color: #a0aec0;
+            margin-bottom: 20px;
+        }
+        
+        .upload-text {
+            font-size: 18px;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+        
+        .upload-hint {
+            font-size: 14px;
+            color: #718096;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .selected-file {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f0fff4;
+            border-radius: 8px;
+            border-left: 4px solid #48bb78;
+        }
+        
+        .file-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .file-name {
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .file-size {
+            color: #718096;
+            font-size: 14px;
+        }
+        
+        .upload-button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .upload-button:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status-area {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .status-success {
+            background: #f0fff4;
+            border: 1px solid #9ae6b4;
+            color: #22543d;
+        }
+        
+        .status-error {
+            background: #fed7d7;
+            border: 1px solid #fc8181;
+            color: #742a2a;
+        }
+        
+        .status-loading {
+            background: #ebf4ff;
+            border: 1px solid #90cdf4;
+            color: #2c5282;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .back-button {
+            display: inline-block;
+            margin: 20px;
+            padding: 10px 20px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 8px;
+            border: 2px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-button">← 返回主页</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>📊 Excel文件上传</h1>
+            <p>将Excel文件直接上传到Cloudflare R2存储</p>
+        </div>
+        
+        <div class="upload-area">
+            <div class="file-drop-zone" id="dropZone">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">点击选择或拖拽Excel文件</div>
+                <div class="upload-hint">支持 .xlsx, .xls 格式，最大50MB</div>
+                <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+            </div>
+            
+            <div id="selectedFile" class="selected-file" style="display: none;">
+                <div class="file-info">
+                    <span class="file-name" id="fileName"></span>
+                    <span class="file-size" id="fileSize"></span>
+                </div>
+            </div>
+            
+            <button id="uploadButton" class="upload-button" disabled>选择文件后开始上传</button>
+            
+            <div id="statusArea" class="status-area">
+                <div id="statusMessage"></div>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class DirectR2Upload {
+            constructor() {
+                this.r2Endpoint = 'https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system';
+                this.selectedFile = null;
+                this.initializeElements();
+                this.setupEventListeners();
+            }
+
+            initializeElements() {
+                this.dropZone = document.getElementById('dropZone');
+                this.fileInput = document.getElementById('fileInput');
+                this.selectedFileDiv = document.getElementById('selectedFile');
+                this.fileName = document.getElementById('fileName');
+                this.fileSize = document.getElementById('fileSize');
+                this.uploadButton = document.getElementById('uploadButton');
+                this.statusArea = document.getElementById('statusArea');
+                this.statusMessage = document.getElementById('statusMessage');
+                this.progressFill = document.getElementById('progressFill');
+            }
+
+            setupEventListeners() {
+                // 点击选择文件
+                this.dropZone.addEventListener('click', () => {
+                    this.fileInput.click();
+                });
+
+                // 文件选择
+                this.fileInput.addEventListener('change', (e) => {
+                    this.handleFileSelect(e.target.files[0]);
+                });
+
+                // 拖拽处理
+                this.dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    this.dropZone.classList.add('dragover');
+                });
+
+                this.dropZone.addEventListener('dragleave', () => {
+                    this.dropZone.classList.remove('dragover');
+                });
+
+                this.dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    this.dropZone.classList.remove('dragover');
+                    this.handleFileSelect(e.dataTransfer.files[0]);
+                });
+
+                // 上传按钮
+                this.uploadButton.addEventListener('click', () => {
+                    this.uploadFile();
+                });
+            }
+
+            handleFileSelect(file) {
+                if (!file) return;
+
+                // 验证文件类型
+                if (!this.isExcelFile(file)) {
+                    this.showStatus('只支持Excel文件(.xlsx, .xls)', 'error');
+                    return;
+                }
+
+                // 验证文件大小 (50MB)
+                if (file.size > 50 * 1024 * 1024) {
+                    this.showStatus('文件大小不能超过50MB', 'error');
+                    return;
+                }
+
+                this.selectedFile = file;
+                this.fileName.textContent = file.name;
+                this.fileSize.textContent = this.formatFileSize(file.size);
+                this.selectedFileDiv.style.display = 'block';
+                this.uploadButton.disabled = false;
+                this.uploadButton.textContent = '开始上传到R2存储';
+                
+                this.hideStatus();
+            }
+
+            isExcelFile(file) {
+                const allowedTypes = [
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+                    'application/vnd.ms-excel', // .xls
+                    'application/excel',
+                    'application/x-excel'
+                ];
+                
+                const allowedExtensions = ['.xlsx', '.xls'];
+                const fileName = file.name.toLowerCase();
+                
+                return allowedTypes.includes(file.type) || 
+                       allowedExtensions.some(ext => fileName.endsWith(ext));
+            }
+
+            async uploadFile() {
+                if (!this.selectedFile) return;
+
+                this.uploadButton.disabled = true;
+                this.uploadButton.textContent = '上传中...';
+                this.showStatus('正在上传文件到R2存储...', 'loading');
+                this.updateProgress(0);
+
+                try {
+                    // 生成文件路径
+                    const timestamp = Date.now();
+                    const randomSuffix = Math.round(Math.random() * 1E9);
+                    const fileExtension = this.getFileExtension(this.selectedFile.name);
+                    const fileName = `${timestamp}-${randomSuffix}.${fileExtension}`;
+                    const filePath = `arc/${fileName}`;
+                    
+                    console.log('📁 上传路径:', filePath);
+                    
+                    // 直接上传到R2
+                    const uploadUrl = `${this.r2Endpoint}/${filePath}`;
+                    
+                    const response = await fetch(uploadUrl, {
+                        method: 'PUT',
+                        body: this.selectedFile,
+                        headers: {
+                            'Content-Type': this.selectedFile.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        }
+                    });
+
+                    this.updateProgress(100);
+
+                    if (response.ok) {
+                        this.showStatus(
+                            `✅ 文件上传成功！<br>` +
+                            `📁 文件名: ${this.selectedFile.name}<br>` +
+                            `📊 大小: ${this.formatFileSize(this.selectedFile.size)}<br>` +
+                            `🗂️ 存储路径: arc/${fileName}<br>` +
+                            `⏰ 上传时间: ${new Date().toLocaleString()}`,
+                            'success'
+                        );
+                        
+                        // 重置表单
+                        setTimeout(() => {
+                            this.resetForm();
+                        }, 3000);
+                        
+                    } else {
+                        throw new Error(`上传失败: HTTP ${response.status}`);
+                    }
+
+                } catch (error) {
+                    console.error('上传错误:', error);
+                    this.showStatus(`❌ 上传失败: ${error.message}`, 'error');
+                    this.uploadButton.disabled = false;
+                    this.uploadButton.textContent = '重新上传';
+                }
+            }
+
+            getFileExtension(fileName) {
+                const lastDot = fileName.lastIndexOf('.');
+                return lastDot !== -1 ? fileName.substring(lastDot + 1) : 'xlsx';
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            showStatus(message, type) {
+                this.statusMessage.innerHTML = message;
+                this.statusArea.className = `status-area status-${type}`;
+                this.statusArea.style.display = 'block';
+            }
+
+            hideStatus() {
+                this.statusArea.style.display = 'none';
+            }
+
+            updateProgress(percent) {
+                this.progressFill.style.width = percent + '%';
+            }
+
+            resetForm() {
+                this.selectedFile = null;
+                this.fileInput.value = '';
+                this.selectedFileDiv.style.display = 'none';
+                this.uploadButton.disabled = true;
+                this.uploadButton.textContent = '选择文件后开始上传';
+                this.hideStatus();
+                this.updateProgress(0);
+            }
+        }
+
+        // 初始化上传器
+        document.addEventListener('DOMContentLoaded', () => {
+            new DirectR2Upload();
+        });
+    </script>
+</body>
+</html>
