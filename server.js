@@ -151,7 +151,12 @@ function writeLocalDb(data) {
 }
 
 function readWideTable() {
-  return fs.readJsonSync(wideTableFile);
+  try {
+    return fs.readJsonSync(wideTableFile);
+  } catch (error) {
+    console.error('读取宽表数据失败:', error.message);
+    return [];
+  }
 }
 
 function writeWideTable(data) {
@@ -159,7 +164,12 @@ function writeWideTable(data) {
 }
 
 function readRecords() {
-  return fs.readJsonSync(recordsFile);
+  try {
+    return fs.readJsonSync(recordsFile);
+  } catch (error) {
+    console.error('读取历史记录失败:', error.message);
+    return [];
+  }
 }
 
 function writeRecords(data) {
@@ -1574,221 +1584,6 @@ app.post('/api/localdb/records/clear-all', authenticateToken, (req, res) => {
 });
 
 // ==================== 数据分析API ====================
-
-// 获取数据分析概览
-app.get('/api/analysis/overview', authenticateToken, (req, res) => {
-  try {
-    const wideData = readWideTable();
-    const records = readRecords();
-    
-    // 计算基础统计
-    const totalSku = wideData.length;
-    const totalRecords = records.length;
-    
-    // 计算库存健康率
-    let healthyStock = 0;
-    let warningStock = 0;
-    let outOfStock = 0;
-    
-    wideData.forEach(item => {
-      const latestStock = getLatestStock(item);
-      if (latestStock === 0) {
-        outOfStock++;
-      } else if (latestStock < 20) {
-        warningStock++;
-      } else {
-        healthyStock++;
-      }
-    });
-    
-    const healthRate = totalSku > 0 ? Math.round((healthyStock / totalSku) * 100 * 10) / 10 : 0;
-    
-    // 计算平均周转率
-    let totalTurnover = 0;
-    let turnoverCount = 0;
-    
-    wideData.forEach(item => {
-      const turnover = calculateTurnover(item);
-      if (turnover > 0) {
-        totalTurnover += turnover;
-        turnoverCount++;
-      }
-    });
-    
-    const avgTurnover = turnoverCount > 0 ? Math.round((totalTurnover / turnoverCount) * 10) / 10 : 0;
-    
-    // 计算库存价值（假设每个SKU平均价值1000元）
-    const estimatedValue = totalSku * 1000;
-    
-    res.json({
-      success: true,
-      data: {
-        totalSku: totalSku,
-        healthRate: healthRate,
-        avgTurnover: avgTurnover,
-        warningCount: warningStock + outOfStock,
-        estimatedValue: estimatedValue,
-        totalRecords: totalRecords
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: '获取分析概览失败: ' + error.message });
-  }
-});
-
-// 获取库存趋势数据
-app.get('/api/analysis/stock-trend', authenticateToken, (req, res) => {
-  try {
-    const wideData = readWideTable();
-    const records = readRecords();
-    const { days = 30 } = req.query;
-    // 生成日期范围
-    const dates = [];
-    const today = new Date();
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      dates.push(date.toISOString().split('T')[0]);
-    }
-    // 计算每日库存数据（宽表+行记录）
-    const stockData = {
-      total: [],
-      healthy: [],
-      warning: [],
-      outOfStock: []
-    };
-    dates.forEach(date => {
-      let total = 0, healthy = 0, warning = 0, outOfStock = 0;
-      // 宽表部分
-      wideData.forEach(item => {
-        const stock = parseInt(item[date]) || 0;
-        total += stock;
-        if (stock === 0) {
-          outOfStock++;
-        } else if (stock < 20) {
-          warning++;
-        } else {
-          healthy++;
-        }
-      });
-      // 行记录部分（只统计该日期的库存）
-      records.forEach(rec => {
-        if (rec['日期'] === date) {
-          const stock = parseInt(rec['库存']) || 0;
-          total += stock;
-          if (stock === 0) {
-            outOfStock++;
-          } else if (stock < 20) {
-            warning++;
-          } else {
-            healthy++;
-          }
-        }
-      });
-      stockData.total.push(total);
-      stockData.healthy.push(healthy);
-      stockData.warning.push(warning);
-      stockData.outOfStock.push(outOfStock);
-    });
-    res.json({
-      success: true,
-      data: {
-        dates: dates,
-        series: stockData
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: '获取库存趋势失败: ' + error.message });
-  }
-});
-
-// 获取销售趋势数据
-app.get('/api/analysis/sales-trend', authenticateToken, (req, res) => {
-  try {
-    const wideData = readWideTable();
-    const { days = 30 } = req.query;
-    
-    // 生成日期范围
-    const dates = [];
-    const today = new Date();
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      dates.push(date.toISOString().split('T')[0]);
-    }
-    
-    // 计算每日销售数据
-    const salesData = {
-      quantity: [],
-      amount: []
-    };
-    
-    dates.forEach(date => {
-      let totalQuantity = 0;
-      let totalAmount = 0;
-      
-      wideData.forEach(item => {
-        const sales = parseInt(item[date + '_销量']) || 0;
-        totalQuantity += sales;
-        // 假设每个SKU平均单价100元
-        totalAmount += sales * 100;
-      });
-      
-      salesData.quantity.push(totalQuantity);
-      salesData.amount.push(Math.round(totalAmount / 10000 * 10) / 10); // 转换为万元
-    });
-    
-    res.json({
-      success: true,
-      data: {
-        dates: dates,
-        series: salesData
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: '获取销售趋势失败: ' + error.message });
-  }
-});
-
-// 获取SKU详细分析
-app.get('/api/analysis/sku-details', authenticateToken, (req, res) => {
-  try {
-    const wideData = readWideTable();
-    const { limit = 10 } = req.query;
-    
-    const skuAnalysis = wideData.map(item => {
-      const latestStock = getLatestStock(item);
-      const totalSales = calculateTotalSales(item);
-      const turnover = calculateTurnover(item);
-      const trend = calculateSalesTrend(item);
-      const status = getStockStatus(latestStock);
-      const suggestion = getSuggestion(status, trend, turnover);
-      
-      return {
-        sku: item.SKU,
-        name: item['产品中文名'],
-        url: item['网页链接'] || '', // 添加URL字段
-        currentStock: latestStock,
-        totalSales: totalSales,
-        turnover: turnover,
-        status: status,
-        trend: trend,
-        suggestion: suggestion
-      };
-    });
-    
-    // 按销量排序并限制数量
-    skuAnalysis.sort((a, b) => b.totalSales - a.totalSales);
-    const topSku = skuAnalysis.slice(0, parseInt(limit));
-    
-    res.json({
-      success: true,
-      data: topSku
-    });
-  } catch (error) {
-    res.status(500).json({ error: '获取SKU分析失败: ' + error.message });
-  }
-});
 
 // 天猫订单分析接口
 app.get('/api/tmall-orders/analysis/sku-details', authenticateToken, (req, res) => {

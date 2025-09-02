@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Excel数据查看器（简化版） - 数据管理系统</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f8f9fa;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      text-align: center;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }
+    .info-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .sheet-selector {
+      margin-bottom: 20px;
+    }
+    .sheet-button {
+      margin: 5px;
+      padding: 10px 15px;
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      cursor: pointer;
+      display: inline-block;
+    }
+    .sheet-button.active {
+      background: #16baaa;
+      color: white;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+    .data-table th, .data-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .data-table th {
+      background: #f8f9fa;
+      font-weight: bold;
+      position: sticky;
+      top: 0;
+    }
+    .data-table tr:nth-child(even) {
+      background: #fafafa;
+    }
+    .pagination {
+      text-align: center;
+      margin: 20px 0;
+    }
+    .pagination button {
+      margin: 0 5px;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      background: white;
+      cursor: pointer;
+    }
+    .pagination button.active {
+      background: #16baaa;
+      color: white;
+    }
+    .controls {
+      text-align: center;
+      margin: 20px 0;
+    }
+    .table-wrapper {
+      overflow: auto;
+      max-height: 70vh;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 Excel数据查看器（简化版）</h1>
+  </div>
+  
+  <div class="container">
+    <div class="info-card">
+      <h3 id="fileName">文件名：加载中...</h3>
+      <p id="fileInfo">文件信息：加载中...</p>
+    </div>
+    
+    <div class="info-card">
+      <h4>工作表选择：</h4>
+      <div class="sheet-selector" id="sheetSelector">
+        <!-- 动态生成工作表按钮 -->
+      </div>
+      
+      <div class="controls">
+        <button class="layui-btn layui-btn-primary" onclick="goBack()">返回表格管理</button>
+        <button class="layui-btn layui-btn-normal" onclick="downloadFile()">下载文件</button>
+        <span style="margin-left: 20px;">
+          当前显示：第 <span id="currentPage">1</span> 页，共 <span id="totalPages">1</span> 页，
+          总计 <span id="totalRows">0</span> 行数据
+        </span>
+      </div>
+    </div>
+    
+    <div class="info-card">
+      <div class="loading" id="loading">
+        <div>正在加载Excel数据...</div>
+      </div>
+      
+      <div class="table-wrapper" id="tableWrapper" style="display: none;">
+        <table class="data-table" id="dataTable">
+          <!-- 动态生成表格 -->
+        </table>
+      </div>
+      
+      <div class="pagination" id="pagination">
+        <!-- 动态生成分页按钮 -->
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['layer'], function(){
+      var layer = layui.layer;
+      
+      var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      var currentFileId = null;
+      var currentSheet = null;
+      var currentPage = 1;
+      var totalPages = 1;
+      var totalRows = 0;
+      var allSheets = [];
+      
+      // 初始化
+      init();
+      
+      function init() {
+        // 检查登录状态
+        if (!userInfo.username) {
+          layer.msg('请先登录！', {icon: 2}, function(){
+            window.location.href = 'login.html';
+          });
+          return;
+        }
+        
+        // 获取文件ID
+        var urlParams = new URLSearchParams(window.location.search);
+        currentFileId = urlParams.get('fileId');
+        
+        if (!currentFileId) {
+          layer.msg('未指定文件ID！', {icon: 2}, function(){
+            window.location.href = 'table-management.html';
+          });
+          return;
+        }
+        
+        loadExcelData();
+      }
+      
+      function loadExcelData() {
+        var token = userInfo.token || localStorage.getItem('token');
+        var url = '/api/files/' + currentFileId + '/analyze?limit=20';
+        
+        if (currentSheet) {
+          url += '&sheet=' + encodeURIComponent(currentSheet);
+        }
+        if (currentPage > 1) {
+          url += '&page=' + currentPage;
+        }
+        
+        var headers = {};
+        if (token) {
+          headers['Authorization'] = 'Bearer ' + token;
+        }
+        
+        fetch(url, { headers: headers })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            displayData(data.analysis);
+          } else {
+            console.error('API错误:', data);
+            // 如果有错误，至少显示基本信息
+            if (data.availableSheets) {
+              displaySheets(data.availableSheets);
+              layer.msg('工作表加载失败，已显示可用工作表', {icon: 2});
+            } else {
+              layer.msg('加载失败: ' + data.error, {icon: 2});
+            }
+          }
+        })
+        .catch(error => {
+          console.error('网络错误:', error);
+          layer.msg('网络错误，请重试', {icon: 2});
+        });
+      }
+      
+      function displayData(analysis) {
+        // 显示文件信息
+        document.getElementById('fileName').textContent = '文件名：' + analysis.fileName;
+        document.getElementById('fileInfo').textContent = 
+          '工作表数：' + analysis.summary.totalSheets + 
+          ' | 文件大小：' + formatFileSize(analysis.summary.fileSize) + 
+          ' | 上传者：' + analysis.summary.uploadedBy;
+        
+        // 保存数据
+        allSheets = analysis.allSheets;
+        currentSheet = analysis.currentSheet;
+        
+        // 显示工作表选择器
+        displaySheets(analysis.allSheets);
+        
+        // 显示数据表格
+        displayTable(analysis.headers, analysis.data);
+        
+        // 更新分页信息
+        if (analysis.pagination) {
+          currentPage = analysis.pagination.currentPage;
+          totalPages = analysis.pagination.totalPages;
+          totalRows = analysis.pagination.totalRows;
+          updatePagination();
+          updateStats();
+        }
+        
+        // 隐藏加载提示
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('tableWrapper').style.display = 'block';
+      }
+      
+      function displaySheets(sheets) {
+        var container = document.getElementById('sheetSelector');
+        var html = '';
+        
+        sheets.forEach(function(sheet) {
+          var activeClass = sheet.name === currentSheet ? 'active' : '';
+          html += '<div class="sheet-button ' + activeClass + '" onclick="switchSheet(\'' + 
+                  escapeHtml(sheet.name) + '\')">' + 
+                  escapeHtml(sheet.name) + ' (' + sheet.rowCount + '行)</div>';
+        });
+        
+        container.innerHTML = html;
+      }
+      
+      function displayTable(headers, data) {
+        var table = document.getElementById('dataTable');
+        var html = '<thead><tr>';
+        
+        // 表头
+        headers.forEach(function(header, index) {
+          html += '<th>第' + (index + 1) + '列<br>' + escapeHtml(header || '未命名') + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        
+        // 数据行
+        data.forEach(function(row) {
+          html += '<tr>';
+          for (var i = 0; i < headers.length; i++) {
+            var cellValue = row[i] || '';
+            html += '<td title="' + escapeHtml(cellValue) + '">' + escapeHtml(cellValue) + '</td>';
+          }
+          html += '</tr>';
+        });
+        
+        html += '</tbody>';
+        table.innerHTML = html;
+      }
+      
+      function updatePagination() {
+        var container = document.getElementById('pagination');
+        var html = '';
+        
+        // 上一页按钮
+        if (currentPage > 1) {
+          html += '<button onclick="changePage(' + (currentPage - 1) + ')">上一页</button>';
+        }
+        
+        // 页码按钮
+        for (var i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+          var activeClass = i === currentPage ? 'active' : '';
+          html += '<button class="' + activeClass + '" onclick="changePage(' + i + ')">' + i + '</button>';
+        }
+        
+        // 下一页按钮
+        if (currentPage < totalPages) {
+          html += '<button onclick="changePage(' + (currentPage + 1) + ')">下一页</button>';
+        }
+        
+        container.innerHTML = html;
+      }
+      
+      function updateStats() {
+        document.getElementById('currentPage').textContent = currentPage;
+        document.getElementById('totalPages').textContent = totalPages;
+        document.getElementById('totalRows').textContent = totalRows;
+      }
+      
+      window.switchSheet = function(sheetName) {
+        console.log('切换到工作表:', sheetName);
+        currentSheet = sheetName;
+        currentPage = 1;
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('tableWrapper').style.display = 'none';
+        loadExcelData();
+      };
+      
+      window.changePage = function(page) {
+        console.log('切换到第', page, '页');
+        currentPage = page;
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('tableWrapper').style.display = 'none';
+        loadExcelData();
+      };
+      
+      window.goBack = function() {
+        console.log('返回表格管理');
+        window.location.href = 'table-management.html';
+      };
+      
+      window.downloadFile = function() {
+        var token = userInfo.token || localStorage.getItem('token');
+        var downloadUrl = '/api/files/' + currentFileId + '/download';
+        
+        if (token) {
+          fetch(downloadUrl, {
+            headers: { 'Authorization': 'Bearer ' + token }
+          })
+          .then(response => response.blob())
+          .then(blob => {
+            var url = window.URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = '';
+            link.click();
+            window.URL.revokeObjectURL(url);
+            layer.msg('文件下载成功！', {icon: 1});
+          })
+          .catch(error => {
+            console.error('下载错误:', error);
+            layer.msg('下载失败', {icon: 2});
+          });
+        } else {
+          layer.msg('请先登录', {icon: 2});
+        }
+      };
+      
+      function escapeHtml(text) {
+        if (!text) return '';
+        return text.toString()
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+      
+      function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        var k = 1024;
+        var sizes = ['B', 'KB', 'MB', 'GB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+    });
+  </script>
+</body>
+</html> 

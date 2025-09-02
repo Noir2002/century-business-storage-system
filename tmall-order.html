@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>天猫订单分析 - 数据管理系统</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <link href="./src/css/app-header.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    /* 复用data-analysis.html的样式 */
+    body { background: #f8f9fa; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between; }
+    .header .layui-nav { background: transparent; }
+    .header .layui-nav .layui-nav-item a { color: rgba(255,255,255,0.9); }
+    .header .layui-nav .layui-nav-item a:hover { color: white; }
+    .header .logo { font-size: 18px; font-weight: bold; white-space: nowrap; }
+    .main-nav { flex: 1; display: flex; justify-content: center; margin: 0 20px; }
+    .main-nav .layui-nav-item { margin: 0 5px; }
+    .main-nav .layui-nav-item a { padding: 0 20px; border-radius: 6px; transition: all 0.3s ease; font-size: 14px; }
+    .main-nav .layui-nav-item a:hover, .main-nav .layui-nav-item.layui-this a { background: rgba(255,255,255,0.2); color: white; }
+    .main-nav .layui-nav-item a i { margin-right: 6px; }
+    .header .user-info { white-space: nowrap; }
+    .user-info .layui-nav-child dd a { padding: 10px 15px; color: #666; transition: all 0.3s ease; }
+    .user-info .layui-nav-child dd a:hover { background: #f8f9fa; color: #16baaa; }
+    .user-info .layui-nav-child dd a i { margin-right: 8px; font-size: 14px; }
+    .content-wrapper { padding: 20px; }
+    .page-header { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .page-title { font-size: 24px; font-weight: bold; color: #333; margin: 0; }
+    .page-subtitle { color: #666; margin-top: 5px; }
+    .breadcrumb { color: #999; font-size: 14px; margin-top: 10px; }
+    .breadcrumb a { color: #16baaa; text-decoration: none; }
+    .filter-panel { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .filter-title { font-weight: bold; margin-bottom: 15px; color: #333; }
+    .upload-panel { margin-bottom: 20px; }
+    .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
+    .stats-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; position: relative; overflow: hidden; }
+    .stats-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; }
+    .stats-card.blue::before { background: #16baaa; }
+    .stats-card.green::before { background: #52c41a; }
+    .stats-card.orange::before { background: #fa8c16; }
+    .stats-card.red::before { background: #f5222d; }
+    .stats-card.purple::before { background: #722ed1; }
+    .stats-icon { font-size: 32px; margin-bottom: 10px; }
+    .stats-value { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 5px; }
+    .stats-label { color: #666; font-size: 14px; }
+    .stats-trend { font-size: 12px; margin-top: 5px; }
+    .trend-up { color: #52c41a; }
+    .trend-down { color: #f5222d; }
+    .chart-container { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .chart-header { padding: 20px; border-bottom: 1px solid #f0f0f0; background: #fafafa; display: flex; justify-content: space-between; align-items: center; }
+    .chart-title { font-size: 18px; font-weight: bold; color: #333; margin: 0; }
+    .chart-controls { display: flex; gap: 10px; }
+    .chart-content { padding: 20px; }
+    .chart { width: 100%; height: 400px; }
+    .table-container { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; }
+    .table-header { padding: 20px; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
+    .analysis-table { width: 100%; font-size: 13px; }
+    .analysis-table th { background: #f8f9fa; font-weight: bold; text-align: center; padding: 12px 8px; border-bottom: 1px solid #e6e6e6; }
+    .analysis-table td { padding: 10px 8px; border-bottom: 1px solid #f0f0f0; text-align: center; }
+    .analysis-table tbody tr:hover { background: #f8f9fa; }
+    .no-data { text-align: center; padding: 60px 20px; color: #999; }
+    .no-data-icon { font-size: 48px; margin-bottom: 15px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="layui-header header">
+    <div class="logo">📊 数据管理系统</div>
+    <ul class="layui-nav main-nav">
+      <li class="layui-nav-item"><a href="dashboard.html"><i class="layui-icon layui-icon-home"></i> 数据仪表盘</a></li>
+      <li class="layui-nav-item"><a href="table-management.html"><i class="layui-icon layui-icon-table"></i> 表格管理</a></li>
+      <li class="layui-nav-item"><a href="data-upload.html"><i class="layui-icon layui-icon-upload-drag"></i> 数据导入</a></li>
+      <li class="layui-nav-item"><a href="virtual-inventory.html"><i class="layui-icon layui-icon-engine"></i> 虚拟库存</a></li>
+      <li class="layui-nav-item"><a href="data-analysis.html"><i class="layui-icon layui-icon-chart"></i> 数据分析</a></li>
+      <li class="layui-nav-item"><a href="local-database.html"><i class="layui-icon layui-icon-database"></i> 本地数据库</a></li>
+      <li class="layui-nav-item"><a href="tmall-database.html"><i class="layui-icon layui-icon-cart"></i> 天猫数据库</a></li>
+      <li class="layui-nav-item layui-this"><a href="tmall-order.html"><i class="layui-icon layui-icon-cart"></i> 天猫订单</a></li>
+      <li class="layui-nav-item" id="adminOnlyTopNav" style="display: none;"><a href="user-management.html"><i class="layui-icon layui-icon-username"></i> 用户管理</a></li>
+    </ul>
+    
+  </div>
+  <div class="content-wrapper">
+    <div class="page-header">
+      <h1 class="page-title">🛒 天猫订单分析</h1>
+      <p class="page-subtitle">上传天猫订单Excel，自动分析爆款与滞销品</p>
+      <div class="breadcrumb"><a href="dashboard.html">首页</a> / 天猫订单分析</div>
+    </div>
+    <div class="upload-panel">
+      <input type="file" id="excelFile" accept=".xlsx,.xls" />
+      <button class="layui-btn layui-btn-normal" onclick="uploadTmallOrder()"><i class="layui-icon layui-icon-upload-drag"></i> 上传并分析</button>
+      <span id="uploadStatus"></span>
+    </div>
+    <div id="analysisResult" style="display:none;">
+      <!-- 统计卡片 -->
+      <div class="stats-cards" id="statsCards"></div>
+      <!-- 图表 -->
+      <div class="chart-container">
+        <div class="chart-header"><h3 class="chart-title">📈 销量趋势分析</h3></div>
+        <div class="chart-content"><div id="salesChart" class="chart"></div></div>
+      </div>
+      <!-- SKU分析表格 -->
+      <div class="table-container">
+        <div class="table-header"><h3>🔍 SKU详细分析</h3></div>
+        <div style="overflow-x: auto; padding: 20px;">
+          <table class="analysis-table" id="skuTable">
+            <thead><tr id="skuTableHead"></tr></thead>
+            <tbody id="skuTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['form', 'layer'], function(){
+      var form = layui.form;
+      var layer = layui.layer;
+      var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      // 初始化页面
+      if (!userInfo.username) {
+        layer.msg('请先登录！', {icon: 2}, function(){ window.location.href = 'login.html'; });
+        return;
+      }
+      var cu = document.getElementById('currentUser');
+      if (cu) cu.textContent = userInfo.realname || userInfo.username;
+      if (userInfo.role === 'admin') {
+        document.getElementById('adminOnlyTopNav').style.display = 'block';
+      }
+    });
+    // 退出登录
+    function logout() {
+      layui.layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index){
+        localStorage.removeItem('currentUser');
+        layui.layer.close(index);
+        layui.layer.msg('已安全退出！', {icon: 1}, function(){ window.location.href = 'login.html'; });
+      });
+    }
+    // 切换账号
+    function switchAccount() {
+      layui.layer.confirm('切换账号将退出当前登录，是否继续？', {icon: 3, title: '切换账号', btn: ['确定', '取消']}, function(index) {
+        localStorage.removeItem('currentUser');
+        layui.layer.close(index);
+        layui.layer.msg('正在切换账号...', {icon: 16, time: 1000}, function(){ window.location.href = 'login.html'; });
+      });
+    }
+    // 上传并分析天猫订单
+    function uploadTmallOrder() {
+      var fileInput = document.getElementById('excelFile');
+      var file = fileInput.files[0];
+      if (!file) {
+        layui.layer.msg('请先选择Excel文件！', {icon: 2});
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var data = new Uint8Array(e.target.result);
+        var workbook = XLSX.read(data, {type: 'array'});
+        var sheetName = workbook.SheetNames[0];
+        var worksheet = workbook.Sheets[sheetName];
+        var jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ''});
+        if (!jsonData.length) {
+          layui.layer.msg('Excel内容为空！', {icon: 2});
+          return;
+        }
+        // 存到后端
+        saveTmallOrderToBackend(jsonData, function(success) {
+          if (success) {
+            layui.layer.msg('上传并保存成功，正在分析...', {icon: 1});
+            analyzeTmallOrder(jsonData);
+          } else {
+            layui.layer.msg('上传保存失败！', {icon: 2});
+          }
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    }
+    // 保存到后端
+    function saveTmallOrderToBackend(data, cb) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/tmall-orders/upload');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      var token = localStorage.getItem('token');
+      if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200) {
+            cb(true);
+          } else {
+            cb(false);
+          }
+        }
+      };
+      xhr.send(JSON.stringify({data: data}));
+    }
+    // 分析并展示
+    function analyzeTmallOrder(data) {
+      document.getElementById('analysisResult').style.display = '';
+      // 统计卡片
+      var skuSet = new Set();
+      var totalCount = 0;
+      var skuSales = {};
+      data.forEach(row => {
+        var sku = row['SKU'] || row['sku'] || row['Sku'] || '';
+        var qty = parseInt(row['商品数量'] || row['数量'] || row['商品数'] || 1);
+        if (!sku) return;
+        skuSet.add(sku);
+        skuSales[sku] = (skuSales[sku] || 0) + qty;
+        totalCount += qty;
+      });
+      var skuArr = Object.keys(skuSales).map(sku => ({sku, sales: skuSales[sku]}));
+      skuArr.sort((a, b) => b.sales - a.sales);
+      var hotCount = Math.min(5, skuArr.length);
+      var slowCount = Math.min(5, skuArr.length);
+      var hotList = skuArr.slice(0, hotCount);
+      var slowList = skuArr.slice(-slowCount);
+      // 卡片
+      var statsHtml = `
+        <div class="stats-card blue"><div class="stats-icon">🔢</div><div class="stats-value">${skuSet.size}</div><div class="stats-label">SKU总数</div></div>
+        <div class="stats-card green"><div class="stats-icon">📦</div><div class="stats-value">${totalCount}</div><div class="stats-label">订单总量</div></div>
+        <div class="stats-card orange"><div class="stats-icon">🔥</div><div class="stats-value">${hotList[0] ? hotList[0].sales : 0}</div><div class="stats-label">爆款销量</div></div>
+        <div class="stats-card red"><div class="stats-icon">🧊</div><div class="stats-value">${slowList[0] ? slowList[0].sales : 0}</div><div class="stats-label">滞销销量</div></div>
+      `;
+      document.getElementById('statsCards').innerHTML = statsHtml;
+      // 图表
+      var chart = echarts.init(document.getElementById('salesChart'));
+      chart.setOption({
+        title: {text: 'SKU销量排行', left: 'center'},
+        tooltip: {trigger: 'axis'},
+        xAxis: {type: 'category', data: skuArr.map(x=>x.sku)},
+        yAxis: {type: 'value'},
+        series: [{name: '销量', type: 'bar', data: skuArr.map(x=>x.sales), itemStyle: {color: '#16baaa'}}]
+      });
+      // 表格
+      var headHtml = '<th>排名</th><th>SKU</th><th>销量</th>';
+      document.getElementById('skuTableHead').innerHTML = headHtml;
+      var bodyHtml = skuArr.map((x,i)=>`<tr><td>${i+1}</td><td>${x.sku}</td><td>${x.sales}</td></tr>`).join('');
+      document.getElementById('skuTableBody').innerHTML = bodyHtml;
+    }
+  </script>
+</body>
+</html> 

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>爆品滞销品分析 - 数据管理系统</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="src/css/layui.css">
+  <script src="src/modules/jquery.js"></script>
+  <script src="src/layui.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <style>
+    .analysis-container {
+      padding: 20px;
+      background: #f8f9fa;
+      min-height: 100vh;
+    }
+    .analysis-header {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stats-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 2em;
+      font-weight: bold;
+      color: #1E9FFF;
+    }
+    .stat-label {
+      color: #666;
+      margin-top: 5px;
+    }
+    .chart-container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .chart {
+      height: 400px;
+      width: 100%;
+    }
+    .product-list {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .filter-bar {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .hot-product {
+      color: #FF5722;
+      font-weight: bold;
+    }
+    .slow-product {
+      color: #FFB800;
+      font-weight: bold;
+    }
+    .normal-product {
+      color: #5FB878;
+    }
+    .back-btn {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="analysis-container">
+    <!-- 返回按钮 -->
+    <div class="back-btn">
+      <button class="layui-btn layui-btn-primary" onclick="goBack()">
+        <i class="layui-icon layui-icon-left"></i> 返回数据分析
+      </button>
+      <button class="layui-btn layui-btn-warm" onclick="goTmallAnalysis()">
+        <i class="layui-icon layui-icon-cart"></i> 天猫数据分析
+      </button>
+    </div>
+
+    <!-- 页面标题 -->
+    <div class="analysis-header">
+      <h1>📊 爆品滞销品分析</h1>
+      <p>智能分析产品销量表现，识别爆品和滞销品</p>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <form class="layui-form" lay-filter="analysisFilter">
+        <div class="layui-form-item">
+          <div class="layui-inline">
+            <label class="layui-form-label">分析范围</label>
+            <div class="layui-input-inline">
+              <select name="timeRange" lay-filter="timeRange">
+                <option value="7">最近7天</option>
+                <option value="30" selected>最近30天</option>
+                <option value="90">最近90天</option>
+              </select>
+            </div>
+          </div>
+          <div class="layui-inline">
+            <label class="layui-form-label">显示数量</label>
+            <div class="layui-input-inline">
+              <select name="limit">
+                <option value="10">前10名</option>
+                <option value="20" selected>前20名</option>
+                <option value="50">前50名</option>
+              </select>
+            </div>
+          </div>
+          <div class="layui-inline">
+            <button class="layui-btn" lay-submit lay-filter="updateAnalysis">
+              <i class="layui-icon layui-icon-refresh"></i> 更新分析
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-cards">
+      <div class="stat-card">
+        <div class="stat-number" id="totalProducts">0</div>
+        <div class="stat-label">总产品数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="hotProducts">0</div>
+        <div class="stat-label">爆品数量</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="slowProducts">0</div>
+        <div class="stat-label">滞销品数量</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="totalSales">0</div>
+        <div class="stat-label">总销量</div>
+      </div>
+    </div>
+
+    <!-- 销量趋势图 -->
+    <div class="chart-container">
+      <h3>📊 每日总销量趋势</h3>
+      <div id="dailyTotalSalesChart" class="chart"></div>
+    </div>
+    <div class="chart-container">
+      <h3>📈 销量趋势分析</h3>
+      <div id="salesTrendChart" class="chart"></div>
+    </div>
+
+    <!-- 爆品分析 -->
+    <div class="chart-container">
+      <h3>🔥 爆品销量排行</h3>
+      <div id="hotProductsChart" class="chart"></div>
+    </div>
+
+    <!-- 爆品分级图表 -->
+    <div class="chart-container">
+      <h3>🔥 爆品分级分析</h3>
+      <div id="hotLevelChartsContainer"></div>
+    </div>
+
+    <!-- 滞销品分析 -->
+    <div class="chart-container">
+      <h3>📉 滞销品分析</h3>
+      <div id="slowProductsChart" class="chart"></div>
+    </div>
+
+    <!-- 产品详细列表 -->
+    <div class="product-list">
+      <h3>📋 产品详细分析</h3>
+      <table class="layui-table" id="productTable">
+        <thead>
+          <tr>
+            <th>排名</th>
+            <th>产品名称</th>
+            <th>SKU</th>
+            <th>总销量</th>
+            <th>当前库存</th>
+            <th>平均日销量</th>
+            <th>网址</th>
+          </tr>
+        </thead>
+        <tbody id="productTableBody">
+          <!-- 数据将通过JavaScript动态填充 -->
+        </tbody>
+      </table>
+      <!-- 产品表格分页 -->
+      <div id="productTablePagination"></div>
+    </div>
+  </div>
+
+  <script>
+    layui.use(['form', 'layer', 'table', 'jquery'], function(){
+      var form = layui.form;
+      var layer = layui.layer;
+      var table = layui.table;
+      var $ = layui.jquery;
+      var salesTrendChart = null;
+      var hotProductsChart = null;
+      var slowProductsChart = null;
+      var dailyTotalSalesChart = null;
+      var allWideData = [];
+      var allRecordData = [];
+      var currentTimeRange = 30;
+      var currentLimit = 20;
+      initPage();
+      function initPage() {
+        loadAllData();
+        form.on('submit(updateAnalysis)', function(data){
+          currentTimeRange = parseInt(data.field.timeRange || 30);
+          currentLimit = parseInt(data.field.limit || 20);
+          loadAllData();
+          return false;
+        });
+      }
+      function loadAllData() {
+        layer.msg('正在加载本地宽表和明细数据...', {icon: 16, time: 1000});
+        var token = localStorage.getItem('token');
+        var headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        // 并行请求宽表和明细
+        $.when(
+          $.ajax({ url: '/api/localdb/wide', type: 'GET', headers: headers }),
+          $.ajax({ url: '/api/localdb/records', type: 'GET', headers: headers })
+        ).done(function(wideRes, recordRes) {
+          allWideData = (wideRes[0] && wideRes[0].data) || [];
+          allRecordData = (recordRes[0] && recordRes[0].data) || [];
+          processData();
+        }).fail(function() {
+          layer.msg('数据加载失败', {icon:2});
+        });
+      }
+      function processData() {
+        // 1. 过滤时间范围
+        var now = new Date();
+        var startDate = new Date(now);
+        startDate.setDate(now.getDate() - currentTimeRange + 1);
+        // 2. 聚合宽表每日销量
+        var dateMap = {};
+        var skuMap = {};
+        allWideData.forEach(row => {
+          var sku = row['SKU'];
+          var name = row['产品中文名'] || row['产品名称'] || '';
+          if (!sku) return;
+          if (!skuMap[sku]) skuMap[sku] = { sku: sku, name: name, totalSales: 0, salesByDate: {}, salesList: [], currentStock: 0 };
+          let latestDate = '';
+          Object.keys(row).forEach(key => {
+            if (/^\d{4}-\d{2}-\d{2}_销量$/.test(key)) {
+              var date = key.replace('_销量', '');
+              if (new Date(date) < startDate) return;
+              var qty = parseInt(row[key]) || 0;
+              dateMap[date] = (dateMap[date] || 0) + qty;
+              skuMap[sku].totalSales += qty;
+              skuMap[sku].salesByDate[date] = (skuMap[sku].salesByDate[date] || 0) + qty;
+              skuMap[sku].salesList.push({ date: date, qty: qty });
+              // 记录最新日期
+              if (!latestDate || date > latestDate) latestDate = date;
+            }
+          });
+          // 取最新库存
+          if (latestDate && row[latestDate] !== undefined) {
+            skuMap[sku].currentStock = parseInt(row[latestDate]) || 0;
+          }
+        });
+        // 3. 聚合明细每日销量
+        allRecordData.forEach(row => {
+          var sku = row['SKU'];
+          var name = row['产品中文名'] || row['产品名称'] || '';
+          var date = row['日期'] || row['时间'];
+          var qty = parseInt(row['销量'] || 0);
+          if (!sku || !date || !qty) return;
+          var dateStr = '';
+          try {
+            var d = new Date(date.replace(/[./]/g, '-'));
+            if (!isNaN(d)) dateStr = d.toISOString().split('T')[0];
+          } catch(e) {}
+          if (!dateStr) return;
+          if (new Date(dateStr) < startDate) return;
+          dateMap[dateStr] = (dateMap[dateStr] || 0) + qty;
+          if (!skuMap[sku]) skuMap[sku] = { sku: sku, name: name, totalSales: 0, salesByDate: {}, salesList: [], currentStock: 0 };
+          skuMap[sku].totalSales += qty;
+          skuMap[sku].salesByDate[dateStr] = (skuMap[sku].salesByDate[dateStr] || 0) + qty;
+          skuMap[sku].salesList.push({ date: dateStr, qty: qty });
+        });
+        // 4. 生成每日总销量趋势图表
+        renderDailyTotalSalesChart(dateMap);
+        // 5. 统计卡片
+        var skuArr = Object.values(skuMap);
+        $('#totalProducts').text(skuArr.length);
+        $('#totalSales').text(skuArr.reduce((sum, s) => sum + s.totalSales, 0));
+        skuArr.sort((a, b) => b.totalSales - a.totalSales);
+        var hotArr = skuArr.slice(0, currentLimit);
+        var slowArr = skuArr.filter(s => s.totalSales <= 5);
+        $('#hotProducts').text(hotArr.length);
+        $('#slowProducts').text(slowArr.length);
+        // 6. 其它分析
+        generateSalesTrendChart(skuArr, currentTimeRange);
+        generateHotProductsChart(skuArr);
+        generateHotLevelCharts(skuArr);
+        generateSlowProductsList(slowArr);
+        generateProductTableWithPagination(skuArr);
+        layer.msg('爆品滞销品分析完成！', {icon: 1});
+      }
+      function renderDailyTotalSalesChart(dateMap) {
+        var chartDom = document.getElementById('dailyTotalSalesChart');
+        if (dailyTotalSalesChart) dailyTotalSalesChart.dispose();
+        dailyTotalSalesChart = echarts.init(chartDom);
+        var dates = Object.keys(dateMap).sort();
+        var values = dates.map(d => dateMap[d]);
+        var option = {
+          title: { text: '每日总销量趋势', left: 'center' },
+          tooltip: { trigger: 'axis' },
+          xAxis: { type: 'category', data: dates },
+          yAxis: { type: 'value' },
+          series: [{ name: '总销量', type: 'line', data: values, smooth: true, itemStyle: { color: '#FF5722' } }]
+        };
+        dailyTotalSalesChart.setOption(option);
+      }
+      
+      // 生成销量趋势图
+      function generateSalesTrendChart(data, timeRange) {
+        const chartDom = document.getElementById('salesTrendChart');
+        if (salesTrendChart) {
+          salesTrendChart.dispose();
+        }
+        salesTrendChart = echarts.init(chartDom);
+        
+        // 按销量排序，取前10名
+        const topProducts = data.slice(0, 10);
+        
+        const option = {
+          title: {
+            text: '销量趋势分析',
+            left: 'center'
+          },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            }
+          },
+          legend: {
+            data: topProducts.map(item => item.name),
+            type: 'scroll',
+            bottom: 10
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '15%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            data: ['总销量', '平均日销量']
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: topProducts.map((item, index) => ({
+            name: item.name,
+            type: 'bar',
+            data: [item.totalSales, Math.round(item.totalSales / timeRange * 10) / 10],
+            itemStyle: {
+              color: index < 3 ? '#FF5722' : '#1E9FFF'
+            }
+          }))
+        };
+        
+        salesTrendChart.setOption(option);
+      }
+      
+      // 生成爆品图表
+      function generateHotProductsChart(hotProducts) {
+        const chartDom = document.getElementById('hotProductsChart');
+        if (hotProductsChart) {
+          hotProductsChart.dispose();
+        }
+        hotProductsChart = echarts.init(chartDom);
+        
+        const option = {
+          title: {
+            text: '爆品销量排行',
+            left: 'center'
+          },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            }
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'value'
+          },
+          yAxis: {
+            type: 'category',
+            data: hotProducts.slice(0, 10).map(item => item.name)
+          },
+          series: [{
+            name: '销量',
+            type: 'bar',
+            data: hotProducts.slice(0, 10).map(item => item.totalSales),
+            itemStyle: {
+              color: '#FF5722'
+            }
+          }]
+        };
+        
+        hotProductsChart.setOption(option);
+      }
+      
+      // 生成爆品分级图表
+      function generateHotLevelCharts(hotLevelCharts) {
+        const chartContainer = document.getElementById('hotLevelChartsContainer');
+        chartContainer.innerHTML = '';
+        
+        // 创建按钮组
+        const buttonGroup = document.createElement('div');
+        buttonGroup.style.textAlign = 'center';
+        buttonGroup.style.marginBottom = '20px';
+        buttonGroup.innerHTML = `
+          <button class="layui-btn layui-btn-sm layui-btn-primary" data-level="10">前10</button>
+          <button class="layui-btn layui-btn-sm" data-level="20">前20</button>
+          <button class="layui-btn layui-btn-sm" data-level="50">前50</button>
+          <button class="layui-btn layui-btn-sm" data-level="100">前100</button>
+        `;
+        chartContainer.appendChild(buttonGroup);
+        
+        // 创建图表容器
+        const chartDiv = document.createElement('div');
+        chartDiv.style.height = '400px';
+        chartDiv.id = 'hotLevelChart';
+        chartContainer.appendChild(chartDiv);
+        
+        // 初始化图表
+        const chart = echarts.init(chartDiv);
+        let currentLevel = 10;
+        
+        // 更新图表函数
+        function updateChart(level) {
+          const data = hotLevelCharts.slice(0, level); // 只取前level个
+          const option = {
+            title: {
+              text: `爆品销量排行（前${level}）`,
+              left: 'center'
+            },
+            tooltip: {
+              trigger: 'axis',
+              axisPointer: { type: 'shadow' },
+              formatter: function(params) {
+                // params 是数组，取第一个
+                const p = params[0];
+                const item = data[p.dataIndex];
+                return `
+                  <div style="min-width:180px;">
+                    <b>${item.name}</b><br/>
+                    <span style='color:#FF5722;'>●</span> 销量：${item.totalSales}<br/>
+                    <span style='color:#16baaa;'>●</span> 库存：${item.currentStock}
+                  </div>
+                `;
+              }
+            },
+            grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+            xAxis: { type: 'value' },
+            yAxis: {
+              type: 'category',
+              data: data.map(item => item.name)
+            },
+            series: [{
+              name: '销量',
+              type: 'bar',
+              data: data.map(item => item.totalSales),
+              itemStyle: { color: '#FF5722' }
+            }]
+          };
+          chart.setOption(option);
+        }
+        
+        // 初始化显示前10
+        updateChart(10);
+        
+        // 绑定按钮事件
+        buttonGroup.addEventListener('click', function(e) {
+          if (e.target.tagName === 'BUTTON') {
+            const level = parseInt(e.target.getAttribute('data-level'));
+            currentLevel = level;
+            
+            // 更新按钮状态
+            buttonGroup.querySelectorAll('button').forEach(btn => {
+              btn.className = 'layui-btn layui-btn-sm';
+            });
+            e.target.className = 'layui-btn layui-btn-sm layui-btn-primary';
+            
+            // 更新图表
+            updateChart(level);
+          }
+        });
+      }
+      
+      // 生成滞销品列表
+      function generateSlowProductsList(slowProducts) {
+        const chartDom = document.getElementById('slowProductsChart');
+        if (slowProductsChart) slowProductsChart.dispose();
+        slowProductsChart = echarts.init(chartDom);
+        if (!slowProducts || slowProducts.length === 0) {
+          slowProductsChart.setOption({
+            title: { text: '滞销品分析', left: 'center' },
+            graphic: [{ type: 'text', left: 'center', top: 'middle', style: { text: '暂无滞销品数据', fontSize: 16, fill: '#999' } }]
+          });
+          return;
+        }
+        // 只显示前10滞销品
+        const data = slowProducts.slice(0, 10);
+        const option = {
+          title: { text: '滞销品（销量≤5）前10', left: 'center' },
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+          xAxis: { type: 'value' },
+          yAxis: { type: 'category', data: data.map(item => item.name) },
+          series: [{ name: '销量', type: 'bar', data: data.map(item => item.totalSales), itemStyle: { color: '#FFB800' } }]
+        };
+        slowProductsChart.setOption(option);
+      }
+      
+      // 生成产品表格（分页）
+      let currentPage = 1;
+      const pageSize = 20;
+      let tableData = [];
+      function generateProductTableWithPagination(data) {
+        tableData = data;
+        renderProductTablePage(1);
+        renderPagination();
+      }
+      function renderProductTablePage(page) {
+        currentPage = page;
+        const tbody = $('#productTableBody');
+        tbody.empty();
+        const start = (page - 1) * pageSize;
+        const end = start + pageSize;
+        const pageData = tableData.slice(start, end);
+        pageData.forEach((item, index) => {
+          // 使用后端返回的url字段
+          const url = item.url || '';
+          const urlHtml = url && url !== '未找到' && url !== 'null' && url !== 'undefined' ? 
+            `<a href="${url}" target="_blank">${url}</a>` : '-';
+          
+          const row = `
+            <tr>
+              <td>${start + index + 1}</td>
+              <td>${item.name}</td>
+              <td>${item.sku}</td>
+              <td>${item.totalSales}</td>
+              <td>${item.currentStock}</td>
+              <td>${Math.round(item.totalSales / 30 * 10) / 10}</td>
+              <td>${urlHtml}</td>
+            </tr>
+          `;
+          tbody.append(row);
+        });
+      }
+      function renderPagination() {
+        const total = tableData.length;
+        const totalPages = Math.ceil(total / pageSize);
+        const pagination = $('#productTablePagination');
+        pagination.empty();
+        // 居中容器
+        const centerDiv = $('<div style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;"></div>');
+        // 上一页
+        const prevBtn = $(`<button class="layui-btn layui-btn-sm" ${currentPage === 1 ? 'disabled' : ''}>上一页</button>`);
+        prevBtn.on('click', function() { if(currentPage > 1) { renderProductTablePage(currentPage - 1); renderPagination(); } });
+        centerDiv.append(prevBtn);
+        // 数字页码（只显示当前页前后2页）
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, currentPage + 2);
+        if (currentPage <= 3) endPage = Math.min(5, totalPages);
+        if (currentPage >= totalPages - 2) startPage = Math.max(1, totalPages - 4);
+        if (startPage > 1) centerDiv.append('<span style="margin:0 4px;">...</span>');
+        for (let i = startPage; i <= endPage; i++) {
+          const btn = $(`<button class="layui-btn layui-btn-sm ${i === currentPage ? 'layui-btn-primary' : ''}">${i}</button>`);
+          btn.on('click', function() { renderProductTablePage(i); renderPagination(); });
+          centerDiv.append(btn);
+        }
+        if (endPage < totalPages) centerDiv.append('<span style="margin:0 4px;">...</span>');
+        // 下一页
+        const nextBtn = $(`<button class="layui-btn layui-btn-sm" ${currentPage === totalPages ? 'disabled' : ''}>下一页</button>`);
+        nextBtn.on('click', function() { if(currentPage < totalPages) { renderProductTablePage(currentPage + 1); renderPagination(); } });
+        centerDiv.append(nextBtn);
+        pagination.append(centerDiv);
+      }
+      
+      // 响应式处理
+      window.addEventListener('resize', function() {
+        if (salesTrendChart) {
+          salesTrendChart.resize();
+        }
+        if (hotProductsChart) {
+          hotProductsChart.resize();
+        }
+        if (slowProductsChart) {
+          slowProductsChart.resize();
+        }
+        if (dailyTotalSalesChart) {
+          dailyTotalSalesChart.resize();
+        }
+      });
+    });
+    
+    // 返回按钮功能
+    function goBack() {
+      window.location.href = 'data-analysis.html';
+    }
+
+    function goTmallAnalysis() {
+      window.location.href = 'tmall-hot-slow-analysis.html';
+    }
+  </script>
+</body>
+</html> 

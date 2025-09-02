@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>本地数据库管理 - 数据管理系统</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <link href="./src/css/app-header.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@16.0.1/dist/handsontable.full.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@16.0.1/styles/ht-theme-main.min.css">
+  <style>
+    body {
+      background: #f8f9fa;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header .layui-nav {
+      background: transparent;
+    }
+    .header .layui-nav .layui-nav-item a {
+      color: rgba(255,255,255,0.9);
+    }
+    .header .layui-nav .layui-nav-item a:hover {
+      color: white;
+    }
+    .header .logo {
+      font-size: 18px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    
+    /* 主导航样式 */
+    .main-nav {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      margin: 0 20px;
+    }
+    .main-nav .layui-nav-item {
+      margin: 0 5px;
+    }
+    .main-nav .layui-nav-item a {
+      padding: 0 20px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+    .main-nav .layui-nav-item a:hover,
+    .main-nav .layui-nav-item.layui-this a {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+    .main-nav .layui-nav-item a i {
+      margin-right: 6px;
+    }
+    
+    .header .user-info {
+      white-space: nowrap;
+    }
+    
+    /* 用户下拉菜单样式 */
+    .user-info .layui-nav-child dd a {
+      padding: 10px 15px;
+      color: #666;
+      transition: all 0.3s ease;
+    }
+    .user-info .layui-nav-child dd a:hover {
+      background: #f8f9fa;
+      color: #16baaa;
+    }
+    .user-info .layui-nav-child dd a i {
+      margin-right: 8px;
+      font-size: 14px;
+    }
+    
+    .content-wrapper {
+      padding: 20px;
+    }
+    
+    .page-header {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .page-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin: 0;
+    }
+    .page-subtitle {
+      color: #666;
+      margin-top: 5px;
+    }
+    .breadcrumb {
+      color: #999;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .breadcrumb a {
+      color: #16baaa;
+      text-decoration: none;
+    }
+    
+    .mode-switch {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .mode-switch .layui-btn {
+      margin: 0 10px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+    }
+    .mode-switch .layui-btn.layui-btn-primary {
+      background: #f8f9fa;
+      border: 1px solid #e6e6e6;
+      color: #666;
+    }
+    .mode-switch .layui-btn.active {
+      background: #16baaa;
+      color: white;
+      border-color: #16baaa;
+    }
+    .mode-switch .layui-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .mode-description {
+      text-align: center;
+      color: #666;
+      margin: 15px 0;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border-left: 4px solid #16baaa;
+    }
+    
+    .table-container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    
+    .table-header {
+      padding: 20px;
+      border-bottom: 1px solid #f0f0f0;
+      background: #fafafa;
+    }
+    .table-stats {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      color: #666;
+    }
+    
+    .action-buttons {
+      text-align: right;
+      margin-bottom: 15px;
+    }
+    .action-buttons .layui-btn {
+      margin-left: 10px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+    }
+    .action-buttons .layui-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .wide-table-container, .record-table-container {
+      display: none;
+    }
+    .wide-table-container.active, .record-table-container.active {
+      display: block;
+    }
+    
+    .handsontable-container {
+      padding: 20px;
+    }
+    
+    /* 表格样式统一 */
+    .layui-table-cell {
+      max-width: 300px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    /* 编辑状态栏样式 */
+    .edit-status-bar {
+      background: linear-gradient(90deg, #52c41a, #73d13d);
+      color: white;
+      padding: 8px 20px;
+      margin: 0 -20px 15px -20px;
+      border-radius: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(82, 196, 26, 0.3);
+    }
+    
+    .edit-status-bar .status-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .edit-status-bar .unsaved-indicator {
+      margin-left: 20px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+    
+    /* 已下架商品样式 */
+    .sku-offline {
+      background-color: #fff2f0 !important;
+      color: #cf1322 !important;
+      font-weight: bold !important;
+    }
+    
+    /* 批量上新弹窗样式 */
+    .batch-upload-container {
+      max-width: 500px;
+    }
+    
+    .upload-instructions {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #52c41a;
+    }
+    
+    .instruction-item {
+      margin-bottom: 15px;
+    }
+    
+    .instruction-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .upload-buttons {
+      text-align: center;
+    }
+    
+    .upload-buttons .layui-btn {
+      margin: 0 5px;
+    }
+    
+    .upload-status {
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    .upload-status.success {
+      background: #f6ffed;
+      border: 1px solid #b7eb8f;
+      color: #52c41a;
+    }
+    
+    .upload-status.error {
+      background: #fff2f0;
+      border: 1px solid #ffccc7;
+      color: #cf1322;
+    }
+    
+    .upload-status.processing {
+      background: #e6f7ff;
+      border: 1px solid #91d5ff;
+      color: #1890ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="layui-header header">
+    <div class="logo">
+      📊 数据管理系统
+    </div>
+    
+    <!-- 主导航按钮 -->
+    <ul class="layui-nav main-nav">
+      <li class="layui-nav-item">
+        <a href="dashboard.html">
+          <i class="layui-icon layui-icon-home"></i> 数据仪表盘
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="table-management.html">
+          <i class="layui-icon layui-icon-table"></i> 表格管理
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="data-upload.html">
+          <i class="layui-icon layui-icon-upload-drag"></i> 数据导入
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="data-analysis.html">
+          <i class="layui-icon layui-icon-chart"></i> 数据分析
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="virtual-inventory.html">
+          <i class="layui-icon layui-icon-engine"></i> 虚拟库存
+        </a>
+      </li>
+      <li class="layui-nav-item layui-this">
+        <a href="local-database.html">
+          <i class="layui-icon layui-icon-database"></i> 本地数据库
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="tmall-database.html">
+          <i class="layui-icon layui-icon-cart"></i> 天猫数据库
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="tmall-order.html">
+          <i class="layui-icon layui-icon-list"></i> 天猫订单
+        </a>
+      </li>
+      <li class="layui-nav-item" id="adminOnlyTopNav" style="display: none;">
+        <a href="user-management.html">
+          <i class="layui-icon layui-icon-username"></i> 用户管理
+        </a>
+      </li>
+    </ul>
+    
+    
+  </div>
+  
+  <div class="content-wrapper">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <h1 class="page-title">📊 本地数据库管理</h1>
+      <p class="page-subtitle">管理您的SKU库存和销售数据</p>
+      <div class="breadcrumb">
+        <a href="dashboard.html">首页</a> / 本地数据库
+      </div>
+    </div>
+    
+    <!-- 模式切换 -->
+    <div class="mode-switch">
+      <button class="layui-btn layui-btn-primary active" id="wideTableMode">
+        <i class="layui-icon layui-icon-table"></i> 宽表模式（最近5天）
+      </button>
+      <button class="layui-btn layui-btn-primary" id="recordMode">
+        <i class="layui-icon layui-icon-list"></i> 行记录模式（历史数据）
+      </button>
+    </div>
+    
+    <div class="mode-description" id="modeDescription">
+      宽表模式：适合日常快速录入和查看最近5天的数据，支持批量编辑
+    </div>
+
+    <!-- 宽表模式容器 -->
+    <div class="wide-table-container active" id="wideTableContainer">
+      <div class="table-container">
+        <div class="table-header">
+          <div class="table-stats">
+            <span>宽表数据管理</span>
+            <span>最近5天库存数据</span>
+          </div>
+        </div>
+        <div class="action-buttons">
+          <button class="layui-btn layui-btn-normal" id="enableEditBtn">
+            <i class="layui-icon layui-icon-edit"></i> 开始编辑
+          </button>
+          <button class="layui-btn layui-btn-primary" id="refreshBtn">
+            <i class="layui-icon layui-icon-refresh"></i> 刷新
+          </button>
+          <button class="layui-btn layui-btn-danger" id="saveWideTableBtn" disabled>
+            <i class="layui-icon layui-icon-ok"></i> 保存修改
+          </button>
+          <button class="layui-btn layui-btn-warm" id="cancelEditBtn" disabled>
+            <i class="layui-icon layui-icon-close"></i> 取消编辑
+          </button>
+          <button class="layui-btn layui-btn-normal" id="addNewProductBtn">
+            <i class="layui-icon layui-icon-add-1"></i> 上新产品
+          </button>
+          <button class="layui-btn layui-btn-warm" id="batchAddProductBtn">
+            <i class="layui-icon layui-icon-upload"></i> 批量上新
+          </button>
+          <button class="layui-btn" id="importBtn">
+            <i class="layui-icon layui-icon-upload"></i> 导入Excel
+          </button>
+          <button class="layui-btn" id="exportBtn">
+            <i class="layui-icon layui-icon-download-circle"></i> 导出Excel
+          </button>
+          <button class="layui-btn layui-btn-danger" id="clearAllDataBtn">
+            <i class="layui-icon layui-icon-close"></i> 清空所有数据
+          </button>
+        </div>
+        
+        <!-- 编辑状态提示 -->
+        <div class="edit-status-bar" id="editStatusBar" style="display: none;">
+          <div class="status-info">
+            <i class="layui-icon layui-icon-edit"></i>
+            <span>编辑模式已启用，可以修改表格数据</span>
+            <span class="unsaved-indicator" id="unsavedIndicator" style="display: none;">
+              <i class="layui-icon layui-icon-tips"></i> 有未保存的修改
+            </span>
+          </div>
+        </div>
+        <div class="handsontable-container">
+          <div id="wideTable" style="width:100%;min-height:500px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 行记录模式容器 -->
+    <div class="record-table-container" id="recordTableContainer">
+      <div class="table-container">
+        <div class="table-header">
+          <div class="table-stats">
+            <span>历史记录管理</span>
+            <span>历史数据查询</span>
+          </div>
+        </div>
+        <div class="action-buttons">
+          <button class="layui-btn" id="addRecordBtn">
+            <i class="layui-icon layui-icon-add-1"></i> 新增记录
+          </button>
+          <button class="layui-btn layui-btn-primary" id="refreshRecordBtn">
+            <i class="layui-icon layui-icon-refresh"></i> 刷新
+          </button>
+          <button class="layui-btn" id="importRecordBtn">
+            <i class="layui-icon layui-icon-upload"></i> 批量导入
+          </button>
+          <button class="layui-btn" id="exportRecordBtn">
+            <i class="layui-icon layui-icon-download-circle"></i> 导出数据
+          </button>
+          <button class="layui-btn layui-btn-warm" id="downloadRecordTemplateBtn">
+            <i class="layui-icon layui-icon-template"></i> 下载模板
+          </button>
+          <button class="layui-btn layui-btn-danger" id="clearAllRecordDataBtn">
+            <i class="layui-icon layui-icon-close"></i> 清空所有数据
+          </button>
+        </div>
+        <div style="padding: 20px;">
+          <table class="layui-hide" id="recordTable" lay-filter="recordTable"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增/编辑弹窗 -->
+  <div id="editFormModal" style="display:none;padding:20px 30px 0 0;">
+    <form class="layui-form" lay-filter="editForm">
+      <div class="layui-form-item">
+        <label class="layui-form-label">SKU</label>
+        <div class="layui-input-block">
+          <input type="text" name="sku" required lay-verify="required" placeholder="请输入SKU" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">产品中文名</label>
+        <div class="layui-input-block">
+          <input type="text" name="name" required lay-verify="required" placeholder="请输入产品中文名" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">网页链接</label>
+        <div class="layui-input-block">
+          <input type="url" name="url" placeholder="请输入网页链接" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">初始库存</label>
+        <div class="layui-input-block">
+          <input type="number" name="initialStock" required lay-verify="required|number" placeholder="请输入初始库存数量" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">日期</label>
+        <div class="layui-input-block">
+          <input type="text" name="date" required lay-verify="required|date" placeholder="如 2024-07-18 11:30" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">库存</label>
+        <div class="layui-input-block">
+          <input type="number" name="stock" required lay-verify="required|number" placeholder="请输入库存数量" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <div class="layui-input-block">
+          <button class="layui-btn" lay-submit lay-filter="submitEdit">保存</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- 上新产品弹窗 -->
+  <div id="addNewProductModal" style="display:none;padding:20px 30px 0 0;">
+    <form class="layui-form" lay-filter="addNewProductForm">
+      <div class="layui-form-item">
+        <label class="layui-form-label">SKU</label>
+        <div class="layui-input-block">
+          <input type="text" name="sku" required lay-verify="required" placeholder="请输入新产品SKU" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">产品中文名</label>
+        <div class="layui-input-block">
+          <input type="text" name="name" required lay-verify="required" placeholder="请输入产品中文名" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">网页链接</label>
+        <div class="layui-input-block">
+          <input type="url" name="url" placeholder="请输入网页链接" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">初始库存</label>
+        <div class="layui-input-block">
+          <input type="number" name="initialStock" required lay-verify="required|number" placeholder="请输入初始库存数量" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <div class="layui-input-block">
+          <button class="layui-btn layui-btn-normal" lay-submit lay-filter="submitNewProduct">添加新产品</button>
+          <button type="button" class="layui-btn layui-btn-primary" id="cancelNewProduct">取消</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- 批量上新产品弹窗 -->
+  <div id="batchAddProductModal" style="display:none;padding:20px;">
+    <div class="batch-upload-container">
+      <div class="upload-instructions">
+        <h3 style="margin-top:0;color:#333;">📋 批量上新产品说明</h3>
+        <div class="instruction-item">
+          <strong>📄 Excel格式要求：</strong>
+          <ul style="margin:8px 0;padding-left:20px;color:#666;">
+            <li>第一列：SKU （必填）</li>
+            <li>第二列：产品中文名 （必填）</li>
+            <li>第三列：网页链接 （选填）</li>
+            <li>第四列：初始库存 （必填，数字）</li>
+          </ul>
+        </div>
+        <div class="instruction-item">
+          <strong>⚠️ 注意事项：</strong>
+          <ul style="margin:8px 0;padding-left:20px;color:#666;">
+            <li>请确保SKU不重复，重复的SKU将被跳过</li>
+            <li>新产品将自动设置为上架状态</li>
+            <li>库存数据将记录到今天的日期</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="upload-area" style="margin:20px 0;">
+        <div class="upload-buttons">
+          <button class="layui-btn layui-btn-normal" id="downloadBatchTemplate">
+            <i class="layui-icon layui-icon-download-circle"></i> 下载Excel模板
+          </button>
+          <button class="layui-btn layui-btn-warm" id="selectBatchFile">
+            <i class="layui-icon layui-icon-upload"></i> 选择Excel文件
+          </button>
+        </div>
+        <div class="upload-status" id="batchUploadStatus" style="margin-top:15px;display:none;">
+          <div class="status-info"></div>
+        </div>
+      </div>
+      
+      <div style="text-align:right;margin-top:20px;">
+        <button type="button" class="layui-btn layui-btn-primary" id="cancelBatchAdd">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/modules/jquery.js"></script>
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['table', 'layer', 'form'], function(){
+      var table = layui.table;
+      var layer = layui.layer;
+      var form = layui.form;
+      var $ = layui.$;
+
+      var currentMode = 'wide'; // 当前模式：wide 或 record
+      var hot = null; // Handsontable实例
+      var isEditMode = false; // 编辑模式状态
+      var hasUnsavedChanges = false; // 是否有未保存的修改
+      var originalData = null; // 原始数据备份
+
+      // 检查登录状态
+      var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      if (!userInfo.username) {
+        layer.msg('请先登录！', {icon: 2}, function(){
+          window.location.href = 'login.html';
+        });
+        return;
+      }
+
+      // 显示用户信息（可选）
+      var cu = document.getElementById('currentUser');
+      if (cu) cu.textContent = userInfo.realname || userInfo.username;
+
+      // 模式切换
+      $('#wideTableMode').on('click', function() {
+        switchMode('wide');
+      });
+
+      $('#recordMode').on('click', function() {
+        switchMode('record');
+      });
+
+      function switchMode(mode) {
+        currentMode = mode;
+        
+        // 更新按钮状态
+        $('.mode-switch .layui-btn').removeClass('active');
+        if (mode === 'wide') {
+          $('#wideTableMode').addClass('active');
+          $('#modeDescription').text('宽表模式：适合日常快速录入和查看最近5天的数据，支持批量编辑');
+        } else {
+          $('#recordMode').addClass('active');
+          $('#modeDescription').text('行记录模式：管理历史数据，支持单条记录操作和批量导入导出');
+        }
+
+        // 切换容器显示
+        $('.wide-table-container, .record-table-container').removeClass('active');
+        if (mode === 'wide') {
+          $('#wideTableContainer').addClass('active');
+          initWideTable();
+        } else {
+          $('#recordTableContainer').addClass('active');
+          initRecordTable();
+        }
+      }
+
+      // 初始化宽表模式
+      function initWideTable() {
+        if (hot) {
+          hot.destroy();
+        }
+
+        // 字段定义 - 宽表模式，按日期分列
+        const today = new Date();
+        const columns = [
+          {data: 'SKU', type: 'text'},
+          {data: '产品中文名', type: 'text'},
+          {data: '网页链接', type: 'text'},
+          {data: '初始库存', type: 'numeric'}
+        ];
+        const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存'];
+        
+        // 生成最近5天的列（库存和销量）
+        for (let i = 4; i >= 0; i--) {
+          const date = new Date(today);
+          date.setDate(date.getDate() - i);
+          const dateStr = date.toISOString().split('T')[0];
+          
+          // 库存列
+          columns.push({data: dateStr, type: 'numeric'});
+          colHeaders.push(dateStr + '(库存)');
+          
+          // 销量列
+          columns.push({data: dateStr + '_销量', type: 'numeric'});
+          colHeaders.push(dateStr + '(销量)');
+        }
+
+        // 从后端加载宽表数据
+        loadWideTableData(columns, colHeaders);
+      }
+
+      // 加载宽表数据
+      function loadWideTableData(columns, colHeaders) {
+        var token = localStorage.getItem('token');
+        var headers = {};
+        if (token) {
+          headers['Authorization'] = 'Bearer ' + token;
+        }
+        
+        $.ajax({
+          url: '/api/localdb/wide',
+          type: 'GET',
+          headers: headers,
+          success: function(res) {
+            if(res.success) {
+              // 保存原始数据
+              originalData = JSON.parse(JSON.stringify(res.data));
+              
+              // 初始化Handsontable
+              hot = new Handsontable(document.getElementById('wideTable'), {
+                data: res.data,
+                columns: columns,
+                colHeaders: colHeaders,
+                rowHeaders: true,
+                minSpareRows: 0, // 默认不允许新增行
+                contextMenu: false, // 默认禁用右键菜单
+                manualColumnResize: true,
+                manualRowResize: true,
+                stretchH: 'all',
+                height: 600,
+                licenseKey: 'non-commercial-and-evaluation',
+                language: 'zh-CN',
+                dropdownMenu: false, // 默认禁用下拉菜单
+                filters: true,
+                columnSorting: true,
+                autoWrapRow: true,
+                autoWrapCol: true,
+                readOnly: true, // 默认只读模式
+                beforeChange: function(changes, source) {
+                  // 检查是否在编辑模式
+                  if (!isEditMode && source !== 'loadData') {
+                    layer.msg('请先点击"开始编辑"按钮才能修改数据', {icon: 2});
+                    return false;
+                  }
+                  // 标记有未保存的修改
+                  if (isEditMode && source !== 'loadData') {
+                    hasUnsavedChanges = true;
+                    updateUnsavedIndicator();
+                  }
+                },
+                afterChange: function(changes, source) {
+                  // 数据变更后重新应用样式
+                  if (source !== 'loadData') {
+                    setTimeout(function() {
+                      applyOfflineStyles();
+                    }, 100);
+                  }
+                },
+                afterLoadData: function() {
+                  // 应用下架商品样式
+                  applyOfflineStyles();
+                }
+              });
+              // 加载后自动计算销量
+              calculateSales(hot.getSourceData(), columns);
+              hot.render();
+              applyOfflineStyles();
+            } else {
+              layer.msg('数据加载失败: ' + res.error, {icon:2});
+            }
+          },
+          error: function(xhr) {
+            if (xhr.status === 401) {
+              layer.msg('请先登录', {icon:2}, function(){
+                window.location.href = 'login.html';
+              });
+            } else {
+              layer.msg('数据加载失败', {icon:2});
+            }
+          }
+        });
+      }
+
+      // 计算所有行的销量
+      function calculateSales(tableData, columns) {
+        // 获取所有日期列
+        const dateCols = columns
+          .map(col => col.data)
+          .filter(key => /^\d{4}-\d{2}-\d{2}$/.test(key));
+        tableData.forEach(row => {
+          let lastStock = null;
+          let lastDate = null;
+          dateCols.forEach((dateKey, idx) => {
+            const stock = parseInt(row[dateKey]) || 0;
+            // 查找前面最近的有库存数据的日期
+            let prevStock = null;
+            for (let j = idx - 1; j >= 0; j--) {
+              const prevKey = dateCols[j];
+              if (row[prevKey] !== undefined && row[prevKey] !== null && row[prevKey] !== '') {
+                prevStock = parseInt(row[prevKey]) || 0;
+                break;
+              }
+            }
+            // 如果找不到前一天，则销量为0
+            let sales = 0;
+            if (prevStock !== null) {
+              sales = Math.max(0, prevStock - stock);
+            }
+            row[dateKey + '_销量'] = sales;
+          });
+        });
+      }
+
+      // 初始化行记录模式
+      function initRecordTable() {
+        renderRecordTable();
+      }
+
+      // 渲染行记录表格
+      function renderRecordTable() {
+        var token = localStorage.getItem('token');
+        var headers = {};
+        if (token) {
+          headers['Authorization'] = 'Bearer ' + token;
+        }
+        
+        $.ajax({
+          url: '/api/localdb/records',
+          type: 'GET',
+          headers: headers,
+          success: function(res) {
+            if(res.success) {
+              table.render({
+                elem: '#recordTable',
+                data: res.data,
+                page: true,
+                limit: 20,
+                cols: [[
+                  {field:'SKU', title:'SKU', width:150, sort:true},
+                  {field:'产品中文名', title:'产品中文名', width:180},
+                  {field:'网页链接', title:'网页链接', width:220, templet: function(d){ return d['网页链接'] ? '<a href="'+d['网页链接']+'" target="_blank">'+d['网页链接']+'</a>' : ''; }},
+                  {field:'初始库存', title:'初始库存', width:100, sort:true},
+                  {field:'日期', title:'日期', width:160, sort:true},
+                  {field:'库存', title:'库存', width:100, sort:true},
+                  {field:'销量', title:'销量', width:100, sort:true, templet: function(d){ 
+                    return '<span style="color: ' + (d['销量'] > 0 ? '#52c41a' : '#999') + ';">' + d['销量'] + '</span>'; 
+                  }},
+                  {title:'操作', width:180, align:'center', toolbar:'#rowBar'}
+                ]],
+                text: {none: '暂无数据'}
+              });
+            } else {
+              layer.msg('数据加载失败: ' + res.error, {icon:2});
+            }
+          },
+          error: function(xhr) {
+            if (xhr.status === 401) {
+              layer.msg('请先登录', {icon:2}, function(){
+                window.location.href = 'login.html';
+              });
+            } else {
+              layer.msg('数据加载失败', {icon:2});
+            }
+          }
+        });
+      }
+
+      // 工具条模板
+      var rowBarHtml = '<div class="layui-btn-group">'
+        +'<button class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>'
+        +'<button class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</button>'
+        +'</div>';
+      $(document.body).append('<script type="text/html" id="rowBar">'+rowBarHtml+'<\/script>');
+
+      // 编辑模式控制函数
+      function enableEditMode() {
+        isEditMode = true;
+        hasUnsavedChanges = false;
+        
+        // 更新按钮状态
+        $('#enableEditBtn').prop('disabled', true).removeClass('layui-btn-normal').addClass('layui-btn-disabled');
+        $('#saveWideTableBtn').prop('disabled', false).removeClass('layui-btn-disabled');
+        $('#cancelEditBtn').prop('disabled', false).removeClass('layui-btn-disabled');
+        
+        // 显示编辑状态栏
+        $('#editStatusBar').show();
+        
+        // 启用表格编辑
+        if (hot) {
+          hot.updateSettings({
+            readOnly: false,
+            contextMenu: true,
+            minSpareRows: 1
+          });
+        }
+        
+        layer.msg('编辑模式已启用，可以修改表格数据', {icon: 1});
+      }
+      
+      function disableEditMode() {
+        isEditMode = false;
+        hasUnsavedChanges = false;
+        
+        // 更新按钮状态
+        $('#enableEditBtn').prop('disabled', false).removeClass('layui-btn-disabled').addClass('layui-btn-normal');
+        $('#saveWideTableBtn').prop('disabled', true).addClass('layui-btn-disabled');
+        $('#cancelEditBtn').prop('disabled', true).addClass('layui-btn-disabled');
+        
+        // 隐藏编辑状态栏
+        $('#editStatusBar').hide();
+        updateUnsavedIndicator();
+        
+        // 禁用表格编辑
+        if (hot) {
+          hot.updateSettings({
+            readOnly: true,
+            contextMenu: false,
+            minSpareRows: 0
+          });
+        }
+      }
+      
+      function updateUnsavedIndicator() {
+        if (hasUnsavedChanges) {
+          $('#unsavedIndicator').show();
+        } else {
+          $('#unsavedIndicator').hide();
+        }
+      }
+      
+      // 应用下架商品样式
+      function applyOfflineStyles() {
+        if (!hot) return;
+        
+        const data = hot.getSourceData();
+        data.forEach((row, rowIndex) => {
+          // 先清除之前的样式
+          hot.setCellMeta(rowIndex, 0, 'className', '');
+          
+          // 检查商品是否下架（通过上下架管理状态）
+          if (row.status === 'offline') {
+            // 对SKU列（第一列）应用红色样式
+            hot.setCellMeta(rowIndex, 0, 'className', 'sku-offline');
+          }
+        });
+        hot.render();
+      }
+      
+      // 页面离开确认
+      window.addEventListener('beforeunload', function(e) {
+        if (hasUnsavedChanges) {
+          e.preventDefault();
+          e.returnValue = '';
+          return '您有未保存的修改，确定要离开吗？';
+        }
+      });
+
+      // 新的按钮事件
+      $('#enableEditBtn').on('click', function(){
+        enableEditMode();
+      });
+
+      $('#cancelEditBtn').on('click', function(){
+        if (hasUnsavedChanges) {
+          layer.confirm('您有未保存的修改，确定要取消编辑吗？', {
+            icon: 3,
+            title: '确认取消'
+          }, function(index) {
+            // 恢复原始数据
+            if (hot && originalData) {
+              hot.loadData(JSON.parse(JSON.stringify(originalData)));
+              calculateSales(hot.getSourceData(), hot.getSettings().columns);
+              applyOfflineStyles();
+            }
+            disableEditMode();
+            layer.close(index);
+          });
+        } else {
+          disableEditMode();
+        }
+      });
+
+      $('#addNewProductBtn').on('click', function(){
+        // 清空表单
+        form.val('addNewProductForm', {
+          sku: '',
+          name: '',
+          url: '',
+          initialStock: ''
+        });
+        
+        layer.open({
+          type: 1,
+          title: '上新产品',
+          area: ['450px', '400px'],
+          content: $('#addNewProductModal'),
+          btn: [],
+          shadeClose: true
+        });
+      });
+
+      $('#cancelNewProduct').on('click', function(){
+        layer.closeAll();
+      });
+
+      $('#batchAddProductBtn').on('click', function(){
+        layer.open({
+          type: 1,
+          title: '批量上新产品',
+          area: ['600px', '500px'],
+          content: $('#batchAddProductModal'),
+          btn: [],
+          shadeClose: true
+        });
+      });
+
+      $('#cancelBatchAdd').on('click', function(){
+        layer.closeAll();
+      });
+
+      // 下载批量上新模板
+      $('#downloadBatchTemplate').on('click', function() {
+        const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存'];
+        const sampleData = [
+          ['X000001234_Black_M', 'Arc\'teryx Beta AR 夹克 黑色 M码', 'https://arcteryx.com/fr/zh/shop/mens/beta-ar-jacket', '15'],
+          ['X000001234_Black_L', 'Arc\'teryx Beta AR 夹克 黑色 L码', 'https://arcteryx.com/fr/zh/shop/mens/beta-ar-jacket', '20'],
+          ['X000005678_Blue_S', 'Arc\'teryx Gamma SL 短裤 蓝色 S码', 'https://arcteryx.com/fr/zh/shop/mens/gamma-sl-short', '10']
+        ];
+        
+        const ws = XLSX.utils.aoa_to_sheet([colHeaders, ...sampleData]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '批量上新模板');
+        XLSX.writeFile(wb, 'batch-add-products-template.xlsx');
+        
+        layer.msg('模板下载成功', {icon: 1});
+      });
+
+      // 选择批量上新文件
+      $('#selectBatchFile').on('click', function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.xlsx,.xls,.csv';
+        input.onchange = function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          
+          processBatchFile(file);
+        };
+        input.click();
+      });
+
+      // 处理批量文件
+      function processBatchFile(file) {
+        const statusDiv = $('#batchUploadStatus');
+        const statusInfo = statusDiv.find('.status-info');
+        
+        statusDiv.removeClass('success error processing').addClass('processing').show();
+        statusInfo.html('<i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> 正在解析Excel文件...');
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+            
+            if (jsonData.length < 2) {
+              throw new Error('Excel文件格式错误：至少需要包含标题行和一行数据');
+            }
+            
+            // 跳过标题行，处理数据行
+            const products = [];
+            const errors = [];
+            const today = new Date();
+            const todayKey = today.toISOString().split('T')[0];
+            
+            for (let i = 1; i < jsonData.length; i++) {
+              const row = jsonData[i];
+              if (!row || row.length < 4) {
+                errors.push(`第${i+1}行：数据不完整`);
+                continue;
+              }
+              
+              const [sku, name, url, stock] = row;
+              
+              if (!sku || !name || !stock) {
+                errors.push(`第${i+1}行：SKU、产品名称和库存为必填项`);
+                continue;
+              }
+              
+              if (isNaN(stock) || parseInt(stock) < 0) {
+                errors.push(`第${i+1}行：库存必须是非负数字`);
+                continue;
+              }
+              
+              const product = {
+                SKU: String(sku).trim(),
+                '产品中文名': String(name).trim(),
+                '网页链接': url ? String(url).trim() : '',
+                '初始库存': parseInt(stock),
+                status: 'online'
+              };
+              
+              // 添加今天的库存数据
+              product[todayKey] = parseInt(stock);
+              product[todayKey + '_销量'] = 0;
+              
+              products.push(product);
+            }
+            
+            if (products.length === 0) {
+              throw new Error('没有有效的产品数据');
+            }
+            
+            // 显示解析结果
+            let resultHtml = `✅ 成功解析 ${products.length} 个产品`;
+            if (errors.length > 0) {
+              resultHtml += `<br>⚠️ ${errors.length} 个错误：<br>${errors.slice(0, 3).join('<br>')}`;
+              if (errors.length > 3) {
+                resultHtml += `<br>...还有 ${errors.length - 3} 个错误`;
+              }
+            }
+            
+            statusDiv.removeClass('processing error').addClass('success');
+            statusInfo.html(resultHtml + '<br><br><button class="layui-btn layui-btn-sm layui-btn-normal" onclick="confirmBatchAdd()">确认添加</button>');
+            
+            // 保存产品数据到全局变量
+            window.pendingBatchProducts = products;
+            
+          } catch (error) {
+            statusDiv.removeClass('processing success').addClass('error');
+            statusInfo.html(`❌ 解析失败：${error.message}`);
+          }
+        };
+        
+        reader.readAsArrayBuffer(file);
+      }
+
+      // 确认批量添加
+      window.confirmBatchAdd = function() {
+        if (!window.pendingBatchProducts || window.pendingBatchProducts.length === 0) {
+          layer.msg('没有待添加的产品', {icon: 2});
+          return;
+        }
+        
+        const statusDiv = $('#batchUploadStatus');
+        const statusInfo = statusDiv.find('.status-info');
+        
+        statusDiv.removeClass('success error').addClass('processing');
+        statusInfo.html('<i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> 正在添加产品到数据库...');
+        
+        // 获取现有数据并检查SKU重复
+        if (hot) {
+          const existingData = hot.getSourceData();
+          const existingSkus = new Set(existingData.map(row => row.SKU).filter(Boolean));
+          
+          // 过滤掉重复的SKU
+          const newProducts = window.pendingBatchProducts.filter(product => !existingSkus.has(product.SKU));
+          const duplicateCount = window.pendingBatchProducts.length - newProducts.length;
+          
+          if (newProducts.length === 0) {
+            statusDiv.removeClass('processing').addClass('error');
+            statusInfo.html('❌ 所有产品SKU都已存在，无法添加');
+            return;
+          }
+          
+          // 合并数据
+          const updatedData = [...existingData, ...newProducts];
+          
+          // 保存到后端
+          var token = localStorage.getItem('token');
+          var headers = { 'Content-Type': 'application/json' };
+          if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+          }
+          
+          $.ajax({
+            url: '/api/localdb/wide',
+            type: 'POST',
+            headers: headers,
+            data: JSON.stringify({ data: updatedData }),
+            success: function(res) {
+              if(res.success) {
+                let resultHtml = `✅ 成功添加 ${newProducts.length} 个新产品`;
+                if (duplicateCount > 0) {
+                  resultHtml += `<br>⚠️ 跳过 ${duplicateCount} 个重复SKU`;
+                }
+                
+                statusDiv.removeClass('processing').addClass('success');
+                statusInfo.html(resultHtml);
+                
+                // 刷新表格
+                setTimeout(() => {
+                  layer.closeAll();
+                  initWideTable();
+                  layer.msg('批量上新成功！', {icon: 1});
+                }, 2000);
+                
+              } else {
+                statusDiv.removeClass('processing').addClass('error');
+                statusInfo.html('❌ 保存失败: ' + res.error);
+              }
+            },
+            error: function(xhr) {
+              statusDiv.removeClass('processing').addClass('error');
+              if (xhr.status === 401) {
+                statusInfo.html('❌ 请先登录');
+              } else {
+                statusInfo.html('❌ 保存失败，请重试');
+              }
+            }
+          });
+        }
+      };
+
+      $('#refreshBtn').on('click', function() {
+        if (hasUnsavedChanges) {
+          layer.confirm('您有未保存的修改，刷新将丢失修改，确定要继续吗？', {
+            icon: 3,
+            title: '确认刷新'
+          }, function(index) {
+            disableEditMode();
+            initWideTable();
+            layer.close(index);
+          });
+        } else {
+          initWideTable();
+        }
+      });
+
+      // 保存按钮事件
+      $('#saveWideTableBtn').on('click', function() {
+        if (!hot) return;
+        var data = hot.getSourceData();
+        var columns = hot.getSettings().columns;
+        calculateSales(data, columns);
+        var token = localStorage.getItem('token');
+        var headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = 'Bearer ' + token;
+        }
+        layer.msg('正在保存...', {icon: 16, time: 0});
+        $.ajax({
+          url: '/api/localdb/wide',
+          type: 'POST',
+          headers: headers,
+          data: JSON.stringify({ data: data }),
+          success: function(res) {
+            layer.closeAll();
+            if(res.success) {
+              layer.msg('保存成功', {icon:1});
+              // 保存成功后更新原始数据并关闭编辑模式
+              originalData = JSON.parse(JSON.stringify(data));
+              disableEditMode();
+              initWideTable();
+            } else {
+              layer.msg('保存失败: ' + res.error, {icon:2});
+            }
+          },
+          error: function(xhr) {
+            layer.closeAll();
+            if (xhr.status === 401) {
+              layer.msg('请先登录', {icon:2}, function(){
+                window.location.href = 'login.html';
+              });
+            } else {
+              layer.msg('保存失败', {icon:2});
+            }
+          }
+        });
+      });
+
+
+
+      $('#importBtn').on('click', function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.xlsx,.xls,.csv';
+        input.onchange = function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          
+          var token = localStorage.getItem('token');
+          var formData = new FormData();
+          formData.append('file', file);
+          
+          var headers = {};
+          if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+          }
+          
+          $.ajax({
+            url: '/api/localdb/wide/batch',
+            type: 'POST',
+            headers: headers,
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+              if(res.success) {
+                layer.msg('导入成功: ' + res.message, {icon:1});
+                initWideTable();
+              } else {
+                layer.msg('导入失败: ' + res.error, {icon:2});
+              }
+            },
+            error: function(xhr) {
+              if (xhr.status === 401) {
+                layer.msg('请先登录', {icon:2}, function(){
+                  window.location.href = 'login.html';
+                });
+              } else {
+                layer.msg('导入失败', {icon:2});
+              }
+            }
+          });
+        };
+        input.click();
+      });
+
+      $('#exportBtn').on('click', function() {
+        var token = localStorage.getItem('token');
+        var headers = {};
+        if (token) {
+          headers['Authorization'] = 'Bearer ' + token;
+        }
+        
+        $.ajax({
+          url: '/api/localdb/wide/export',
+          type: 'GET',
+          headers: headers,
+          xhrFields: {
+            responseType: 'blob'
+          },
+          success: function(data) {
+            const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'wide-table-export.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            layer.msg('导出成功', {icon:1});
+          },
+          error: function(xhr) {
+            if (xhr.status === 401) {
+              layer.msg('请先登录', {icon:2}, function(){
+                window.location.href = 'login.html';
+              });
+            } else {
+              layer.msg('导出失败', {icon:2});
+            }
+          }
+        });
+      });
+
+
+
+      $('#clearAllDataBtn').on('click', function() {
+        layer.confirm('⚠️ 警告：此操作将清空所有宽表数据，且无法恢复！确定要继续吗？', {
+          icon: 3,
+          title: '确认清空',
+          btn: ['确定清空', '取消']
+        }, function(index) {
+          var token = localStorage.getItem('token');
+          var headers = {};
+          if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+          }
+          
+          $.ajax({
+            url: '/api/localdb/wide/clear-all',
+            type: 'POST',
+            headers: headers,
+            success: function(res) {
+              if(res.success) {
+                layer.msg('清空成功: ' + res.message, {icon:1});
+                initWideTable();
+              } else {
+                layer.msg('清空失败: ' + res.error, {icon:2});
+              }
+            },
+            error: function(xhr) {
+              if (xhr.status === 401) {
+                layer.msg('请先登录', {icon:2}, function(){
+                  window.location.href = 'login.html';
+                });
+              } else {
+                layer.msg('清空失败', {icon:2});
+              }
+            }
+          });
+          layer.close(index);
+        });
+      });
+
+      // 行记录模式按钮事件
+      $('#addRecordBtn').on('click', function(){
+        form.val('editForm', {sku:'', name:'', url:'', initialStock:'', date:'', stock:''});
+        layer.open({
+          type:1, title:'新增记录', area:['400px','480px'], content:$('#editFormModal'),
+          btn:[], shadeClose:true
+        });
+      });
+
+      $('#refreshRecordBtn').on('click', renderRecordTable);
+
+      $('#importRecordBtn').on('click', function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.xlsx,.xls,.csv';
+        input.onchange = function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          
+          var token = localStorage.getItem('token');
+          var formData = new FormData();
+          formData.append('file', file);
+          
+          var headers = {};
+          if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+          }
+          
+          $.ajax({
+            url: '/api/localdb/records/batch',
+            type: 'POST',
+            headers: headers,
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+              if(res.success) {
+                layer.msg('导入成功: ' + res.message, {icon:1});
+                renderRecordTable();
+              } else {
+                layer.msg('导入失败: ' + res.error, {icon:2});
+              }
+            },
+            error: function(xhr) {
+              if (xhr.status === 401) {
+                layer.msg('请先登录', {icon:2}, function(){
+                  window.location.href = 'login.html';
+                });
+              } else {
+                layer.msg('导入失败', {icon:2});
+              }
+            }
+          });
+        };
+        input.click();
+      });
+
+      $('#exportRecordBtn').on('click', function() {
+        var token = localStorage.getItem('token');
+        var headers = {};
+        if (token) {
+          headers['Authorization'] = 'Bearer ' + token;
+        }
+        
+        $.ajax({
+          url: '/api/localdb/records/export',
+          type: 'GET',
+          headers: headers,
+          xhrFields: {
+            responseType: 'blob'
+          },
+          success: function(data) {
+            const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'records-export.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            layer.msg('导出成功', {icon:1});
+          },
+          error: function(xhr) {
+            if (xhr.status === 401) {
+              layer.msg('请先登录', {icon:2}, function(){
+                window.location.href = 'login.html';
+              });
+            } else {
+              layer.msg('导出失败', {icon:2});
+            }
+          }
+        });
+      });
+
+      $('#downloadRecordTemplateBtn').on('click', function() {
+        const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存', '日期（YYYY-MM-DD HH:mm）', '库存'];
+        const ws = XLSX.utils.aoa_to_sheet([colHeaders]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '记录模板');
+        XLSX.writeFile(wb, 'records-template.xlsx');
+      });
+
+      $('#clearAllRecordDataBtn').on('click', function() {
+        layer.confirm('⚠️ 警告：此操作将清空所有历史记录数据，且无法恢复！确定要继续吗？', {
+          icon: 3,
+          title: '确认清空',
+          btn: ['确定清空', '取消']
+        }, function(index) {
+          var token = localStorage.getItem('token');
+          var headers = {};
+          if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+          }
+          
+          $.ajax({
+            url: '/api/localdb/records/clear-all',
+            type: 'POST',
+            headers: headers,
+            success: function(res) {
+              if(res.success) {
+                layer.msg('清空成功: ' + res.message, {icon:1});
+                renderRecordTable();
+              } else {
+                layer.msg('清空失败: ' + res.error, {icon:2});
+              }
+            },
+            error: function(xhr) {
+              if (xhr.status === 401) {
+                layer.msg('请先登录', {icon:2}, function(){
+                  window.location.href = 'login.html';
+                });
+              } else {
+                layer.msg('清空失败', {icon:2});
+              }
+            }
+          });
+          layer.close(index);
+        });
+      });
+
+      // 编辑/删除
+      table.on('tool(recordTable)', function(obj){
+        var data = obj.data;
+        if(obj.event === 'edit'){
+          form.val('editForm', {
+            sku: data.SKU,
+            name: data['产品中文名'],
+            url: data['网页链接'],
+            initialStock: data['初始库存'],
+            date: data['日期'],
+            stock: data['库存']
+          });
+          layer.open({
+            type:1, title:'编辑记录', area:['400px','480px'], content:$('#editFormModal'),
+            btn:[], shadeClose:true
+          });
+          $('#editFormModal').data('editId', data.id);
+        } else if(obj.event === 'del'){
+          layer.confirm('确定要删除该记录吗？', function(index){
+            var token = localStorage.getItem('token');
+            var headers = {};
+            if (token) {
+              headers['Authorization'] = 'Bearer ' + token;
+            }
+            
+            $.ajax({
+              url: '/api/localdb/records/'+data.id,
+              type: 'DELETE',
+              headers: headers,
+              success: function(res){
+                if(res.success){
+                  layer.msg('删除成功', {icon:1});
+                  renderRecordTable();
+                }else{
+                  layer.msg('删除失败: '+res.error, {icon:2});
+                }
+              },
+              error: function(xhr) {
+                if (xhr.status === 401) {
+                  layer.msg('请先登录', {icon:2}, function(){
+                    window.location.href = 'login.html';
+                  });
+                } else {
+                  layer.msg('删除失败', {icon:2});
+                }
+              }
+            });
+            layer.close(index);
+          });
+        }
+      });
+
+      // 表单提交
+      form.on('submit(submitEdit)', function(formObj){
+        var editId = $('#editFormModal').data('editId');
+        var method = editId ? 'PUT' : 'POST';
+        var url = '/api/localdb/records' + (editId ? ('/'+editId) : '');
+        var data = {
+          SKU: formObj.field.sku,
+          '产品中文名': formObj.field.name,
+          '网页链接': formObj.field.url,
+          '初始库存': formObj.field.initialStock,
+          '日期': formObj.field.date,
+          '库存': formObj.field.stock
+        };
+        
+        var token = localStorage.getItem('token');
+        var headers = {
+          'Content-Type': 'application/json'
+        };
+        if (token) {
+          headers['Authorization'] = 'Bearer ' + token;
+        }
+        
+        $.ajax({
+          url: url,
+          type: method,
+          headers: headers,
+          data: JSON.stringify(data),
+          success: function(res){
+            if(res.success){
+              layer.msg('保存成功', {icon:1});
+              layer.closeAll();
+              if (currentMode === 'record') {
+                renderRecordTable();
+              }
+            }else{
+              layer.msg('保存失败: '+res.error, {icon:2});
+            }
+          },
+          error: function(xhr) {
+            if (xhr.status === 401) {
+              layer.msg('请先登录', {icon:2}, function(){
+                window.location.href = 'login.html';
+              });
+            } else {
+              layer.msg('保存失败', {icon:2});
+            }
+          }
+        });
+        return false;
+      });
+
+      // 新产品表单提交
+      form.on('submit(submitNewProduct)', function(formObj){
+        var today = new Date();
+        var dateStr = today.getFullYear() + '-' + 
+                     String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                     String(today.getDate()).padStart(2, '0') + ' ' +
+                     String(today.getHours()).padStart(2, '0') + ':' +
+                     String(today.getMinutes()).padStart(2, '0');
+        
+        var newProduct = {
+          SKU: formObj.field.sku,
+          '产品中文名': formObj.field.name,
+          '网页链接': formObj.field.url,
+          '初始库存': parseInt(formObj.field.initialStock),
+          status: 'online' // 新产品默认上架
+        };
+        
+        // 添加今天的库存数据
+        var todayKey = today.toISOString().split('T')[0];
+        newProduct[todayKey] = parseInt(formObj.field.initialStock);
+        newProduct[todayKey + '_销量'] = 0;
+        
+        // 检查SKU是否已存在
+        if (hot) {
+          var existingData = hot.getSourceData();
+          var skuExists = existingData.some(row => row.SKU === formObj.field.sku);
+          if (skuExists) {
+            layer.msg('SKU已存在，请使用不同的SKU', {icon: 2});
+            return false;
+          }
+          
+          // 添加到表格
+          existingData.push(newProduct);
+          
+          // 保存数据
+          var token = localStorage.getItem('token');
+          var headers = { 'Content-Type': 'application/json' };
+          if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+          }
+          
+          layer.msg('正在添加新产品...', {icon: 16, time: 0});
+          $.ajax({
+            url: '/api/localdb/wide',
+            type: 'POST',
+            headers: headers,
+            data: JSON.stringify({ data: existingData }),
+            success: function(res) {
+              layer.closeAll();
+              if(res.success) {
+                layer.msg('新产品添加成功', {icon:1});
+                layer.closeAll();
+                initWideTable();
+              } else {
+                layer.msg('添加失败: ' + res.error, {icon:2});
+              }
+            },
+            error: function(xhr) {
+              layer.closeAll();
+              if (xhr.status === 401) {
+                layer.msg('请先登录', {icon:2}, function(){
+                  window.location.href = 'login.html';
+                });
+              } else {
+                layer.msg('添加失败', {icon:2});
+              }
+            }
+          });
+        }
+        return false;
+      });
+
+      // 初始加载宽表模式
+      initWideTable();
+    });
+
+    // 退出登录
+    function logout() {
+      layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index){
+        localStorage.removeItem('currentUser');
+        layer.close(index);
+        layer.msg('已安全退出！', {icon: 1}, function(){
+          window.location.href = 'login.html';
+        });
+      });
+    }
+
+    // 切换账户
+    function switchAccount() {
+      layer.confirm('切换账户将退出当前登录，是否继续？', {
+        icon: 3, 
+        title: '切换账户',
+        btn: ['确定', '取消']
+      }, function(index) {
+        localStorage.removeItem('currentUser');
+        layer.close(index);
+        layer.msg('正在切换账户...', {icon: 16, time: 1000}, function(){
+          window.location.href = 'login.html';
+        });
+      });
+    }
+  </script>
+  <!-- Handsontable JS -->
+  <script src="https://cdn.jsdelivr.net/npm/handsontable@16.0.1/dist/handsontable.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</body>
+</html> 

@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>用户管理 - 数据管理系统</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f8f9fa;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header .layui-nav {
+      background: transparent;
+    }
+    .header .layui-nav .layui-nav-item a {
+      color: rgba(255,255,255,0.9);
+    }
+    .header .layui-nav .layui-nav-item a:hover {
+      color: white;
+    }
+    .header .logo {
+      font-size: 18px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    
+    /* 主导航样式 */
+    .main-nav {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      margin: 0 20px;
+    }
+    .main-nav .layui-nav-item {
+      margin: 0 5px;
+    }
+    .main-nav .layui-nav-item a {
+      padding: 0 20px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+    .main-nav .layui-nav-item a:hover,
+    .main-nav .layui-nav-item.layui-this a {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+    .main-nav .layui-nav-item a i {
+      margin-right: 6px;
+    }
+    
+    .header .user-info {
+      white-space: nowrap;
+    }
+    
+    /* 用户下拉菜单样式 */
+    .user-info .layui-nav-child dd a {
+      padding: 10px 15px;
+      color: #666;
+      transition: all 0.3s ease;
+    }
+    .user-info .layui-nav-child dd a:hover {
+      background: #f8f9fa;
+      color: #16baaa;
+    }
+    .user-info .layui-nav-child dd a i {
+      margin-right: 8px;
+      font-size: 14px;
+    }
+    
+    .content-wrapper {
+      padding: 20px;
+    }
+    
+    .page-header {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .page-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin: 0;
+    }
+    .page-subtitle {
+      color: #666;
+      margin-top: 5px;
+    }
+    .breadcrumb {
+      color: #999;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .breadcrumb a {
+      color: #16baaa;
+      text-decoration: none;
+    }
+    
+    .stats-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .stats-card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .stats-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+    }
+    .stats-card.blue::before { background: #16baaa; }
+    .stats-card.green::before { background: #52c41a; }
+    .stats-card.orange::before { background: #fa8c16; }
+    .stats-card.red::before { background: #f5222d; }
+    
+    .stats-icon {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+    .stats-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    .stats-label {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .action-buttons {
+      text-align: right;
+      margin-bottom: 15px;
+    }
+    
+    .table-container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .table-header {
+      padding: 20px;
+      border-bottom: 1px solid #f0f0f0;
+      background: #fafafa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .table-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      margin: 0;
+    }
+    
+    .user-status {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .status-active {
+      background: #f6ffed;
+      color: #52c41a;
+      border: 1px solid #b7eb8f;
+    }
+    .status-inactive {
+      background: #fff2e8;
+      color: #fa8c16;
+      border: 1px solid #ffd591;
+    }
+    .status-locked {
+      background: #fff1f0;
+      color: #f5222d;
+      border: 1px solid #ffa39e;
+    }
+    
+    .role-badge {
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .role-admin {
+      background: #e6f7ff;
+      color: #1890ff;
+    }
+    .role-analyst {
+      background: #f9f0ff;
+      color: #722ed1;
+    }
+    
+    .modal-content {
+      padding: 20px;
+    }
+    .form-section {
+      margin-bottom: 20px;
+    }
+    .form-section-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #333;
+      border-bottom: 1px solid #f0f0f0;
+      padding-bottom: 8px;
+    }
+    
+    .login-history {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .history-item:last-child {
+      border-bottom: none;
+    }
+    .history-info {
+      flex: 1;
+    }
+    .history-time {
+      font-weight: bold;
+      color: #333;
+    }
+    .history-ip {
+      font-size: 12px;
+      color: #999;
+      margin-top: 2px;
+    }
+    .history-status {
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .login-success {
+      background: #f6ffed;
+      color: #52c41a;
+    }
+    .login-failed {
+      background: #fff1f0;
+      color: #f5222d;
+    }
+  </style>
+</head>
+<body>
+  <div class="layui-header header">
+    <div class="logo">
+      📊 数据管理系统
+    </div>
+    
+    <!-- 主导航按钮 -->
+    <ul class="layui-nav main-nav">
+      <li class="layui-nav-item">
+        <a href="dashboard.html">
+          <i class="layui-icon layui-icon-home"></i> 数据仪表盘
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="table-management.html">
+          <i class="layui-icon layui-icon-table"></i> 表格管理
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="data-upload.html">
+          <i class="layui-icon layui-icon-upload-drag"></i> 数据导入
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="data-analysis.html">
+          <i class="layui-icon layui-icon-chart"></i> 数据分析
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="local-database.html">
+          <i class="layui-icon layui-icon-database"></i> 本地数据库
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="tmall-database.html">
+          <i class="layui-icon layui-icon-cart"></i> 天猫数据库
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="tmall-order.html">
+          <i class="layui-icon layui-icon-list"></i> 天猫订单
+        </a>
+      </li>
+      <li class="layui-nav-item layui-this" id="adminOnlyTopNav">
+        <a href="user-management.html">
+          <i class="layui-icon layui-icon-username"></i> 用户管理
+        </a>
+      </li>
+    </ul>
+    
+    
+  </div>
+  
+  <div class="content-wrapper">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <h1 class="page-title">👥 用户管理</h1>
+      <p class="page-subtitle">管理系统用户，控制访问权限和安全设置</p>
+      <div class="breadcrumb">
+        <a href="dashboard.html">首页</a> / 用户管理
+      </div>
+    </div>
+    
+    <!-- 统计卡片 -->
+    <div class="stats-cards">
+      <div class="stats-card blue">
+        <div class="stats-icon">👥</div>
+        <div class="stats-value" id="totalUsers">2</div>
+        <div class="stats-label">总用户数</div>
+      </div>
+      <div class="stats-card green">
+        <div class="stats-icon">✅</div>
+        <div class="stats-value" id="activeUsers">2</div>
+        <div class="stats-label">活跃用户</div>
+      </div>
+      <div class="stats-card orange">
+        <div class="stats-icon">👑</div>
+        <div class="stats-value" id="adminUsers">1</div>
+        <div class="stats-label">管理员</div>
+      </div>
+      <div class="stats-card red">
+        <div class="stats-icon">🔒</div>
+        <div class="stats-value" id="lockedUsers">0</div>
+        <div class="stats-label">锁定用户</div>
+      </div>
+    </div>
+    
+    <!-- 操作按钮 -->
+    <div class="action-buttons">
+      <button class="layui-btn" onclick="addUser()">
+        <i class="layui-icon layui-icon-add-1"></i> 新增用户
+      </button>
+      <button class="layui-btn layui-btn-normal" onclick="exportUsers()">
+        <i class="layui-icon layui-icon-download-circle"></i> 导出用户
+      </button>
+      <button class="layui-btn layui-btn-warm" onclick="refreshUsers()">
+        <i class="layui-icon layui-icon-refresh"></i> 刷新数据
+      </button>
+    </div>
+    
+    <!-- 用户列表 -->
+    <div class="table-container">
+      <div class="table-header">
+        <h3 class="table-title">用户列表</h3>
+        <div>
+          <input type="text" placeholder="搜索用户..." class="layui-input" style="width: 200px; display: inline-block;" id="searchInput">
+          <button class="layui-btn layui-btn-sm layui-btn-normal" onclick="searchUsers()">
+            <i class="layui-icon layui-icon-search"></i>
+          </button>
+        </div>
+      </div>
+      <table class="layui-hide" id="userTable" lay-filter="userTable"></table>
+    </div>
+    
+    <!-- 登录历史 -->
+    <div class="table-container">
+      <div class="table-header">
+        <h3 class="table-title">📝 登录历史</h3>
+        <div>
+          <select id="historyFilter" class="layui-input" style="width: 150px; display: inline-block;">
+            <option value="all">全部用户</option>
+            <option value="admin">管理员</option>
+            <option value="analyst">分析员</option>
+          </select>
+          <button class="layui-btn layui-btn-sm layui-btn-normal" onclick="filterHistory()">
+            <i class="layui-icon layui-icon-search"></i> 筛选
+          </button>
+        </div>
+      </div>
+      <div class="login-history" id="loginHistory">
+        <!-- 动态生成登录历史 -->
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script type="text/html" id="userTableBar">
+    <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+    <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="resetPwd">重置密码</a>
+    <a class="layui-btn layui-btn-xs layui-btn-warm" lay-event="history">登录历史</a>
+    {{# if(d.status === 'active'){ }}
+      <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="disable">禁用</a>
+    {{# } else { }}
+      <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="enable">启用</a>
+    {{# } }}
+  </script>
+  
+  <script>
+    layui.use(['table', 'form', 'layer', 'laydate'], function(){
+      var table = layui.table;
+      var form = layui.form;
+      var layer = layui.layer;
+      var laydate = layui.laydate;
+      
+              var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      
+      // 模拟用户数据
+      var mockUsers = [
+        {
+          id: 1,
+          username: 'admin',
+          email: 'admin@company.com',
+          role: 'admin',
+          roleName: '超级管理员',
+          status: 'active',
+          lastLogin: '2024-07-15 17:30:25',
+          createTime: '2024-01-01 09:00:00',
+          loginCount: 156
+        },
+        {
+          id: 2,
+          username: 'analyst',
+          email: 'analyst@company.com',
+          role: 'analyst',
+          roleName: '数据分析员',
+          status: 'active',
+          lastLogin: '2024-07-15 16:45:12',
+          createTime: '2024-02-15 14:30:00',
+          loginCount: 89
+        }
+      ];
+      
+      // 模拟登录历史
+      var mockLoginHistory = [
+        {
+          username: 'admin',
+          time: '2024-07-15 17:30:25',
+          ip: '192.168.1.91',
+          browser: 'Chrome 126.0',
+          status: 'success'
+        },
+        {
+          username: 'analyst',
+          time: '2024-07-15 16:45:12',
+          ip: '192.168.1.91',
+          browser: 'Chrome 126.0',
+          status: 'success'
+        },
+        {
+          username: 'admin',
+          time: '2024-07-15 09:15:33',
+          ip: '192.168.1.91',
+          browser: 'Chrome 126.0',
+          status: 'success'
+        },
+        {
+          username: 'admin',
+          time: '2024-07-14 18:22:11',
+          ip: '192.168.1.88',
+          browser: 'Firefox 127.0',
+          status: 'failed'
+        }
+      ];
+      
+      // 初始化页面
+      initPage();
+      
+      function initPage() {
+        // 检查登录状态和权限
+        if (!userInfo.username) {
+          layer.msg('请先登录！', {icon: 2}, function(){
+            window.location.href = 'login.html';
+          });
+          return;
+        }
+        
+        if (userInfo.role !== 'admin') {
+          layer.msg('您没有权限访问此页面！', {icon: 2}, function(){
+            window.location.href = 'dashboard.html';
+          });
+          return;
+        }
+        
+        // 显示用户信息（可选）
+        var cu = document.getElementById('currentUser');
+        if (cu) cu.textContent = userInfo.realname || userInfo.username;
+        
+        // 初始化表格
+        initUserTable();
+        
+        // 加载登录历史
+        loadLoginHistory();
+        
+        // 更新统计数据
+        updateStats();
+      }
+      
+      function initUserTable() {
+        table.render({
+          elem: '#userTable',
+          data: mockUsers,
+          cols: [[
+            {field: 'id', title: 'ID', width: 80, sort: true},
+            {field: 'username', title: '用户名', width: 120},
+            {field: 'email', title: '邮箱', width: 180},
+            {field: 'roleName', title: '角色', width: 120, templet: function(d){
+              var roleClass = d.role === 'admin' ? 'role-admin' : 'role-analyst';
+              return '<span class="role-badge ' + roleClass + '">' + d.roleName + '</span>';
+            }},
+            {field: 'status', title: '状态', width: 100, templet: function(d){
+              var statusClass = 'status-' + d.status;
+              var statusText = d.status === 'active' ? '正常' : (d.status === 'inactive' ? '禁用' : '锁定');
+              return '<span class="user-status ' + statusClass + '">' + statusText + '</span>';
+            }},
+            {field: 'lastLogin', title: '最后登录', width: 150},
+            {field: 'loginCount', title: '登录次数', width: 100, sort: true},
+            {field: 'createTime', title: '创建时间', width: 150},
+            {title: '操作', width: 280, toolbar: '#userTableBar', fixed: 'right'}
+          ]],
+          page: true,
+          limit: 10
+        });
+        
+        // 监听工具条
+        table.on('tool(userTable)', function(obj){
+          var data = obj.data;
+          var layEvent = obj.event;
+          
+          if(layEvent === 'edit'){
+            editUser(data);
+          } else if(layEvent === 'resetPwd'){
+            resetPassword(data);
+          } else if(layEvent === 'history'){
+            showUserHistory(data);
+          } else if(layEvent === 'disable'){
+            toggleUserStatus(data, 'inactive');
+          } else if(layEvent === 'enable'){
+            toggleUserStatus(data, 'active');
+          }
+        });
+      }
+      
+      function loadLoginHistory() {
+        var historyHtml = '';
+        mockLoginHistory.forEach(function(item) {
+          var statusClass = item.status === 'success' ? 'login-success' : 'login-failed';
+          var statusText = item.status === 'success' ? '成功' : '失败';
+          
+          historyHtml += `
+            <div class="history-item">
+              <div class="history-info">
+                <div class="history-time">${item.username} - ${item.time}</div>
+                <div class="history-ip">IP: ${item.ip} | 浏览器: ${item.browser}</div>
+              </div>
+              <div class="history-status ${statusClass}">${statusText}</div>
+            </div>
+          `;
+        });
+        
+        document.getElementById('loginHistory').innerHTML = historyHtml;
+      }
+      
+      function updateStats() {
+        var activeCount = mockUsers.filter(u => u.status === 'active').length;
+        var adminCount = mockUsers.filter(u => u.role === 'admin').length;
+        var lockedCount = mockUsers.filter(u => u.status === 'locked').length;
+        
+        document.getElementById('totalUsers').textContent = mockUsers.length;
+        document.getElementById('activeUsers').textContent = activeCount;
+        document.getElementById('adminUsers').textContent = adminCount;
+        document.getElementById('lockedUsers').textContent = lockedCount;
+      }
+      
+      // 新增用户
+      window.addUser = function() {
+        layer.open({
+          type: 1,
+          title: '➕ 新增用户',
+          area: ['600px', '500px'],
+          content: `
+            <div class="modal-content">
+              <form class="layui-form" lay-filter="addUserForm">
+                <div class="form-section">
+                  <div class="form-section-title">基本信息</div>
+                  <div class="layui-form-item">
+                    <label class="layui-form-label">用户名</label>
+                    <div class="layui-input-block">
+                      <input type="text" name="username" lay-verify="required" placeholder="请输入用户名" class="layui-input">
+                    </div>
+                  </div>
+                  <div class="layui-form-item">
+                    <label class="layui-form-label">邮箱</label>
+                    <div class="layui-input-block">
+                      <input type="email" name="email" lay-verify="required|email" placeholder="请输入邮箱" class="layui-input">
+                    </div>
+                  </div>
+                  <div class="layui-form-item">
+                    <label class="layui-form-label">角色</label>
+                    <div class="layui-input-block">
+                      <select name="role" lay-verify="required">
+                        <option value="">请选择角色</option>
+                        <option value="admin">超级管理员</option>
+                        <option value="analyst">数据分析员</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-section">
+                  <div class="form-section-title">密码设置</div>
+                  <div class="layui-form-item">
+                    <label class="layui-form-label">初始密码</label>
+                    <div class="layui-input-block">
+                      <input type="password" name="password" lay-verify="required" placeholder="请输入密码" class="layui-input">
+                    </div>
+                  </div>
+                  <div class="layui-form-item">
+                    <label class="layui-form-label">确认密码</label>
+                    <div class="layui-input-block">
+                      <input type="password" name="confirmPassword" lay-verify="required" placeholder="请确认密码" class="layui-input">
+                    </div>
+                  </div>
+                </div>
+                <div class="layui-form-item">
+                  <div class="layui-input-block">
+                    <button class="layui-btn" lay-submit lay-filter="submitAddUser">立即创建</button>
+                    <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          `,
+          success: function(){
+            form.render();
+            
+            // 监听提交
+            form.on('submit(submitAddUser)', function(data){
+              if(data.field.password !== data.field.confirmPassword) {
+                layer.msg('两次密码输入不一致！', {icon: 2});
+                return false;
+              }
+              
+              layer.msg('用户创建成功！', {icon: 1}, function(){
+                layer.closeAll();
+                refreshUsers();
+              });
+              return false;
+            });
+          }
+        });
+      };
+      
+      // 编辑用户
+      function editUser(data) {
+        layer.open({
+          type: 1,
+          title: '✏️ 编辑用户 - ' + data.username,
+          area: ['600px', '400px'],
+          content: `
+            <div class="modal-content">
+              <form class="layui-form" lay-filter="editUserForm">
+                <div class="layui-form-item">
+                  <label class="layui-form-label">用户名</label>
+                  <div class="layui-input-block">
+                    <input type="text" name="username" value="${data.username}" disabled class="layui-input layui-disabled">
+                  </div>
+                </div>
+                <div class="layui-form-item">
+                  <label class="layui-form-label">邮箱</label>
+                  <div class="layui-input-block">
+                    <input type="email" name="email" value="${data.email}" lay-verify="required|email" class="layui-input">
+                  </div>
+                </div>
+                <div class="layui-form-item">
+                  <label class="layui-form-label">角色</label>
+                  <div class="layui-input-block">
+                    <select name="role" lay-verify="required">
+                      <option value="admin" ${data.role === 'admin' ? 'selected' : ''}>超级管理员</option>
+                      <option value="analyst" ${data.role === 'analyst' ? 'selected' : ''}>数据分析员</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="layui-form-item">
+                  <label class="layui-form-label">状态</label>
+                  <div class="layui-input-block">
+                    <input type="radio" name="status" value="active" title="正常" ${data.status === 'active' ? 'checked' : ''}>
+                    <input type="radio" name="status" value="inactive" title="禁用" ${data.status === 'inactive' ? 'checked' : ''}>
+                  </div>
+                </div>
+                <div class="layui-form-item">
+                  <div class="layui-input-block">
+                    <button class="layui-btn" lay-submit lay-filter="submitEditUser">保存修改</button>
+                    <button type="button" class="layui-btn layui-btn-primary" onclick="layer.closeAll()">取消</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          `,
+          success: function(){
+            form.render();
+            
+            // 监听提交
+            form.on('submit(submitEditUser)', function(formData){
+              layer.msg('用户信息修改成功！', {icon: 1}, function(){
+                layer.closeAll();
+                refreshUsers();
+              });
+              return false;
+            });
+          }
+        });
+      }
+      
+      // 重置密码
+      function resetPassword(data) {
+        layer.open({
+          type: 1,
+          title: '🔑 重置密码 - ' + data.username,
+          area: ['500px', '300px'],
+          content: `
+            <div class="modal-content">
+              <form class="layui-form" lay-filter="resetPwdForm">
+                <div class="layui-form-item">
+                  <label class="layui-form-label">新密码</label>
+                  <div class="layui-input-block">
+                    <input type="password" name="newPassword" lay-verify="required" placeholder="请输入新密码" class="layui-input">
+                  </div>
+                </div>
+                <div class="layui-form-item">
+                  <label class="layui-form-label">确认密码</label>
+                  <div class="layui-input-block">
+                    <input type="password" name="confirmPassword" lay-verify="required" placeholder="请确认新密码" class="layui-input">
+                  </div>
+                </div>
+                <div class="layui-form-item">
+                  <div class="layui-input-block">
+                    <input type="checkbox" name="forceChange" title="强制下次登录修改密码" lay-skin="primary">
+                  </div>
+                </div>
+                <div class="layui-form-item">
+                  <div class="layui-input-block">
+                    <button class="layui-btn" lay-submit lay-filter="submitResetPwd">重置密码</button>
+                    <button type="button" class="layui-btn layui-btn-primary" onclick="layer.closeAll()">取消</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          `,
+          success: function(){
+            form.render();
+            
+            // 监听提交
+            form.on('submit(submitResetPwd)', function(formData){
+              if(formData.field.newPassword !== formData.field.confirmPassword) {
+                layer.msg('两次密码输入不一致！', {icon: 2});
+                return false;
+              }
+              
+              layer.msg('密码重置成功！', {icon: 1}, function(){
+                layer.closeAll();
+              });
+              return false;
+            });
+          }
+        });
+      }
+      
+      // 显示用户登录历史
+      function showUserHistory(data) {
+        var userHistory = mockLoginHistory.filter(h => h.username === data.username);
+        var historyHtml = '';
+        
+        userHistory.forEach(function(item) {
+          var statusClass = item.status === 'success' ? 'login-success' : 'login-failed';
+          var statusText = item.status === 'success' ? '成功' : '失败';
+          
+          historyHtml += `
+            <div class="history-item">
+              <div class="history-info">
+                <div class="history-time">${item.time}</div>
+                <div class="history-ip">IP: ${item.ip} | 浏览器: ${item.browser}</div>
+              </div>
+              <div class="history-status ${statusClass}">${statusText}</div>
+            </div>
+          `;
+        });
+        
+        layer.open({
+          type: 1,
+          title: '📝 登录历史 - ' + data.username,
+          area: ['600px', '400px'],
+          content: '<div class="modal-content"><div class="login-history">' + historyHtml + '</div></div>'
+        });
+      }
+      
+      // 切换用户状态
+      function toggleUserStatus(data, newStatus) {
+        var actionText = newStatus === 'active' ? '启用' : '禁用';
+        layer.confirm('确定要' + actionText + '用户 "' + data.username + '" 吗？', {icon: 3}, function(index){
+          layer.msg(actionText + '成功！', {icon: 1});
+          refreshUsers();
+          layer.close(index);
+        });
+      }
+      
+      // 其他功能
+      window.exportUsers = function() {
+        layer.msg('用户数据导出成功！', {icon: 1});
+      };
+      
+      window.refreshUsers = function() {
+        table.reload('userTable');
+        loadLoginHistory();
+        updateStats();
+        layer.msg('数据刷新完成！', {icon: 1});
+      };
+      
+      window.searchUsers = function() {
+        var keyword = document.getElementById('searchInput').value;
+        if(keyword) {
+          layer.msg('搜索: ' + keyword, {icon: 1});
+          // 这里可以实现真实的搜索功能
+        }
+      };
+      
+      window.filterHistory = function() {
+        var filter = document.getElementById('historyFilter').value;
+        layer.msg('筛选: ' + filter, {icon: 1});
+        // 这里可以实现真实的筛选功能
+      };
+    });
+    
+    // 退出登录
+          function logout() {
+        layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index){
+          localStorage.removeItem('currentUser');
+          layer.close(index);
+          layer.msg('已安全退出！', {icon: 1}, function(){
+            window.location.href = 'login.html';
+          });
+        });
+      }
+      
+      // 切换账户
+      function switchAccount() {
+        layer.confirm('切换账户将退出当前登录，是否继续？', {
+          icon: 3, 
+          title: '切换账户',
+          btn: ['确定', '取消']
+        }, function(index) {
+          localStorage.removeItem('currentUser');
+          layer.close(index);
+          layer.msg('正在切换账户...', {icon: 16, time: 1000}, function(){
+            window.location.href = 'login.html';
+          });
+        });
+      }
+  </script>
+</body>
+</html> 

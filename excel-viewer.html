@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Excel数据查看器 - 数据管理系统</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f8f9fa;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header .layui-nav {
+      background: transparent;
+    }
+    .header .layui-nav .layui-nav-item a {
+      color: rgba(255,255,255,0.9);
+    }
+    .header .layui-nav .layui-nav-item a:hover {
+      color: white;
+    }
+    .header .logo {
+      font-size: 18px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    
+    /* 主导航样式 */
+    .main-nav {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      margin: 0 20px;
+    }
+    .main-nav .layui-nav-item {
+      margin: 0 5px;
+    }
+    .main-nav .layui-nav-item a {
+      padding: 0 20px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+    .main-nav .layui-nav-item a:hover,
+    .main-nav .layui-nav-item.layui-this a {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+    .main-nav .layui-nav-item a i {
+      margin-right: 6px;
+    }
+    
+    .header .user-info {
+      white-space: nowrap;
+    }
+    
+    /* 用户下拉菜单样式 */
+    .user-info .layui-nav-child dd a {
+      padding: 10px 15px;
+      color: #666;
+      transition: all 0.3s ease;
+    }
+    .user-info .layui-nav-child dd a:hover {
+      background: #f8f9fa;
+      color: #16baaa;
+    }
+    .user-info .layui-nav-child dd a i {
+      margin-right: 8px;
+      font-size: 14px;
+    }
+    
+    .content-wrapper {
+      padding: 20px;
+    }
+    
+    .page-header {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .page-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin: 0;
+    }
+    .page-subtitle {
+      color: #666;
+      margin-top: 5px;
+    }
+    .breadcrumb {
+      color: #999;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .breadcrumb a {
+      color: #16baaa;
+      text-decoration: none;
+    }
+    
+    .control-panel {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      padding: 20px;
+    }
+    
+    .sheet-tabs {
+      margin-bottom: 20px;
+    }
+    .sheet-tab {
+      display: inline-block;
+      padding: 10px 20px;
+      margin-right: 10px;
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .sheet-tab:hover {
+      background: #e9ecef;
+    }
+    .sheet-tab.active {
+      background: #16baaa;
+      color: white;
+      border-color: #16baaa;
+    }
+    
+    .file-info {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .file-info h4 {
+      margin: 0 0 10px 0;
+      color: #333;
+    }
+    .file-info .info-item {
+      display: inline-block;
+      margin-right: 20px;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .table-container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .table-header {
+      padding: 20px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .table-stats {
+      font-size: 14px;
+      color: #666;
+    }
+    .table-stats strong {
+      color: #333;
+    }
+    
+    .excel-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .excel-table th {
+      background: #f8f9fa;
+      padding: 12px 8px;
+      border: 1px solid #e6e6e6;
+      font-weight: bold;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .excel-table td {
+      padding: 10px 8px;
+      border: 1px solid #e6e6e6;
+      text-align: center;
+      background: white;
+      min-width: 80px;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .excel-table tr:nth-child(even) td {
+      background: #fafafa;
+    }
+    .excel-table tr:hover td {
+      background: #e6f7ff;
+    }
+    
+    .pagination-wrapper {
+      padding: 20px;
+      text-align: center;
+      border-top: 1px solid #f0f0f0;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+    .loading i {
+      font-size: 32px;
+      margin-bottom: 10px;
+      display: block;
+    }
+    
+    .table-wrapper {
+      overflow-x: auto;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    
+    .actions {
+      margin-top: 20px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="layui-header header">
+    <div class="logo">
+      📊 数据管理系统
+    </div>
+    
+    <!-- 主导航按钮 -->
+    <ul class="layui-nav main-nav">
+      <li class="layui-nav-item">
+        <a href="dashboard.html">
+          <i class="layui-icon layui-icon-home"></i> 数据仪表盘
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="table-management.html">
+          <i class="layui-icon layui-icon-table"></i> 表格管理
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="data-upload.html">
+          <i class="layui-icon layui-icon-upload-drag"></i> 数据导入
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="data-analysis.html">
+          <i class="layui-icon layui-icon-chart"></i> 数据分析
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="local-database.html">
+          <i class="layui-icon layui-icon-database"></i> 本地数据库
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="tmall-database.html">
+          <i class="layui-icon layui-icon-cart"></i> 天猫数据库
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="tmall-order.html">
+          <i class="layui-icon layui-icon-list"></i> 天猫订单
+        </a>
+      </li>
+      <li class="layui-nav-item" id="adminOnlyTopNav" style="display: none;">
+        <a href="user-management.html">
+          <i class="layui-icon layui-icon-username"></i> 用户管理
+        </a>
+      </li>
+    </ul>
+    
+    
+  </div>
+  
+  <div class="content-wrapper">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <h1 class="page-title">📈 Excel数据查看器</h1>
+      <p class="page-subtitle">查看和分析您的Excel文件数据</p>
+      <div class="breadcrumb">
+        <a href="dashboard.html">首页</a> / <a href="table-management.html">表格管理</a> / Excel查看器
+      </div>
+    </div>
+    
+    <!-- 控制面板 -->
+    <div class="control-panel">
+      <!-- 文件信息 -->
+      <div class="file-info" id="fileInfo" style="display: none;">
+        <h4 id="fileName">文件名</h4>
+        <div>
+          <span class="info-item" id="fileSize">大小: -</span>
+          <span class="info-item" id="uploadTime">上传时间: -</span>
+          <span class="info-item" id="uploadedBy">上传者: -</span>
+          <span class="info-item" id="totalSheets">工作表数: -</span>
+        </div>
+      </div>
+      
+      <!-- 工作表选择 -->
+      <div class="sheet-tabs" id="sheetTabs" style="display: none;">
+        <!-- 动态生成工作表标签 -->
+      </div>
+      
+      <!-- 操作按钮 -->
+      <div class="actions">
+        <button class="layui-btn layui-btn-primary" onclick="goBack()">
+          <i class="layui-icon layui-icon-return"></i> 返回
+        </button>
+        <button class="layui-btn layui-btn-normal" onclick="downloadFile()">
+          <i class="layui-icon layui-icon-download-circle"></i> 下载文件
+        </button>
+        <button class="layui-btn" onclick="refreshData()">
+          <i class="layui-icon layui-icon-refresh-3"></i> 刷新数据
+        </button>
+      </div>
+    </div>
+    
+    <!-- 数据表格 -->
+    <div class="table-container">
+      <div class="table-header">
+        <div class="table-stats">
+          <span>当前工作表: <strong id="currentSheetName">-</strong></span>
+          <span style="margin-left: 20px;">共 <strong id="totalRows">0</strong> 行数据</span>
+          <span style="margin-left: 20px;">第 <strong id="currentPage">1</strong> / <strong id="totalPages">1</strong> 页</span>
+        </div>
+        <div>
+          <span style="font-size: 14px; color: #666;">每页显示 20 行</span>
+        </div>
+      </div>
+      
+      <div class="table-wrapper">
+        <div class="loading" id="loading">
+          <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i>
+          <div>正在加载数据...</div>
+        </div>
+        
+        <table class="excel-table" id="dataTable" style="display: none;">
+          <thead id="tableHeader">
+            <!-- 动态生成表头 -->
+          </thead>
+          <tbody id="tableBody">
+            <!-- 动态生成表格数据 -->
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="pagination-wrapper">
+        <div id="pagination"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['layer', 'laypage'], function(){
+      var layer = layui.layer;
+      var laypage = layui.laypage;
+      
+      var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      var currentFileId = null;
+      var currentSheet = null;
+      var currentPage = 1;
+      var allSheets = [];
+      
+      // 初始化页面
+      initPage();
+      
+      function initPage() {
+        // 检查登录状态
+        if (!userInfo.username) {
+          layer.msg('请先登录！', {icon: 2}, function(){
+            window.location.href = 'login.html';
+          });
+          return;
+        }
+        
+        // 显示用户信息（可选）
+        var cu = document.getElementById('currentUser');
+        if (cu) cu.textContent = userInfo.realname || userInfo.username;
+        
+        // 根据角色显示导航
+        if (userInfo.role === 'admin') {
+          document.getElementById('adminOnlyTopNav').style.display = 'block';
+        }
+        
+        // 获取URL参数中的文件ID
+        var urlParams = new URLSearchParams(window.location.search);
+        currentFileId = urlParams.get('fileId');
+        
+        if (!currentFileId) {
+          layer.msg('未指定文件ID！', {icon: 2}, function(){
+            window.location.href = 'table-management.html';
+          });
+          return;
+        }
+        
+        // 加载文件数据
+        loadFileData();
+      }
+      
+      function loadFileData() {
+        if (!currentFileId) return;
+        
+        showLoading(true);
+        
+        var url = '/api/files/' + currentFileId + '/analyze';
+        var params = new URLSearchParams();
+        
+        if (currentSheet) {
+          params.append('sheet', currentSheet);
+        }
+        
+        if (currentPage > 1) {
+          params.append('page', currentPage);
+        }
+        
+        params.append('limit', '20');
+        
+        url += '?' + params.toString();
+        
+        var token = userInfo.token || localStorage.getItem('token');
+        var headers = {};
+        
+        if (token) {
+          headers['Authorization'] = 'Bearer ' + token;
+        }
+        
+        fetch(url, {
+          headers: headers
+        })
+        .then(response => {
+          console.log('API响应状态:', response.status);
+          if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log('收到数据:', data);
+          if (data.success) {
+            try {
+              displayFileData(data.analysis);
+            } catch (renderError) {
+              console.error('数据渲染错误:', renderError);
+              layer.msg('数据渲染失败，数据量过大: ' + renderError.message, {icon: 2});
+            }
+          } else {
+            layer.msg('加载数据失败: ' + data.error, {icon: 2});
+          }
+        })
+        .catch(error => {
+          console.error('加载错误:', error);
+          layer.msg('加载失败: ' + error.message, {icon: 2});
+        })
+        .finally(() => {
+          showLoading(false);
+        });
+      }
+      
+      function displayFileData(analysis) {
+        // 显示文件信息
+        document.getElementById('fileName').textContent = analysis.fileName;
+        document.getElementById('fileSize').textContent = '大小: ' + formatFileSize(analysis.summary.fileSize);
+        document.getElementById('uploadTime').textContent = '上传时间: ' + formatDateTime(analysis.summary.uploadTime);
+        document.getElementById('uploadedBy').textContent = '上传者: ' + analysis.summary.uploadedBy;
+        document.getElementById('totalSheets').textContent = '工作表数: ' + analysis.summary.totalSheets;
+        document.getElementById('fileInfo').style.display = 'block';
+        
+        // 保存工作表信息
+        allSheets = analysis.allSheets;
+        currentSheet = analysis.currentSheet;
+        
+        // 显示工作表选项卡
+        displaySheetTabs(analysis.allSheets, analysis.currentSheet);
+        
+        // 显示数据表格
+        displayDataTable(analysis);
+        
+        // 显示分页
+        if (analysis.pagination) {
+          displayPagination(analysis.pagination);
+        }
+      }
+      
+      function displaySheetTabs(sheets, activeSheet) {
+        var tabsHtml = '';
+        sheets.forEach(function(sheet) {
+          var activeClass = sheet.name === activeSheet ? 'active' : '';
+          tabsHtml += '<div class="sheet-tab ' + activeClass + '" onclick="switchSheet(\'' + 
+                      sheet.name + '\')">' + sheet.name + ' (' + sheet.rowCount + ' 行)</div>';
+        });
+        
+        document.getElementById('sheetTabs').innerHTML = tabsHtml;
+        document.getElementById('sheetTabs').style.display = 'block';
+      }
+      
+      function displayDataTable(analysis) {
+        console.log('开始渲染数据表格...');
+        console.log('数据行数:', analysis.data ? analysis.data.length : 0);
+        console.log('列数:', analysis.headers ? analysis.headers.length : 0);
+        
+        var headers = analysis.headers || [];
+        var data = analysis.data || [];
+        
+        // 生成表头（与表格数据保持一致的列数限制）
+        var maxColsToShow = Math.min(headers.length, 30);
+        var headerParts = ['<tr>'];
+        
+        for (var index = 0; index < maxColsToShow; index++) {
+          var header = headers[index] || '未命名';
+          headerParts.push('<th>第' + (index + 1) + '列<br>' + header + '</th>');
+        }
+        
+        if (headers.length > maxColsToShow) {
+          headerParts.push('<th style="color:#999;">... (' + (headers.length - maxColsToShow) + ' 列)</th>');
+        }
+        
+        headerParts.push('</tr>');
+        document.getElementById('tableHeader').innerHTML = headerParts.join('');
+        
+        // 优化的表格渲染 - 使用DocumentFragment提升性能
+        console.log('开始渲染表格行...');
+        var maxRowsToShow = Math.min(data.length, 50); // 减少到50行，提升速度
+        var maxColsToShow = Math.min(headers.length, 30); // 减少到30列，提升速度
+        
+        // 使用数组拼接而不是字符串连接，性能更好
+        var bodyParts = [];
+        
+        for (var rowIndex = 0; rowIndex < maxRowsToShow; rowIndex++) {
+          var row = data[rowIndex] || [];
+          var rowParts = ['<tr>'];
+          
+          for (var i = 0; i < maxColsToShow; i++) {
+            var cellValue = (row[i] || '').toString();
+            // 限制单元格内容长度
+            if (cellValue.length > 50) { // 减少到50字符，提升渲染速度
+              cellValue = cellValue.substring(0, 50) + '...';
+            }
+            // 简化HTML，移除title属性以提升性能
+            rowParts.push('<td>' + cellValue + '</td>');
+          }
+          
+          if (headers.length > maxColsToShow) {
+            rowParts.push('<td style="color:#999;">...</td>');
+          }
+          rowParts.push('</tr>');
+          bodyParts.push(rowParts.join(''));
+        }
+        
+        if (data.length > maxRowsToShow) {
+          bodyParts.push('<tr><td colspan="' + maxColsToShow + 
+                        '" style="text-align: center; color: #999; padding: 20px;">... 省略 ' + 
+                        (data.length - maxRowsToShow) + ' 行，请使用分页浏览</td></tr>');
+        }
+        
+        // 一次性设置innerHTML，比多次DOM操作快很多
+        var bodyHtml = bodyParts.join('');
+        document.getElementById('tableBody').innerHTML = bodyHtml;
+        console.log('表格渲染完成');
+        
+        // 更新统计信息
+        document.getElementById('currentSheetName').textContent = analysis.currentSheet;
+        if (analysis.pagination) {
+          document.getElementById('totalRows').textContent = analysis.pagination.totalRows;
+          document.getElementById('currentPage').textContent = analysis.pagination.currentPage;
+          document.getElementById('totalPages').textContent = analysis.pagination.totalPages;
+        }
+        
+        document.getElementById('dataTable').style.display = 'table';
+        console.log('数据表格显示完成');
+      }
+      
+      function displayPagination(pagination) {
+        laypage.render({
+          elem: 'pagination',
+          count: pagination.totalRows,
+          limit: pagination.limit,
+          curr: pagination.currentPage,
+          layout: ['count', 'prev', 'page', 'next', 'refresh', 'skip'],
+          jump: function(obj, first) {
+            if (!first) {
+              currentPage = obj.curr;
+              loadFileData();
+            }
+          }
+        });
+      }
+      
+      window.switchSheet = function(sheetName) {
+        if (sheetName === currentSheet) return;
+        
+        currentSheet = sheetName;
+        currentPage = 1; // 切换工作表时重置到第一页
+        loadFileData();
+      };
+      
+      window.refreshData = function() {
+        loadFileData();
+      };
+      
+      window.goBack = function() {
+        console.log('返回按钮被点击');
+        console.log('当前referrer:', document.referrer);
+        
+        // 直接跳转到表格管理页面，避免history问题
+        window.location.href = 'table-management.html';
+      };
+      
+      window.downloadFile = function() {
+        if (!currentFileId) return;
+        
+        var token = userInfo.token || localStorage.getItem('token');
+        var downloadUrl = '/api/files/' + currentFileId + '/download';
+        
+        if (token) {
+          // 使用fetch下载并处理认证
+          fetch(downloadUrl, {
+            headers: {
+              'Authorization': 'Bearer ' + token
+            }
+          })
+          .then(response => {
+            if (response.ok) {
+              return response.blob();
+            } else {
+              throw new Error('下载失败: ' + response.status);
+            }
+          })
+          .then(blob => {
+            var url = window.URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = ''; // 让浏览器根据响应头决定文件名
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            layer.msg('文件下载成功！', {icon: 1});
+          })
+          .catch(error => {
+            console.error('下载错误:', error);
+            layer.msg('下载失败，请重试', {icon: 2});
+          });
+        } else {
+          layer.msg('请先登录', {icon: 2});
+        }
+      };
+      
+      function showLoading(show) {
+        document.getElementById('loading').style.display = show ? 'block' : 'none';
+        document.getElementById('dataTable').style.display = show ? 'none' : 'table';
+      }
+      
+      function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        var k = 1024;
+        var sizes = ['B', 'KB', 'MB', 'GB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+      
+      function formatDateTime(dateString) {
+        var date = new Date(dateString);
+        return date.toLocaleString('zh-CN');
+      }
+    });
+    
+    // 退出登录
+    function logout() {
+      layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index){
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('token');
+        layer.close(index);
+        layer.msg('已安全退出！', {icon: 1}, function(){
+          window.location.href = 'login.html';
+        });
+      });
+    }
+    
+    // 切换账户
+    function switchAccount() {
+      layer.confirm('切换账户将退出当前登录，是否继续？', {
+        icon: 3, 
+        title: '切换账户',
+        btn: ['确定', '取消']
+      }, function(index) {
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('token');
+        layer.close(index);
+        layer.msg('正在切换账户...', {icon: 16, time: 1000}, function(){
+          window.location.href = 'login.html';
+        });
+      });
+    }
+  </script>
+</body>
+</html> 

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Layui 入门示例 - 开始使用</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <style>
+    .demo-container {
+      padding: 20px;
+      margin: 20px 0;
+      background-color: #f8f8f8;
+      border-radius: 5px;
+    }
+    .demo-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: #333;
+      border-left: 4px solid #16baaa;
+      padding-left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="layui-container">
+    <div class="layui-row">
+      <div class="layui-col-md12">
+        <h1 style="text-align: center; color: #16baaa; margin: 30px 0;">
+          🎉 欢迎使用 Layui
+        </h1>
+        <p style="text-align: center; color: #666; margin-bottom: 40px;">
+          这是一个完整的入门示例，展示了layui主要组件的使用方法
+        </p>
+      </div>
+    </div>
+
+    <!-- 按钮组件示例 -->
+    <div class="demo-container">
+      <div class="demo-title">1. 按钮组件</div>
+      <div class="layui-btn-container">
+        <button class="layui-btn">默认按钮</button>
+        <button class="layui-btn layui-btn-primary">主要按钮</button>
+        <button class="layui-btn layui-btn-normal">百搭按钮</button>
+        <button class="layui-btn layui-btn-warm">暖色按钮</button>
+        <button class="layui-btn layui-btn-danger">危险按钮</button>
+        <button class="layui-btn layui-btn-disabled">禁用按钮</button>
+      </div>
+    </div>
+
+    <!-- 弹层组件示例 -->
+    <div class="demo-container">
+      <div class="demo-title">2. 弹层组件 (Layer)</div>
+      <div class="layui-btn-container">
+        <button class="layui-btn" id="msgBtn">信息提示</button>
+        <button class="layui-btn layui-btn-normal" id="confirmBtn">确认框</button>
+        <button class="layui-btn layui-btn-warm" id="pageBtn">页面层</button>
+        <button class="layui-btn layui-btn-danger" id="loadBtn">加载层</button>
+      </div>
+    </div>
+
+    <!-- 表单组件示例 -->
+    <div class="demo-container">
+      <div class="demo-title">3. 表单组件</div>
+      <form class="layui-form" action="">
+        <div class="layui-row">
+          <div class="layui-col-md6">
+            <div class="layui-form-item">
+              <label class="layui-form-label">用户名</label>
+              <div class="layui-input-block">
+                <input type="text" name="username" lay-verify="required" placeholder="请输入用户名" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">密码</label>
+              <div class="layui-input-block">
+                <input type="password" name="password" lay-verify="required" placeholder="请输入密码" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">选择城市</label>
+              <div class="layui-input-block">
+                <select name="city" lay-verify="required">
+                  <option value="">请选择一个城市</option>
+                  <option value="010">北京</option>
+                  <option value="021">上海</option>
+                  <option value="0571">杭州</option>
+                  <option value="0755">深圳</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <div class="layui-col-md6">
+            <div class="layui-form-item">
+              <label class="layui-form-label">日期选择</label>
+              <div class="layui-input-block">
+                <input type="text" class="layui-input" id="dateInput" placeholder="yyyy-MM-dd">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">复选框</label>
+              <div class="layui-input-block">
+                <input type="checkbox" name="hobby" value="读书" title="读书">
+                <input type="checkbox" name="hobby" value="写作" title="写作" checked>
+                <input type="checkbox" name="hobby" value="游戏" title="游戏">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">单选框</label>
+              <div class="layui-input-block">
+                <input type="radio" name="sex" value="男" title="男" checked>
+                <input type="radio" name="sex" value="女" title="女">
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="layui-form-item">
+          <label class="layui-form-label">开关</label>
+          <div class="layui-input-block">
+            <input type="checkbox" name="switch" lay-skin="switch" lay-text="开启|关闭">
+          </div>
+        </div>
+        
+        <div class="layui-form-item">
+          <div class="layui-input-block">
+            <button class="layui-btn" lay-submit lay-filter="formDemo">立即提交</button>
+            <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- 选项卡组件示例 -->
+    <div class="demo-container">
+      <div class="demo-title">4. 选项卡组件</div>
+      <div class="layui-tab" lay-filter="demoTab">
+        <ul class="layui-tab-title">
+          <li class="layui-this">网站设置</li>
+          <li>用户管理</li>
+          <li>权限分配</li>
+          <li>商品管理</li>
+        </ul>
+        <div class="layui-tab-content">
+          <div class="layui-tab-item layui-show">
+            <p>网站设置的相关内容</p>
+            <div class="layui-progress" lay-filter="demo" lay-showpercent="yes">
+              <div class="layui-progress-bar layui-bg-blue" lay-percent="30%"></div>
+            </div>
+          </div>
+          <div class="layui-tab-item">
+            <p>用户管理的相关内容</p>
+            <div class="layui-progress" lay-filter="demo2" lay-showpercent="yes">
+              <div class="layui-progress-bar layui-bg-green" lay-percent="80%"></div>
+            </div>
+          </div>
+          <div class="layui-tab-item">
+            <p>权限分配的相关内容</p>
+            <div class="layui-progress" lay-filter="demo3" lay-showpercent="yes">
+              <div class="layui-progress-bar layui-bg-orange" lay-percent="60%"></div>
+            </div>
+          </div>
+          <div class="layui-tab-item">
+            <p>商品管理的相关内容</p>
+            <div class="layui-progress" lay-filter="demo4" lay-showpercent="yes">
+              <div class="layui-progress-bar layui-bg-red" lay-percent="45%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 表格组件示例 -->
+    <div class="demo-container">
+      <div class="demo-title">5. 表格组件</div>
+      <table class="layui-hide" id="demoTable" lay-filter="tableDemo"></table>
+    </div>
+
+    <!-- 分页组件示例 -->
+    <div class="demo-container">
+      <div class="demo-title">6. 分页组件</div>
+      <div id="pageDemo"></div>
+    </div>
+
+    <!-- 徽章和时间线示例 -->
+    <div class="demo-container">
+      <div class="demo-title">7. 其他组件</div>
+      <div class="layui-row">
+        <div class="layui-col-md6">
+          <h4>徽章组件</h4>
+          <span class="layui-badge">6</span>
+          <span class="layui-badge layui-bg-orange">hot</span>
+          <span class="layui-badge layui-bg-green">new</span>
+          <span class="layui-badge-dot layui-bg-red"></span>消息
+        </div>
+        <div class="layui-col-md6">
+          <h4>评分组件</h4>
+          <div id="rateDemo"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['layer', 'form', 'laydate', 'element', 'table', 'laypage', 'rate'], function(){
+      var layer = layui.layer;
+      var form = layui.form;
+      var laydate = layui.laydate;
+      var element = layui.element;
+      var table = layui.table;
+      var laypage = layui.laypage;
+      var rate = layui.rate;
+
+      // 欢迎消息
+      layer.msg('欢迎使用 Layui！', {icon: 6, time: 2000});
+
+      // 弹层示例
+      document.getElementById('msgBtn').onclick = function(){
+        layer.msg('这是一个信息提示', {icon: 1});
+      };
+
+      document.getElementById('confirmBtn').onclick = function(){
+        layer.confirm('您确定要执行此操作吗？', {
+          btn: ['确定','取消']
+        }, function(){
+          layer.msg('您点击了确定', {icon: 1});
+        }, function(){
+          layer.msg('您点击了取消', {icon: 2});
+        });
+      };
+
+      document.getElementById('pageBtn').onclick = function(){
+        layer.open({
+          type: 1,
+          title: '页面层示例',
+          shadeClose: true,
+          shade: 0.8,
+          area: ['600px', '400px'],
+          content: '<div style="padding: 20px;">这是一个页面层内容<br><br>您可以在这里放置任何HTML内容</div>'
+        });
+      };
+
+      document.getElementById('loadBtn').onclick = function(){
+        var index = layer.load(2, {time: 3000});
+        setTimeout(function(){
+          layer.msg('加载完成！', {icon: 1});
+        }, 3000);
+      };
+
+      // 日期选择器
+      laydate.render({
+        elem: '#dateInput',
+        type: 'date'
+      });
+
+      // 表单提交
+      form.on('submit(formDemo)', function(data){
+        layer.msg('表单提交成功！数据：' + JSON.stringify(data.field));
+        console.log(data.field);
+        return false;
+      });
+
+      // 表格组件
+      table.render({
+        elem: '#demoTable',
+        height: 312,
+        data: [
+          {id: 1, username: '张三', email: 'zhangsan@example.com', sex: '男', city: '北京', sign: '人生就像是一场修行'},
+          {id: 2, username: '李四', email: 'lisi@example.com', sex: '女', city: '上海', sign: '于千万人之中遇见你所遇见的人'},
+          {id: 3, username: '王五', email: 'wangwu@example.com', sex: '男', city: '杭州', sign: '于千万年之中，时间的无涯的荒野里'},
+          {id: 4, username: '赵六', email: 'zhaoliu@example.com', sex: '女', city: '深圳', sign: '没有早一步，也没有晚一步'},
+          {id: 5, username: '钱七', email: 'qianqi@example.com', sex: '男', city: '广州', sign: '刚巧赶上了'}
+        ],
+        cols: [[
+          {field: 'id', title: 'ID', width: 80, fixed: 'left', sort: true},
+          {field: 'username', title: '用户名', width: 120},
+          {field: 'email', title: '邮箱', width: 180},
+          {field: 'sex', title: '性别', width: 80},
+          {field: 'city', title: '城市', width: 100},
+          {field: 'sign', title: '签名'}
+        ]]
+      });
+
+      // 分页组件
+      laypage.render({
+        elem: 'pageDemo',
+        count: 100,
+        limit: 10,
+        layout: ['count', 'prev', 'page', 'next', 'limit', 'refresh', 'skip'],
+        jump: function(obj){
+          console.log('当前页：' + obj.curr + '，每页显示：' + obj.limit);
+        }
+      });
+
+      // 评分组件
+      rate.render({
+        elem: '#rateDemo',
+        value: 3,
+        choose: function(value){
+          layer.msg('您评了' + value + '星');
+        }
+      });
+    });
+  </script>
+</body>
+</html> 

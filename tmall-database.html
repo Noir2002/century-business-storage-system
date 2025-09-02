@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>天猫数据库管理 - 数据管理系统</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <link href="./src/css/app-header.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@16.0.1/dist/handsontable.full.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@16.0.1/styles/ht-theme-main.min.css">
+  <style>
+    body { background: #f8f9fa; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between; }
+    .header .layui-nav { background: transparent; }
+    .header .layui-nav .layui-nav-item a { color: rgba(255,255,255,0.9); }
+    .header .layui-nav .layui-nav-item a:hover { color: white; }
+    .header .logo { font-size: 18px; font-weight: bold; white-space: nowrap; }
+    .main-nav { flex: 1; display: flex; justify-content: center; margin: 0 20px; }
+    .main-nav .layui-nav-item { margin: 0 5px; }
+    .main-nav .layui-nav-item a { padding: 0 20px; border-radius: 6px; transition: all 0.3s ease; font-size: 14px; }
+    .main-nav .layui-nav-item a:hover, .main-nav .layui-nav-item.layui-this a { background: rgba(255,255,255,0.2); color: white; }
+    .main-nav .layui-nav-item a i { margin-right: 6px; }
+    .header .user-info { white-space: nowrap; }
+    .user-info .layui-nav-child dd a { padding: 10px 15px; color: #666; transition: all 0.3s ease; }
+    .user-info .layui-nav-child dd a:hover { background: #f8f9fa; color: #16baaa; }
+    .user-info .layui-nav-child dd a i { margin-right: 8px; font-size: 14px; }
+    .content-wrapper { padding: 20px; }
+    .page-header { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .page-title { font-size: 24px; font-weight: bold; color: #333; margin: 0; }
+    .page-subtitle { color: #666; margin-top: 5px; }
+    .breadcrumb { color: #999; font-size: 14px; margin-top: 10px; }
+    .breadcrumb a { color: #16baaa; text-decoration: none; }
+    .mode-switch { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; text-align: center; }
+    .mode-switch .layui-btn { margin: 0 10px; border-radius: 6px; transition: all 0.3s ease; }
+    .mode-switch .layui-btn.layui-btn-primary { background: #f8f9fa; border: 1px solid #e6e6e6; color: #666; }
+    .mode-switch .layui-btn.active { background: #16baaa; color: white; border-color: #16baaa; }
+    .mode-switch .layui-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .mode-description { text-align: center; color: #666; margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #16baaa; }
+    .table-container { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 20px; }
+    .table-header { padding: 20px; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
+    .table-stats { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #666; }
+    .action-buttons { text-align: right; margin-bottom: 15px; }
+    .action-buttons .layui-btn { margin-left: 10px; border-radius: 6px; transition: all 0.3s ease; }
+    .action-buttons .layui-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .wide-table-container, .record-table-container { display: none; }
+    .wide-table-container.active, .record-table-container.active { display: block; }
+    .handsontable-container { padding: 20px; }
+    .layui-table-cell { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  </style>
+</head>
+<body>
+  <div class="layui-header header">
+    <div class="logo">📊 数据管理系统</div>
+    <ul class="layui-nav main-nav">
+      <li class="layui-nav-item"><a href="dashboard.html"><i class="layui-icon layui-icon-home"></i> 数据仪表盘</a></li>
+      <li class="layui-nav-item"><a href="table-management.html"><i class="layui-icon layui-icon-table"></i> 表格管理</a></li>
+      <li class="layui-nav-item"><a href="data-upload.html"><i class="layui-icon layui-icon-upload-drag"></i> 数据导入</a></li>
+      <li class="layui-nav-item"><a href="virtual-inventory.html"><i class="layui-icon layui-icon-engine"></i> 虚拟库存</a></li>
+      <li class="layui-nav-item"><a href="data-analysis.html"><i class="layui-icon layui-icon-chart"></i> 数据分析</a></li>
+      <li class="layui-nav-item"><a href="local-database.html"><i class="layui-icon layui-icon-database"></i> 本地数据库</a></li>
+      <li class="layui-nav-item layui-this"><a href="tmall-database.html"><i class="layui-icon layui-icon-cart"></i> 天猫数据库</a></li>
+      <li class="layui-nav-item" id="adminOnlyTopNav" style="display: none;"><a href="user-management.html"><i class="layui-icon layui-icon-username"></i> 用户管理</a></li>
+    </ul>
+    <ul class="layui-nav layui-layout-right user-info">
+      <li class="layui-nav-item">
+        <a href="javascript:;"><span id="currentUser">用户</span></a>
+        <dl class="layui-nav-child">
+          <dd><a href="profile.html"><i class="layui-icon layui-icon-username"></i> 个人信息</a></dd>
+          <dd><a href="javascript:;" onclick="switchAccount()"><i class="layui-icon layui-icon-refresh-3"></i> 切换账号</a></dd>
+          <dd><a href="javascript:;" onclick="logout()"><i class="layui-icon layui-icon-logout"></i> 登出</a></dd>
+        </dl>
+      </li>
+    </ul>
+  </div>
+  <div class="content-wrapper">
+    <div class="page-header">
+      <h1 class="page-title">🛒 天猫数据库管理</h1>
+      <p class="page-subtitle">管理您的天猫订单SKU库存和销售数据</p>
+      <div class="breadcrumb"><a href="dashboard.html">首页</a> / 天猫数据库</div>
+    </div>
+    <div class="mode-switch">
+      <button class="layui-btn layui-btn-primary active" id="wideTableMode"><i class="layui-icon layui-icon-table"></i> 宽表模式（最近5天）</button>
+      <button class="layui-btn layui-btn-primary" id="recordMode"><i class="layui-icon layui-icon-list"></i> 行记录模式（历史数据）</button>
+    </div>
+    <div class="mode-description" id="modeDescription">宽表模式：适合日常快速录入和查看最近5天的天猫订单数据，支持批量编辑</div>
+    <div class="wide-table-container active" id="wideTableContainer">
+      <div class="table-container">
+        <div class="table-header">
+          <div class="table-stats"><span>宽表数据管理</span><span>最近5天天猫订单数据</span></div>
+        </div>
+        <div class="action-buttons">
+          <button class="layui-btn layui-btn-normal" id="addRowBtn"><i class="layui-icon layui-icon-add-1"></i> 新增记录</button>
+          <button class="layui-btn layui-btn-primary" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
+          <button class="layui-btn layui-btn-danger" id="saveWideTableBtn"><i class="layui-icon layui-icon-ok"></i> 保存</button>
+          <button class="layui-btn layui-btn-lg" id="smartImportBtn"><i class="layui-icon layui-icon-magic"></i> 智能导入</button>
+          <button class="layui-btn" id="importBtn"><i class="layui-icon layui-icon-upload"></i> 导入Excel</button>
+          <button class="layui-btn" id="exportBtn"><i class="layui-icon layui-icon-download-circle"></i> 导出Excel</button>
+          <button class="layui-btn layui-btn-warm" id="downloadTemplateBtn"><i class="layui-icon layui-icon-template"></i> 下载模板</button>
+          <button class="layui-btn layui-btn-danger" id="clearOldDataBtn"><i class="layui-icon layui-icon-delete"></i> 清理旧数据</button>
+          <button class="layui-btn layui-btn-danger" id="clearAllDataBtn"><i class="layui-icon layui-icon-close"></i> 清空所有数据</button>
+        </div>
+        <div class="handsontable-container"><div id="wideTable" style="width:100%;min-height:500px;"></div></div>
+      </div>
+    </div>
+    <div class="record-table-container" id="recordTableContainer">
+      <div class="table-container">
+        <div class="table-header"><div class="table-stats"><span>历史记录管理</span><span>天猫订单历史数据查询</span></div></div>
+        <div class="action-buttons">
+          <button class="layui-btn" id="addRecordBtn"><i class="layui-icon layui-icon-add-1"></i> 新增记录</button>
+          <button class="layui-btn layui-btn-primary" id="refreshRecordBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
+          <button class="layui-btn" id="importRecordBtn"><i class="layui-icon layui-icon-upload"></i> 批量导入</button>
+          <button class="layui-btn" id="exportRecordBtn"><i class="layui-icon layui-icon-download-circle"></i> 导出数据</button>
+          <button class="layui-btn layui-btn-warm" id="downloadRecordTemplateBtn"><i class="layui-icon layui-icon-template"></i> 下载模板</button>
+          <button class="layui-btn layui-btn-danger" id="clearAllRecordDataBtn"><i class="layui-icon layui-icon-close"></i> 清空所有数据</button>
+        </div>
+        <div style="padding: 20px;"><table class="layui-hide" id="recordTable" lay-filter="recordTable"></table></div>
+      </div>
+    </div>
+  </div>
+  <div id="editFormModal" style="display:none;padding:20px 30px 0 0;">
+    <form class="layui-form" lay-filter="editForm">
+      <div class="layui-form-item"><label class="layui-form-label">SKU</label><div class="layui-input-block"><input type="text" name="sku" required lay-verify="required" placeholder="请输入SKU" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">产品中文名</label><div class="layui-input-block"><input type="text" name="name" required lay-verify="required" placeholder="请输入产品中文名" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">网页链接</label><div class="layui-input-block"><input type="url" name="url" placeholder="请输入网页链接" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">初始库存</label><div class="layui-input-block"><input type="number" name="initialStock" required lay-verify="required|number" placeholder="请输入初始库存数量" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">日期</label><div class="layui-input-block"><input type="text" name="date" required lay-verify="required|date" placeholder="如 2024-07-18 11:30" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">库存</label><div class="layui-input-block"><input type="number" name="stock" required lay-verify="required|number" placeholder="请输入库存数量" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><div class="layui-input-block"><button class="layui-btn" lay-submit lay-filter="submitEdit">保存</button></div></div>
+    </form>
+  </div>
+  <script src="./src/modules/jquery.js"></script>
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['table', 'layer', 'form'], function(){
+      var table = layui.table;
+      var layer = layui.layer;
+      var form = layui.form;
+      var $ = layui.$;
+
+      var currentMode = 'wide';
+      var hot = null;
+      var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      if (!userInfo.username) {
+        layer.msg('请先登录！', {icon: 2}, function(){ window.location.href = 'login.html'; });
+        return;
+      }
+      document.getElementById('currentUser').textContent = userInfo.realname || userInfo.username;
+      $('#wideTableMode').on('click', function() { switchMode('wide'); });
+      $('#recordMode').on('click', function() { switchMode('record'); });
+      function switchMode(mode) {
+        currentMode = mode;
+        $('.mode-switch .layui-btn').removeClass('active');
+        if (mode === 'wide') {
+          $('#wideTableMode').addClass('active');
+          $('#modeDescription').text('宽表模式：适合日常快速录入和查看最近5天的天猫订单数据，支持批量编辑');
+        } else {
+          $('#recordMode').addClass('active');
+          $('#modeDescription').text('行记录模式：管理天猫订单历史数据，支持单条记录操作和批量导入导出');
+        }
+        $('.wide-table-container, .record-table-container').removeClass('active');
+        if (mode === 'wide') {
+          $('#wideTableContainer').addClass('active');
+          initWideTable();
+        } else {
+          $('#recordTableContainer').addClass('active');
+          initRecordTable();
+        }
+      }
+      function initWideTable() {
+        if (hot) hot.destroy();
+        const columns = [
+          {data: '系统履约单号', type: 'text'},
+          {data: '店铺订单时间', type: 'text'},
+          {data: 'SKU', type: 'text'},
+          {data: '商品数量', type: 'numeric'}
+        ];
+        const colHeaders = ['系统履约单号', '店铺订单时间', 'SKU', '商品数量'];
+        loadWideTableData(columns, colHeaders);
+      }
+      function loadWideTableData(columns, colHeaders) {
+        var token = localStorage.getItem('token');
+        var headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        $.ajax({
+          url: '/api/tmall-orders/wide',
+          type: 'GET',
+          headers: headers,
+          success: function(res) {
+            if(res.success) {
+              hot = new Handsontable(document.getElementById('wideTable'), {
+                data: res.data,
+                columns: columns,
+                colHeaders: colHeaders,
+                rowHeaders: true,
+                minSpareRows: 1,
+                contextMenu: true,
+                manualColumnResize: true,
+                manualRowResize: true,
+                stretchH: 'all',
+                height: 600,
+                licenseKey: 'non-commercial-and-evaluation',
+                language: 'zh-CN',
+                dropdownMenu: true,
+                filters: true,
+                columnSorting: true,
+                autoWrapRow: true,
+                autoWrapCol: true
+              });
+              calculateSales(hot.getSourceData(), columns);
+              hot.render();
+            } else {
+              layer.msg('数据加载失败: ' + res.error, {icon:2});
+            }
+          },
+          error: function(xhr) {
+            if (xhr.status === 401) {
+              layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; });
+            } else {
+              layer.msg('数据加载失败', {icon:2});
+            }
+          }
+        });
+      }
+      function calculateSales(tableData, columns) {
+        const dateCols = columns.map(col => col.data).filter(key => /^\d{4}-\d{2}-\d{2}$/.test(key));
+        tableData.forEach(row => {
+          dateCols.forEach((dateKey, idx) => {
+            const stock = parseInt(row[dateKey]) || 0;
+            let prevStock = null;
+            for (let j = idx - 1; j >= 0; j--) {
+              const prevKey = dateCols[j];
+              if (row[prevKey] !== undefined && row[prevKey] !== null && row[prevKey] !== '') {
+                prevStock = parseInt(row[prevKey]) || 0;
+                break;
+              }
+            }
+            let sales = 0;
+            if (prevStock !== null) sales = Math.max(0, prevStock - stock);
+            row[dateKey + '_销量'] = sales;
+          });
+        });
+      }
+      function initRecordTable() { renderRecordTable(); }
+      function renderRecordTable() {
+        var token = localStorage.getItem('token');
+        var headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        $.ajax({
+          url: '/api/tmall-orders/records',
+          type: 'GET',
+          headers: headers,
+          success: function(res) {
+            if(res.success) {
+              table.render({
+                elem: '#recordTable',
+                data: res.data,
+                page: true,
+                limit: 20,
+                cols: [[
+                  {field:'SKU', title:'SKU', width:150, sort:true},
+                  {field:'产品中文名', title:'产品中文名', width:180},
+                  {field:'网页链接', title:'网页链接', width:220, templet: function(d){ return d['网页链接'] ? '<a href="'+d['网页链接']+'" target="_blank">'+d['网页链接']+'</a>' : ''; }},
+                  {field:'初始库存', title:'初始库存', width:100, sort:true},
+                  {field:'日期', title:'日期', width:160, sort:true},
+                  {field:'库存', title:'库存', width:100, sort:true},
+                  {field:'销量', title:'销量', width:100, sort:true, templet: function(d){ return '<span style="color: ' + (d['销量'] > 0 ? '#52c41a' : '#999') + ';">' + d['销量'] + '</span>'; }},
+                  {title:'操作', width:180, align:'center', toolbar:'#rowBar'}
+                ]],
+                text: {none: '暂无数据'}
+              });
+            } else {
+              layer.msg('数据加载失败: ' + res.error, {icon:2});
+            }
+          },
+          error: function(xhr) {
+            if (xhr.status === 401) {
+              layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; });
+            } else {
+              layer.msg('数据加载失败', {icon:2});
+            }
+          }
+        });
+      }
+      var rowBarHtml = '<div class="layui-btn-group">'
+        +'<button class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>'
+        +'<button class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</button>'
+        +'</div>';
+      $(document.body).append('<script type="text/html" id="rowBar">'+rowBarHtml+'<\/script>');
+      $('#addRowBtn').on('click', function(){ if (hot) hot.alter('insert_row', hot.countRows()); });
+      $('#refreshBtn').on('click', function() { if (hot) { calculateSales(hot.getSourceData(), hot.getSettings().columns); hot.render(); } initWideTable(); });
+      $('#saveWideTableBtn').on('click', function() {
+        if (!hot) return;
+        var data = hot.getSourceData();
+        var columns = hot.getSettings().columns;
+        calculateSales(data, columns);
+        var token = localStorage.getItem('token');
+        var headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        layer.msg('正在保存...', {icon: 16, time: 0});
+        $.ajax({
+          url: '/api/tmall-orders/wide',
+          type: 'POST',
+          headers: headers,
+          data: JSON.stringify({ data: data }),
+          success: function(res) {
+            layer.closeAll();
+            if(res.success) { layer.msg('保存成功', {icon:1}); initWideTable(); } else { layer.msg('保存失败: ' + res.error, {icon:2}); }
+          },
+          error: function(xhr) { layer.closeAll(); if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('保存失败', {icon:2}); } }
+        });
+      });
+      $('#smartImportBtn').on('click', function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.xlsx,.xls,.csv';
+        input.onchange = function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          var token = localStorage.getItem('token');
+          var formData = new FormData();
+          formData.append('file', file);
+          var headers = {};
+          if (token) headers['Authorization'] = 'Bearer ' + token;
+          layer.msg('正在智能导入数据...', {icon: 16, time: 0});
+          $.ajax({
+            url: '/api/tmall-orders/smart-import',
+            type: 'POST',
+            headers: headers,
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+              layer.closeAll();
+              if(res.success) { layer.msg('智能导入成功: ' + res.message, {icon:1}); initWideTable(); if (currentMode === 'record') { renderRecordTable(); } } else { layer.msg('智能导入失败: ' + res.error, {icon:2}); }
+            },
+            error: function(xhr) { layer.closeAll(); if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('智能导入失败', {icon:2}); } }
+          });
+        };
+        input.click();
+      });
+      $('#importBtn').on('click', function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.xlsx,.xls,.csv';
+        input.onchange = function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          var token = localStorage.getItem('token');
+          var formData = new FormData();
+          formData.append('file', file);
+          var headers = {};
+          if (token) headers['Authorization'] = 'Bearer ' + token;
+          $.ajax({
+            url: '/api/tmall-orders/wide/batch',
+            type: 'POST',
+            headers: headers,
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) { if(res.success) { layer.msg('导入成功: ' + res.message, {icon:1}); initWideTable(); } else { layer.msg('导入失败: ' + res.error, {icon:2}); } },
+            error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导入失败', {icon:2}); } }
+          });
+        };
+        input.click();
+      });
+      $('#exportBtn').on('click', function() {
+        var token = localStorage.getItem('token');
+        var headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        $.ajax({
+          url: '/api/tmall-orders/wide/export',
+          type: 'GET',
+          headers: headers,
+          xhrFields: { responseType: 'blob' },
+          success: function(data) {
+            const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tmall-wide-table-export.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            layer.msg('导出成功', {icon:1});
+          },
+          error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导出失败', {icon:2}); } }
+        });
+      });
+      $('#downloadTemplateBtn').on('click', function() {
+        const today = new Date();
+        const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存'];
+        for (let i = 4; i >= 0; i--) {
+          const date = new Date(today);
+          date.setDate(date.getDate() - i);
+          const dateStr = date.toISOString().split('T')[0];
+          colHeaders.push(dateStr);
+        }
+        const ws = XLSX.utils.aoa_to_sheet([colHeaders]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '天猫宽表模板');
+        XLSX.writeFile(wb, 'tmall-wide-table-template.xlsx');
+      });
+      $('#clearOldDataBtn').on('click', function() {
+        layer.confirm('确定要清理5天前的数据吗？清理后的数据将移动到历史记录中。', function(index) {
+          var token = localStorage.getItem('token');
+          var headers = {};
+          if (token) headers['Authorization'] = 'Bearer ' + token;
+          $.ajax({
+            url: '/api/tmall-orders/wide/clear',
+            type: 'POST',
+            headers: headers,
+            success: function(res) { if(res.success) { layer.msg('清理成功: ' + res.message, {icon:1}); initWideTable(); } else { layer.msg('清理失败: ' + res.error, {icon:2}); } },
+            error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('清理失败', {icon:2}); } }
+          });
+          layer.close(index);
+        });
+      });
+      $('#clearAllDataBtn').on('click', function() {
+        layer.confirm('⚠️ 警告：此操作将清空所有天猫宽表数据，且无法恢复！确定要继续吗？', {
+          icon: 3, title: '确认清空', btn: ['确定清空', '取消']
+        }, function(index) {
+          var token = localStorage.getItem('token');
+          var headers = {};
+          if (token) headers['Authorization'] = 'Bearer ' + token;
+          $.ajax({
+            url: '/api/tmall-orders/wide/clear-all',
+            type: 'POST',
+            headers: headers,
+            success: function(res) { if(res.success) { layer.msg('清空成功: ' + res.message, {icon:1}); initWideTable(); } else { layer.msg('清空失败: ' + res.error, {icon:2}); } },
+            error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('清空失败', {icon:2}); } }
+          });
+          layer.close(index);
+        });
+      });
+      $('#addRecordBtn').on('click', function(){ form.val('editForm', {sku:'', name:'', url:'', initialStock:'', date:'', stock:''}); layer.open({ type:1, title:'新增记录', area:['400px','480px'], content:$('#editFormModal'), btn:[], shadeClose:true }); });
+      $('#refreshRecordBtn').on('click', renderRecordTable);
+      $('#importRecordBtn').on('click', function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.xlsx,.xls,.csv';
+        input.onchange = function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          var token = localStorage.getItem('token');
+          var formData = new FormData();
+          formData.append('file', file);
+          var headers = {};
+          if (token) headers['Authorization'] = 'Bearer ' + token;
+          $.ajax({
+            url: '/api/tmall-orders/records/batch',
+            type: 'POST',
+            headers: headers,
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) { if(res.success) { layer.msg('导入成功: ' + res.message, {icon:1}); renderRecordTable(); } else { layer.msg('导入失败: ' + res.error, {icon:2}); } },
+            error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导入失败', {icon:2}); } }
+          });
+        };
+        input.click();
+      });
+      $('#exportRecordBtn').on('click', function() {
+        var token = localStorage.getItem('token');
+        var headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        $.ajax({
+          url: '/api/tmall-orders/records/export',
+          type: 'GET',
+          headers: headers,
+          xhrFields: { responseType: 'blob' },
+          success: function(data) {
+            const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tmall-records-export.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            layer.msg('导出成功', {icon:1});
+          },
+          error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导出失败', {icon:2}); } }
+        });
+      });
+      $('#downloadRecordTemplateBtn').on('click', function() {
+        const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存', '日期（YYYY-MM-DD HH:mm）', '库存'];
+        const ws = XLSX.utils.aoa_to_sheet([colHeaders]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '天猫记录模板');
+        XLSX.writeFile(wb, 'tmall-records-template.xlsx');
+      });
+      $('#clearAllRecordDataBtn').on('click', function() {
+        layer.confirm('⚠️ 警告：此操作将清空所有天猫历史记录数据，且无法恢复！确定要继续吗？', {
+          icon: 3, title: '确认清空', btn: ['确定清空', '取消']
+        }, function(index) {
+          var token = localStorage.getItem('token');
+          var headers = {};
+          if (token) headers['Authorization'] = 'Bearer ' + token;
+          $.ajax({
+            url: '/api/tmall-orders/records/clear-all',
+            type: 'POST',
+            headers: headers,
+            success: function(res) { if(res.success) { layer.msg('清空成功: ' + res.message, {icon:1}); renderRecordTable(); } else { layer.msg('清空失败: ' + res.error, {icon:2}); } },
+            error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('清空失败', {icon:2}); } }
+          });
+          layer.close(index);
+        });
+      });
+      table.on('tool(recordTable)', function(obj){
+        var data = obj.data;
+        if(obj.event === 'edit'){
+          form.val('editForm', {
+            sku: data.SKU,
+            name: data['产品中文名'],
+            url: data['网页链接'],
+            initialStock: data['初始库存'],
+            date: data['日期'],
+            stock: data['库存']
+          });
+          layer.open({ type:1, title:'编辑记录', area:['400px','480px'], content:$('#editFormModal'), btn:[], shadeClose:true });
+          $('#editFormModal').data('editId', data.id);
+        } else if(obj.event === 'del'){
+          layer.confirm('确定要删除该记录吗？', function(index){
+            var token = localStorage.getItem('token');
+            var headers = {};
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            $.ajax({
+              url: '/api/tmall-orders/records/'+data.id,
+              type: 'DELETE',
+              headers: headers,
+              success: function(res){ if(res.success){ layer.msg('删除成功', {icon:1}); renderRecordTable(); }else{ layer.msg('删除失败: '+res.error, {icon:2}); } },
+              error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('删除失败', {icon:2}); } }
+            });
+            layer.close(index);
+          });
+        }
+      });
+      form.on('submit(submitEdit)', function(formObj){
+        var editId = $('#editFormModal').data('editId');
+        var method = editId ? 'PUT' : 'POST';
+        var url = '/api/tmall-orders/records' + (editId ? ('/'+editId) : '');
+        var data = {
+          SKU: formObj.field.sku,
+          '产品中文名': formObj.field.name,
+          '网页链接': formObj.field.url,
+          '初始库存': formObj.field.initialStock,
+          '日期': formObj.field.date,
+          '库存': formObj.field.stock
+        };
+        var token = localStorage.getItem('token');
+        var headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        $.ajax({
+          url: url,
+          type: method,
+          headers: headers,
+          data: JSON.stringify(data),
+          success: function(res){ if(res.success){ layer.msg('保存成功', {icon:1}); layer.closeAll(); if (currentMode === 'record') { renderRecordTable(); } }else{ layer.msg('保存失败: '+res.error, {icon:2}); } },
+          error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('保存失败', {icon:2}); } }
+        });
+        return false;
+      });
+      initWideTable();
+    });
+    function logout() {
+      layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index){
+        localStorage.removeItem('currentUser');
+        layer.close(index);
+        layer.msg('已安全退出！', {icon: 1}, function(){ window.location.href = 'login.html'; });
+      });
+    }
+    function switchAccount() {
+      layer.confirm('切换账号将退出当前登录，是否继续？', {icon: 3, title: '切换账号', btn: ['确定', '取消']}, function(index) {
+        localStorage.removeItem('currentUser');
+        layer.close(index);
+        layer.msg('正在切换账号...', {icon: 16, time: 1000}, function(){ window.location.href = 'login.html'; });
+      });
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/handsontable@16.0.1/dist/handsontable.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</body>
+</html> 

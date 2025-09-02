@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>表格管理 - 数据管理系统</title>
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <link href="./src/css/app-header.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f8f9fa;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header .layui-nav {
+      background: transparent;
+    }
+    .header .layui-nav .layui-nav-item a {
+      color: rgba(255,255,255,0.9);
+    }
+    .header .layui-nav .layui-nav-item a:hover {
+      color: white;
+    }
+    .header .logo {
+      font-size: 18px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    
+    /* 主导航样式 */
+    .main-nav {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      margin: 0 20px;
+    }
+    .main-nav .layui-nav-item {
+      margin: 0 5px;
+    }
+    .main-nav .layui-nav-item a {
+      padding: 0 20px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+    .main-nav .layui-nav-item a:hover,
+    .main-nav .layui-nav-item.layui-this a {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+    .main-nav .layui-nav-item a i {
+      margin-right: 6px;
+    }
+    
+    .header .user-info {
+      white-space: nowrap;
+    }
+    
+    /* 用户下拉菜单样式 */
+    .user-info .layui-nav-child dd a {
+      padding: 10px 15px;
+      color: #666;
+      transition: all 0.3s ease;
+    }
+    .user-info .layui-nav-child dd a:hover {
+      background: #f8f9fa;
+      color: #16baaa;
+    }
+    .user-info .layui-nav-child dd a i {
+      margin-right: 8px;
+      font-size: 14px;
+    }
+    
+    .content-wrapper {
+      padding: 20px;
+    }
+    
+    .page-header {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .page-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin: 0;
+    }
+    .page-subtitle {
+      color: #666;
+      margin-top: 5px;
+    }
+    .breadcrumb {
+      color: #999;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .breadcrumb a {
+      color: #16baaa;
+      text-decoration: none;
+    }
+    
+    .filter-panel {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .filter-title {
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    
+    .action-buttons {
+      text-align: right;
+      margin-bottom: 15px;
+    }
+    
+    .table-container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .table-header {
+      padding: 20px;
+      border-bottom: 1px solid #f0f0f0;
+      background: #fafafa;
+    }
+    .table-stats {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      color: #666;
+    }
+    
+    .custom-table {
+      width: 100%;
+      font-size: 13px;
+    }
+    .custom-table th {
+      background: #f8f9fa;
+      font-weight: bold;
+      text-align: center;
+      padding: 12px 8px;
+      border: 1px solid #e6e6e6;
+      white-space: nowrap;
+    }
+    .custom-table td {
+      padding: 10px 8px;
+      border: 1px solid #e6e6e6;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .custom-table tbody tr:hover {
+      background: #f8f9fa;
+    }
+    .editable-cell {
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .editable-cell:hover {
+      background: #e6f7ff;
+    }
+    .editing-cell {
+      background: #fff1b8;
+    }
+    
+    .sku-column {
+      background: #f0f9ff;
+      font-weight: bold;
+      max-width: 120px;
+      word-break: break-all;
+    }
+    .stock-column {
+      background: #f0fff4;
+    }
+    .sales-column {
+      background: #fff7e6;
+    }
+    .date-column {
+      background: #f9f0ff;
+    }
+    
+    .status-low {
+      color: #f5222d;
+      font-weight: bold;
+    }
+    .status-warning {
+      color: #fa8c16;
+      font-weight: bold;
+    }
+    .status-normal {
+      color: #52c41a;
+    }
+    
+    .cell-input {
+      width: 100%;
+      border: none;
+      background: transparent;
+      text-align: center;
+      font-size: 13px;
+    }
+    
+    .pagination-wrapper {
+      padding: 20px;
+      text-align: center;
+      background: white;
+      border-top: 1px solid #f0f0f0;
+    }
+    
+    .modal-content {
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="layui-header header">
+    <div class="logo">
+      📊 数据管理系统
+    </div>
+    
+    <!-- 主导航按钮 -->
+    <ul class="layui-nav main-nav">
+      <li class="layui-nav-item">
+        <a href="dashboard.html">
+          <i class="layui-icon layui-icon-home"></i> 数据仪表盘
+        </a>
+      </li>
+      <li class="layui-nav-item layui-this">
+        <a href="table-management.html">
+          <i class="layui-icon layui-icon-table"></i> 表格管理
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="data-upload.html">
+          <i class="layui-icon layui-icon-upload-drag"></i> 数据导入
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="data-analysis.html">
+          <i class="layui-icon layui-icon-chart"></i> 数据分析
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="local-database.html">
+          <i class="layui-icon layui-icon-database"></i> 本地数据库
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="tmall-database.html">
+          <i class="layui-icon layui-icon-cart"></i> 天猫数据库
+        </a>
+      </li>
+      <li class="layui-nav-item">
+        <a href="tmall-order.html">
+          <i class="layui-icon layui-icon-list"></i> 天猫订单
+        </a>
+      </li>
+      <li class="layui-nav-item" id="adminOnlyTopNav" style="display: none;">
+        <a href="user-management.html">
+          <i class="layui-icon layui-icon-username"></i> 用户管理
+        </a>
+      </li>
+    </ul>
+    
+    
+  </div>
+  
+  <div class="content-wrapper">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <h1 class="page-title">📊 表格数据管理</h1>
+      <p class="page-subtitle">管理您的SKU库存和销售数据</p>
+      <div class="breadcrumb">
+        <a href="dashboard.html">首页</a> / 表格管理
+      </div>
+    </div>
+    
+    <!-- 筛选面板 -->
+    <div class="filter-panel">
+      <div class="filter-title">🔍 数据筛选</div>
+      <form class="layui-form" lay-filter="filterForm">
+        <div class="layui-row layui-col-space15">
+          <div class="layui-col-md3">
+            <label class="layui-form-label">SKU搜索</label>
+            <div class="layui-input-block">
+              <input type="text" name="skuSearch" placeholder="输入SKU编码" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-col-md3">
+            <label class="layui-form-label">库存状态</label>
+            <div class="layui-input-block">
+              <select name="stockStatus">
+                <option value="">全部状态</option>
+                <option value="low">库存不足</option>
+                <option value="warning">库存预警</option>
+                <option value="normal">库存正常</option>
+              </select>
+            </div>
+          </div>
+          <div class="layui-col-md3">
+            <label class="layui-form-label">日期范围</label>
+            <div class="layui-input-block">
+              <input type="text" name="dateRange" id="dateRange" placeholder="选择日期范围" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-col-md3">
+            <label class="layui-form-label">操作</label>
+            <div class="layui-input-block">
+              <button type="button" class="layui-btn layui-btn-normal" onclick="searchData()">
+                <i class="layui-icon layui-icon-search"></i> 搜索
+              </button>
+              <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+    
+    <!-- 操作按钮 -->
+    <div class="action-buttons">
+      <button class="layui-btn layui-btn-normal" onclick="importData()" id="importBtn">
+        <i class="layui-icon layui-icon-upload"></i> 导入数据
+      </button>
+      <button class="layui-btn layui-btn-warm" onclick="exportData()">
+        <i class="layui-icon layui-icon-download-circle"></i> 导出数据
+      </button>
+      <button class="layui-btn" onclick="addRecord()" id="addBtn">
+        <i class="layui-icon layui-icon-add-1"></i> 新增记录
+      </button>
+      <button class="layui-btn layui-btn-danger" onclick="deleteSelected()" id="deleteBtn">
+        <i class="layui-icon layui-icon-delete"></i> 批量删除
+      </button>
+    </div>
+    
+    <!-- 文件列表容器 -->
+    <div class="table-container">
+      <div class="table-header">
+        <div class="table-stats">
+          <span>共 <strong id="totalRecords">0</strong> 个文件</span>
+          <span>已选择 <strong id="selectedCount">0</strong> 个</span>
+        </div>
+      </div>
+      
+      <div style="overflow-x: auto;">
+        <table class="custom-table" id="fileTable">
+          <thead>
+            <tr>
+              <th><input type="checkbox" lay-skin="primary" id="selectAll"></th>
+              <th>文件名</th>
+              <th>大小</th>
+              <th>工作表数</th>
+              <th>数据行数</th>
+              <th>上传时间</th>
+              <th>上传者</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr>
+              <td colspan="8" style="text-align: center; padding: 40px; color: #999;">
+                <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop" style="font-size: 24px;"></i>
+                <div style="margin-top: 10px;">正在加载文件列表...</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="pagination-wrapper">
+        <div id="pagination"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['form', 'layer', 'laydate', 'laypage'], function(){
+      var form = layui.form;
+      var layer = layui.layer;
+      var laydate = layui.laydate;
+      var laypage = layui.laypage;
+      
+      var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      var fileList = [];
+      
+      // 初始化页面
+      initPage();
+      
+      function initPage() {
+        // 检查登录状态
+        if (!userInfo.username) {
+          layer.msg('请先登录！', {icon: 2}, function(){
+            window.location.href = 'login.html';
+          });
+          return;
+        }
+        
+        // 显示用户信息（可选）
+        var cu = document.getElementById('currentUser');
+        if (cu) cu.textContent = userInfo.realname || userInfo.username;
+        
+        // 根据角色显示/隐藏功能
+        if (userInfo.role === 'admin') {
+          // 显示管理员专用导航
+          document.getElementById('adminOnlyTopNav').style.display = 'block';
+        } else {
+          // 数据分析员隐藏编辑功能
+          document.getElementById('importBtn').style.display = 'none';
+          document.getElementById('addBtn').style.display = 'none';
+          document.getElementById('deleteBtn').style.display = 'none';
+        }
+        
+        // 初始化日期选择器
+        laydate.render({
+          elem: '#dateRange',
+          type: 'date',
+          range: true
+        });
+        
+        // 加载文件列表
+        loadFileList();
+        
+        // 全选功能
+        document.getElementById('selectAll').addEventListener('change', function(){
+          var checkboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+          checkboxes.forEach(function(checkbox){
+            checkbox.checked = this.checked;
+          }.bind(this));
+          updateSelectedCount();
+        });
+      }
+      
+      function loadFileList() {
+        var token = userInfo.token || localStorage.getItem('token');
+        var headers = {};
+        
+        if (token) {
+          headers['Authorization'] = 'Bearer ' + token;
+        }
+        
+        fetch('/api/files', {
+          headers: headers
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            fileList = data.files;
+            renderFileTable();
+            updateFileStats();
+          } else {
+            layer.msg('加载文件列表失败: ' + data.error, {icon: 2});
+            showEmptyState();
+          }
+        })
+        .catch(error => {
+          console.error('加载错误:', error);
+          layer.msg('网络错误，请重试', {icon: 2});
+          showEmptyState();
+        });
+      }
+      
+      function renderFileTable() {
+        var tbody = document.getElementById('tableBody');
+        var html = '';
+        
+        if (fileList.length === 0) {
+          showEmptyState();
+          return;
+        }
+        
+        fileList.forEach(function(file){
+          html += '<tr>';
+          html += '<td><input type="checkbox" lay-skin="primary" data-file-id="' + file.id + '" onchange="updateSelectedCount()"></td>';
+          html += '<td><i class="layui-icon layui-icon-file" style="color: #52c41a; margin-right: 5px;"></i>' + file.originalName + '</td>';
+          html += '<td>' + formatFileSize(file.size) + '</td>';
+          html += '<td>' + (file.sheetNames ? file.sheetNames.length : '-') + '</td>';
+          html += '<td>' + (file.rowCount || '-') + '</td>';
+          html += '<td>' + formatDateTime(file.uploadTime) + '</td>';
+          html += '<td>' + file.uploadedBy + '</td>';
+          html += '<td>';
+          
+          // 查看详情按钮（所有用户都可以使用）
+          html += '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="viewExcelData(' + file.id + ')" title="查看Excel数据">';
+          html += '<i class="layui-icon layui-icon-table"></i> 高级查看</button> ';
+          
+          // 简化版查看器
+          html += '<button class="layui-btn layui-btn-xs" onclick="viewExcelDataSimple(' + file.id + ')" title="简化版查看器">';
+          html += '<i class="layui-icon layui-icon-list"></i> 简化查看</button> ';
+          
+          // 下载按钮
+          html += '<button class="layui-btn layui-btn-xs" onclick="downloadFile(' + file.id + ')" title="下载文件">';
+          html += '<i class="layui-icon layui-icon-download-circle"></i> 下载</button>';
+          
+          // 管理员权限按钮
+          if (userInfo.role === 'admin') {
+            html += ' <button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteFile(' + file.id + ')" title="删除文件">';
+            html += '<i class="layui-icon layui-icon-delete"></i> 删除</button>';
+          }
+          
+          html += '</td>';
+          html += '</tr>';
+        });
+        
+        tbody.innerHTML = html;
+        form.render('checkbox');
+      }
+      
+      function showEmptyState() {
+        var tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #999;">' +
+          '<i class="layui-icon layui-icon-file" style="font-size: 48px; color: #ddd; display: block; margin-bottom: 10px;"></i>' +
+          '<div>暂无Excel文件</div>' +
+          '<div style="margin-top: 10px;"><a href="data-upload.html">立即上传文件</a></div>' +
+          '</td></tr>';
+      }
+      
+      function updateFileStats() {
+        document.getElementById('totalRecords').textContent = fileList.length;
+      }
+      
+      function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        var k = 1024;
+        var sizes = ['B', 'KB', 'MB', 'GB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+      
+      function formatDateTime(dateString) {
+        var date = new Date(dateString);
+        return date.toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+      
+      function getStockStatus(stock) {
+        if (stock <= 0) return 'status-low';
+        if (stock < 20) return 'status-warning';
+        return 'status-normal';
+      }
+      
+      function updateSelectedCount() {
+        var selected = document.querySelectorAll('tbody input[type="checkbox"]:checked');
+        document.getElementById('selectedCount').textContent = selected.length;
+      }
+      
+      // 搜索功能
+      window.searchData = function() {
+        var formData = form.val('filterForm');
+        layer.msg('搜索功能：' + JSON.stringify(formData), {icon: 1});
+        // 这里可以实现真实的搜索逻辑
+      };
+      
+      // 单元格编辑
+      window.editCell = function(cell, recordId, columnKey) {
+        if (userInfo.role !== 'admin') return;
+        
+        var currentValue = cell.textContent.trim();
+        cell.classList.add('editing-cell');
+        cell.innerHTML = '<input type="text" class="cell-input" value="' + currentValue + '" onblur="saveCell(this, ' + recordId + ', \'' + columnKey + '\')" onkeypress="handleCellKeypress(event, this, ' + recordId + ', \'' + columnKey + '\')" autofocus>';
+        cell.querySelector('.cell-input').focus();
+      };
+      
+      window.saveCell = function(input, recordId, columnKey) {
+        var newValue = input.value;
+        var cell = input.parentNode;
+        cell.classList.remove('editing-cell');
+        cell.innerHTML = newValue;
+        
+        // 这里可以发送AJAX请求保存数据
+        layer.msg('数据已保存', {icon: 1, time: 1000});
+      };
+      
+      window.handleCellKeypress = function(event, input, recordId, columnKey) {
+        if (event.key === 'Enter') {
+          input.blur();
+        }
+      };
+      
+      // Excel数据查看器
+      window.viewExcelData = function(fileId) {
+        window.open('excel-viewer.html?fileId=' + fileId, '_blank');
+      };
+      
+      // 简化版Excel数据查看器
+      window.viewExcelDataSimple = function(fileId) {
+        window.open('simple-excel-viewer.html?fileId=' + fileId, '_blank');
+      };
+      
+      // 下载文件
+      window.downloadFile = function(fileId) {
+        var token = userInfo.token || localStorage.getItem('token');
+        var downloadUrl = '/api/files/' + fileId + '/download';
+        
+        if (token) {
+          // 使用fetch下载并处理认证
+          fetch(downloadUrl, {
+            headers: {
+              'Authorization': 'Bearer ' + token
+            }
+          })
+          .then(response => {
+            if (response.ok) {
+              return response.blob();
+            } else {
+              throw new Error('下载失败: ' + response.status);
+            }
+          })
+          .then(blob => {
+            var url = window.URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = ''; // 让浏览器根据响应头决定文件名
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            layer.msg('文件下载成功！', {icon: 1});
+          })
+          .catch(error => {
+            console.error('下载错误:', error);
+            layer.msg('下载失败，请重试', {icon: 2});
+          });
+        } else {
+          layer.msg('请先登录', {icon: 2});
+        }
+      };
+      
+      // 删除文件
+      window.deleteFile = function(fileId) {
+        layer.confirm('确定要删除这个文件吗？删除后无法恢复！', {
+          icon: 3, 
+          title: '确认删除'
+        }, function(index) {
+          var token = userInfo.token || localStorage.getItem('token');
+          var headers = {};
+          
+          if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+          }
+          
+          fetch('/api/files/' + fileId, {
+            method: 'DELETE',
+            headers: headers
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              layer.msg('文件删除成功！', {icon: 1});
+              loadFileList(); // 重新加载文件列表
+            } else {
+              layer.msg('删除失败: ' + data.error, {icon: 2});
+            }
+          })
+          .catch(error => {
+            console.error('删除错误:', error);
+            layer.msg('网络错误，请重试', {icon: 2});
+          });
+          
+          layer.close(index);
+        });
+      };
+      
+      // 导入数据
+      window.importData = function() {
+        window.location.href = 'data-upload.html';
+      };
+      
+      // 导出数据
+      window.exportData = function() {
+        layer.confirm('确定要导出当前数据吗？', {icon: 3, title: '确认导出'}, function(index){
+          layer.msg('正在导出数据...', {icon: 16, time: 2000});
+          // 这里可以实现真实的导出功能
+          setTimeout(function(){
+            layer.msg('导出成功！', {icon: 1});
+          }, 2000);
+          layer.close(index);
+        });
+      };
+      
+      // 新增记录
+      window.addRecord = function() {
+        layer.open({
+          type: 1,
+          title: '➕ 新增记录',
+          area: ['800px', '600px'],
+          content: '<div class="modal-content"><p>新增记录表单将在这里显示...</p></div>'
+        });
+      };
+      
+      // 批量删除
+      window.deleteSelected = function() {
+        var selected = document.querySelectorAll('tbody input[type="checkbox"]:checked');
+        if (selected.length === 0) {
+          layer.msg('请先选择要删除的记录！', {icon: 2});
+          return;
+        }
+        
+        layer.confirm('确定要删除选中的 ' + selected.length + ' 条记录吗？', {icon: 3, title: '确认删除'}, function(index){
+          layer.msg('删除成功！', {icon: 1});
+          renderTable();
+          updateSelectedCount();
+          layer.close(index);
+        });
+      };
+      
+      // 编辑记录
+      window.editRecord = function(id) {
+        layer.open({
+          type: 1,
+          title: '✏️ 编辑记录',
+          area: ['800px', '600px'],
+          content: '<div class="modal-content"><p>编辑记录 ID: ' + id + '</p></div>'
+        });
+      };
+      
+      // 查看记录
+      window.viewRecord = function(id) {
+        layer.open({
+          type: 1,
+          title: '👁️ 查看记录',
+          area: ['800px', '600px'],
+          content: '<div class="modal-content"><p>查看记录 ID: ' + id + '</p></div>'
+        });
+      };
+      
+      // 删除记录
+      window.deleteRecord = function(id) {
+        layer.confirm('确定要删除这条记录吗？', {icon: 3, title: '确认删除'}, function(index){
+          layer.msg('删除成功！', {icon: 1});
+          renderTable();
+          layer.close(index);
+        });
+      };
+    });
+    
+    // 退出登录
+          function logout() {
+        layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index){
+          localStorage.removeItem('currentUser');
+          layer.close(index);
+          layer.msg('已安全退出！', {icon: 1}, function(){
+            window.location.href = 'login.html';
+          });
+        });
+      }
+      
+      // 切换账户
+      function switchAccount() {
+        layer.confirm('切换账户将退出当前登录，是否继续？', {
+          icon: 3, 
+          title: '切换账户',
+          btn: ['确定', '取消']
+        }, function(index) {
+          localStorage.removeItem('currentUser');
+          layer.close(index);
+          layer.msg('正在切换账户...', {icon: 16, time: 1000}, function(){
+            window.location.href = 'login.html';
+          });
+        });
+      }
+  </script>
+</body>
+</html> 

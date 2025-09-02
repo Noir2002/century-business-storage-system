@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>虚拟库存</title>
+    <link href="./src/css/layui.css" rel="stylesheet" />
+    <link href="./src/css/app-header.css" rel="stylesheet" />
+    <style>
+        body { background: #f8f9fa; }
+        .replenish { color: #d23; font-weight: 600; }
+        .ok { color: #16b777; }
+        .url a { color: #1e9fff; }
+        .text-left { text-align: left; }
+    </style>
+    <script>
+        function getToken() {
+            try {
+                return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+            } catch (_) { return ''; }
+        }
+        async function fetchOverview() {
+            const token = getToken();
+            const headers = {};
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const resp = await fetch('/api/virtual-inventory/overview', { headers });
+            if (!resp.ok) {
+                const t = await resp.text();
+                throw new Error('请求失败: ' + resp.status + ' ' + t);
+            }
+            return resp.json();
+        }
+        function renderTable(items) {
+            // 前端兜底排序：需补货优先、按今日订单数降序
+            items = (items || []).slice().sort((a,b)=>{
+                const byNeed = Number(b.needReplenish) - Number(a.needReplenish);
+                if (byNeed !== 0) return byNeed;
+                const byOrders = (b.todayOrderCount||0) - (a.todayOrderCount||0);
+                if (byOrders !== 0) return byOrders;
+                return String(a.sku||'').localeCompare(String(b.sku||''));
+            });
+            const tbody = document.querySelector('#table-body');
+            tbody.innerHTML = '';
+            items.forEach(it => {
+                const skuText = it.sku || it.SKU || it['SKU'] || '';
+                const nameText = it.name || it['产品中文名'] || it['产品名称'] || it['商品名称'] || it.title || '';
+                const link = it.url || it['网页链接'] || it['链接'] || it['URL'] || '';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-left">${skuText}</td>
+                    <td class="text-left">${nameText}</td>
+                    <td class="url">${link ? `<a href="${link}" target="_blank">链接</a>` : ''}</td>
+                    <td style="text-align:center;">${it.virtualStock}</td>
+                    <td style="text-align:center;">${it.todayOrderCount}</td>
+                    <td style="text-align:center;">${it.needReplenish ? '<span class="replenish">需要补货</span>' : '<span class="ok">正常</span>'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        function renderSummary(summary, pagination) {
+            const el = document.querySelector('#summary');
+            const pageInfo = pagination ? ` ｜ 第 ${pagination.page}/${pagination.totalPages} 页（每页 ${pagination.limit} 条）` : '';
+            el.textContent = `日期 ${summary.date} ｜ 在线商品 ${summary.totalOnline} ｜ 今日有订单 ${summary.withOrdersToday} ｜ 虚拟库存/件 ${summary.virtualStockPerSku}${pageInfo}`;
+        }
+        function renderPager(pagination) {
+            const pager = document.querySelector('#pager');
+            if (!pagination) { pager.innerHTML=''; return; }
+            pager.innerHTML = '';
+            const btnPrev = document.createElement('button');
+            btnPrev.className = 'layui-btn layui-btn-sm';
+            btnPrev.textContent = '上一页';
+            btnPrev.disabled = !pagination.hasPrev;
+            btnPrev.onclick = () => changePage(pagination.page - 1);
+            const btnNext = document.createElement('button');
+            btnNext.className = 'layui-btn layui-btn-sm layui-btn-primary';
+            btnNext.textContent = '下一页';
+            btnNext.disabled = !pagination.hasNext;
+            btnNext.onclick = () => changePage(pagination.page + 1);
+            pager.appendChild(btnPrev); pager.appendChild(btnNext);
+        }
+        let currentPage = 1;
+        const pageSize = 100;
+        async function loadData(page=1) {
+            currentPage = page;
+            const loading = document.querySelector('#loading');
+            const err = document.querySelector('#error');
+            loading.style.display = 'block';
+            err.style.display = 'none';
+            try {
+                const token = getToken();
+                const headers = {};
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const resp = await fetch(`/api/virtual-inventory/overview?page=${currentPage}&limit=${pageSize}`, { headers });
+                const { success, data, error } = await resp.json();
+                if (!success) throw new Error(error || '未知错误');
+                renderSummary(data.summary, data.pagination);
+                renderTable(data.items || []);
+                renderPager(data.pagination);
+            } catch (e) {
+                err.style.display = 'block';
+                err.textContent = e.message;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        function changePage(p) { if (p>0) loadData(p); }
+        document.addEventListener('DOMContentLoaded', () => loadData(1));
+    </script>
+</head>
+<body>
+    <style>
+      .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display:flex; align-items:center; justify-content:space-between; }
+      .header .layui-nav { background: transparent; }
+      .header .layui-nav .layui-nav-item a { color: rgba(255,255,255,0.9); }
+      .header .layui-nav .layui-nav-item a:hover { color: white; }
+      .logo { font-size: 18px; font-weight: bold; white-space: nowrap; }
+      .main-nav { flex: 1; display:flex; justify-content:center; margin:0 20px; }
+      .main-nav .layui-nav-item a { padding:0 20px; border-radius:6px; transition: all .3s; font-size:14px; }
+      .main-nav .layui-nav-item a:hover, .main-nav .layui-this a { background: rgba(255,255,255,0.2); color:#fff; }
+    </style>
+    <div class="layui-header header">
+        <div class="logo">📊 数据管理系统</div>
+        <ul class="layui-nav main-nav">
+            <li class="layui-nav-item"><a href="dashboard.html"><i class="layui-icon layui-icon-home"></i> 数据仪表盘</a></li>
+            <li class="layui-nav-item"><a href="table-management.html"><i class="layui-icon layui-icon-table"></i> 表格管理</a></li>
+            <li class="layui-nav-item"><a href="data-upload.html"><i class="layui-icon layui-icon-upload-drag"></i> 数据导入</a></li>
+            <li class="layui-nav-item layui-this"><a href="virtual-inventory.html"><i class="layui-icon layui-icon-engine"></i> 虚拟库存</a></li>
+            <li class="layui-nav-item"><a href="data-analysis.html"><i class="layui-icon layui-icon-chart"></i> 数据分析</a></li>
+            <li class="layui-nav-item"><a href="local-database.html"><i class="layui-icon layui-icon-database"></i> 本地数据库</a></li>
+            <li class="layui-nav-item"><a href="tmall-database.html"><i class="layui-icon layui-icon-cart"></i> 天猫数据库</a></li>
+            <li class="layui-nav-item"><a href="tmall-order.html"><i class="layui-icon layui-icon-list"></i> 天猫订单</a></li>
+            <li class="layui-nav-item" id="adminOnlyTopNav" style="display:none;"><a href="user-management.html"><i class="layui-icon layui-icon-username"></i> 用户管理</a></li>
+        </ul>
+        
+    </div>
+    <div class="layui-card" style="margin:16px;">
+        <div class="layui-card-header">虚拟库存（所有已上架商品固定显示库存=2）</div>
+        <div class="layui-card-body">
+            <div id="summary" style="margin-bottom:12px;color:#666"></div>
+            <div id="loading" style="display:none;">正在加载...</div>
+            <div id="pager" style="margin:8px 0;"></div>
+            <div id="error" style="display:none;color:#d23"></div>
+            <table class="layui-table">
+                <thead>
+                    <tr>
+                        <th class="text-left">SKU</th>
+                        <th class="text-left">产品中文名</th>
+                        <th>链接</th>
+                        <th style="text-align:center;width:120px;">虚拟库存</th>
+                        <th style="text-align:center;width:140px;">今日订单数</th>
+                        <th style="text-align:center;width:140px;">补货提醒</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+    </div>
+    <script src="./src/layui.js"></script>
+    <script>
+        layui.use(['layer'], function(){
+            var layer = layui.layer;
+            var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+            if (!userInfo.username) {
+                layer.msg('请先登录！', {icon: 2}, function(){ window.location.href = 'login.html'; });
+                return;
+            }
+            var cu = document.getElementById('currentUser');
+            if (cu) cu.textContent = userInfo.realname || userInfo.username;
+            if (userInfo.role === 'admin') {
+                var el = document.getElementById('adminOnlyTopNav');
+                if (el) el.style.display = 'block';
+            }
+        });
+        function logout() {
+          layui.layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index){
+            localStorage.removeItem('currentUser');
+            layui.layer.close(index);
+            layui.layer.msg('已安全退出！', {icon: 1}, function(){ window.location.href = 'login.html'; });
+          });
+        }
+        function switchAccount() {
+          layui.layer.confirm('切换账号将退出当前登录，是否继续？', {icon: 3, title: '切换账号', btn: ['确定', '取消']}, function(index) {
+            localStorage.removeItem('currentUser');
+            layui.layer.close(index);
+            layui.layer.msg('正在切换账号...', {icon: 16, time: 1000}, function(){ window.location.href = 'login.html'; });
+          });
+        }
+    </script>
+</body>
+</html>
+
+
