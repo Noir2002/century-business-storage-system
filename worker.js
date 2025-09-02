@@ -34,6 +34,8 @@ export default {
         return await handleInventoryData(request, env, path, method, corsHeaders);
       } else if (path.startsWith('/api/analytics/')) {
         return await handleAnalyticsData(request, env, path, method, corsHeaders);
+      } else if (path.startsWith('/api/localdb/')) {
+        return await handleLocalDB(request, env, path, method, corsHeaders);
       } else {
         return new Response('Not Found', { status: 404, headers: corsHeaders });
       }
@@ -509,4 +511,101 @@ function parseExcelData(arrayBuffer) {
 function getFileExtension(fileName) {
   const lastDot = fileName.lastIndexOf('.');
   return lastDot !== -1 ? fileName.substring(lastDot + 1) : 'xlsx';
+}
+
+// 处理本地数据库API请求
+async function handleLocalDB(request, env, path, method, corsHeaders) {
+  console.log('🔄 处理本地数据库请求:', path);
+  
+  try {
+    if (path === '/api/localdb/wide' && method === 'GET') {
+      // 返回宽表数据
+      const mockWideData = generateMockWideData();
+      return Response.json({
+        success: true,
+        data: mockWideData,
+        total: mockWideData.length
+      }, { headers: corsHeaders });
+    }
+    
+    else if (path === '/api/localdb/records' && method === 'GET') {
+      // 返回记录列表
+      const mockRecords = generateMockRecords();
+      return Response.json({
+        success: true,
+        data: mockRecords,
+        total: mockRecords.length
+      }, { headers: corsHeaders });
+    }
+    
+    else if (path === '/api/localdb/wide/batch' && method === 'POST') {
+      // 批量上传处理
+      const requestData = await request.json();
+      console.log('📤 批量上传数据:', requestData);
+      
+      return Response.json({
+        success: true,
+        message: '批量数据上传成功',
+        processed: requestData.data ? requestData.data.length : 0
+      }, { headers: corsHeaders });
+    }
+    
+    else {
+      return new Response('Not Found', { status: 404, headers: corsHeaders });
+    }
+    
+  } catch (error) {
+    console.error('❌ LocalDB API错误:', error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { 
+      status: 500,
+      headers: corsHeaders 
+    });
+  }
+}
+
+// 生成模拟宽表数据
+function generateMockWideData() {
+  const data = [];
+  const categories = ['手机', '平板', '笔记本', '配件', '耳机'];
+  const suppliers = ['供应商A', '供应商B', '供应商C', '供应商D'];
+  
+  for (let i = 1; i <= 50; i++) {
+    data.push({
+      id: i,
+      SKU: `SKU${String(i).padStart(6, '0')}`,
+      商品名称: `商品${i}`,
+      分类: categories[Math.floor(Math.random() * categories.length)],
+      供应商: suppliers[Math.floor(Math.random() * suppliers.length)],
+      最新库存: Math.floor(Math.random() * 1000) + 10,
+      动态库存: Math.floor(Math.random() * 1000) + 10,
+      销售数量: Math.floor(Math.random() * 100),
+      单价: (Math.random() * 2000 + 100).toFixed(2),
+      成本: (Math.random() * 1000 + 50).toFixed(2),
+      状态: Math.random() > 0.1 ? '正常' : '缺货',
+      最后更新: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
+  }
+  
+  return data;
+}
+
+// 生成模拟记录数据
+function generateMockRecords() {
+  const records = [];
+  
+  for (let i = 1; i <= 20; i++) {
+    records.push({
+      id: i,
+      fileName: `Excel数据表${i}.xlsx`,
+      uploadTime: new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString(),
+      recordCount: Math.floor(Math.random() * 500) + 100,
+      status: Math.random() > 0.1 ? '已处理' : '处理中',
+      description: `批次${i}的库存数据导入`
+    });
+  }
+  
+  return records.sort((a, b) => new Date(b.uploadTime) - new Date(a.uploadTime));
 }
