@@ -331,24 +331,38 @@
                 if (!this.selectedFile) return;
 
                 this.uploadButton.disabled = true;
-                this.uploadButton.textContent = '上传中...';
-                this.showStatus('正在上传文件到R2存储...', 'loading');
-                this.updateProgress(0);
+                this.uploadButton.textContent = '获取上传URL...';
+                this.showStatus('正在准备上传...', 'loading');
+                this.updateProgress(10);
 
                 try {
-                    // 生成文件路径
-                    const timestamp = Date.now();
-                    const randomSuffix = Math.round(Math.random() * 1E9);
-                    const fileExtension = this.getFileExtension(this.selectedFile.name);
-                    const fileName = `${timestamp}-${randomSuffix}.${fileExtension}`;
-                    const filePath = `arc/${fileName}`;
+                    // 第一步：获取预签名URL
+                    console.log('🔄 获取预签名URL...');
+                    const presignedResponse = await fetch('https://century-business-api.anthonin815.workers.dev/api/files/presigned-url', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            fileName: this.selectedFile.name,
+                            fileType: this.selectedFile.type
+                        })
+                    });
+
+                    const presignedData = await presignedResponse.json();
                     
-                    console.log('📁 上传路径:', filePath);
+                    if (!presignedData.success) {
+                        throw new Error(presignedData.error || '获取上传URL失败');
+                    }
+
+                    this.updateProgress(30);
+                    this.uploadButton.textContent = '上传中...';
+                    this.showStatus('正在上传文件到R2存储...', 'loading');
+
+                    // 第二步：使用预签名URL上传文件
+                    console.log('📁 上传文件到:', presignedData.filePath);
                     
-                    // 直接上传到R2
-                    const uploadUrl = `${this.r2Endpoint}/${filePath}`;
-                    
-                    const response = await fetch(uploadUrl, {
+                    const uploadResponse = await fetch(presignedData.uploadUrl, {
                         method: 'PUT',
                         body: this.selectedFile,
                         headers: {
@@ -358,12 +372,13 @@
 
                     this.updateProgress(100);
 
-                    if (response.ok) {
+                    if (uploadResponse.ok) {
                         this.showStatus(
                             `✅ 文件上传成功！<br>` +
                             `📁 文件名: ${this.selectedFile.name}<br>` +
                             `📊 大小: ${this.formatFileSize(this.selectedFile.size)}<br>` +
-                            `🗂️ 存储路径: arc/${fileName}<br>` +
+                            `🗂️ 存储路径: ${presignedData.filePath}<br>` +
+                            `🔗 访问链接: <a href="${presignedData.publicUrl}" target="_blank">点击下载</a><br>` +
                             `⏰ 上传时间: ${new Date().toLocaleString()}`,
                             'success'
                         );
@@ -371,10 +386,10 @@
                         // 重置表单
                         setTimeout(() => {
                             this.resetForm();
-                        }, 3000);
+                        }, 5000);
                         
                     } else {
-                        throw new Error(`上传失败: HTTP ${response.status}`);
+                        throw new Error(`上传失败: HTTP ${uploadResponse.status}`);
                     }
 
                 } catch (error) {
@@ -382,6 +397,7 @@
                     this.showStatus(`❌ 上传失败: ${error.message}`, 'error');
                     this.uploadButton.disabled = false;
                     this.uploadButton.textContent = '重新上传';
+                    this.updateProgress(0);
                 }
             }
 

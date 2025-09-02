@@ -26,6 +26,8 @@ export default {
         return await handleExcelUpload(request, env, corsHeaders);
       } else if (path === '/api/files' && method === 'GET') {
         return await handleFilesList(request, env, corsHeaders);
+      } else if (path === '/api/files/presigned-url' && method === 'POST') {
+        return await handlePresignedUrl(request, env, corsHeaders);
       } else {
         return new Response('Not Found', { status: 404, headers: corsHeaders });
       }
@@ -179,6 +181,89 @@ function isExcelFile(file) {
   
   return allowedTypes.includes(file.type) || 
          allowedExtensions.some(ext => fileName.endsWith(ext));
+}
+
+// 生成预签名URL用于直接上传
+async function handlePresignedUrl(request, env, corsHeaders) {
+  console.log('🔄 生成预签名URL...');
+  
+  try {
+    const body = await request.json();
+    const { fileName, fileType } = body;
+    
+    if (!fileName) {
+      return Response.json({
+        success: false,
+        error: '文件名不能为空'
+      }, { headers: corsHeaders });
+    }
+
+    // 验证文件类型
+    if (!isExcelFileType(fileType, fileName)) {
+      return Response.json({
+        success: false,
+        error: '只支持Excel文件(.xlsx, .xls)'
+      }, { headers: corsHeaders });
+    }
+
+    // 生成文件路径
+    const timestamp = Date.now();
+    const randomSuffix = Math.round(Math.random() * 1E9);
+    const fileExtension = getFileExtension(fileName);
+    const newFileName = `${timestamp}-${randomSuffix}.${fileExtension}`;
+    const filePath = `arc/${newFileName}`;
+    
+    console.log(`📁 生成预签名URL for: ${filePath}`);
+
+    if (env.R2_BUCKET) {
+      // 使用R2 binding生成预签名URL
+      const presignedUrl = await env.R2_BUCKET.sign('PUT', filePath, {
+        httpMetadata: {
+          contentType: fileType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+        customMetadata: {
+          originalName: fileName,
+          uploadTime: new Date().toISOString()
+        }
+      });
+      
+      return Response.json({
+        success: true,
+        uploadUrl: presignedUrl,
+        filePath: filePath,
+        newFileName: newFileName,
+        publicUrl: `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${filePath}`
+      }, { headers: corsHeaders });
+    } else {
+      throw new Error('R2存储桶不可用');
+    }
+    
+  } catch (error) {
+    console.error('❌ 生成预签名URL失败:', error);
+    return Response.json({
+      success: false,
+      error: `生成上传URL失败: ${error.message}`
+    }, { 
+      status: 500,
+      headers: corsHeaders 
+    });
+  }
+}
+
+// 验证Excel文件类型
+function isExcelFileType(fileType, fileName) {
+  const allowedTypes = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.ms-excel', // .xls
+    'application/excel',
+    'application/x-excel'
+  ];
+  
+  const allowedExtensions = ['.xlsx', '.xls'];
+  const fileNameLower = fileName.toLowerCase();
+  
+  return allowedTypes.includes(fileType) || 
+         allowedExtensions.some(ext => fileNameLower.endsWith(ext));
 }
 
 // 获取文件扩展名
