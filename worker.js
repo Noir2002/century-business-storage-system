@@ -30,6 +30,8 @@ export default {
         return handleAnalysis(request, env, path);
       } else if (path.startsWith('/api/files/')) {
         return handleFiles(request, env, path, method);
+      } else if (path.startsWith('/api/r2/')) {
+        return handleR2Proxy(request, env, path, method);
       } else {
         return new Response('Not Found', { status: 404, headers: corsHeaders });
       }
@@ -212,4 +214,154 @@ async function handleFiles(request, env, path, method) {
   }
   
   return Response.json({ error: '文件API暂未完全实现' }, { status: 501 });
+}
+
+// R2代理API - 通过Workers代理R2操作以避免CORS问题
+async function handleR2Proxy(request, env, path, method) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+
+  try {
+    // 从环境变量获取配置
+    const apiToken = env.CLOUDFLARE_API_TOKEN || 'ucKoqfP3F3w38eAlDj-12hqCBAEG10S5SpcijzC3';
+    const accountId = env.CLOUDFLARE_ACCOUNT_ID || '23441d4f7734b84186c4c20ddefef8e7';
+    const bucketName = 'century-business-system';
+
+    if (path === '/api/r2/test-connection') {
+      // 测试R2连接
+      const r2ApiUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets`;
+      
+      const response = await fetch(r2ApiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        const buckets = data.result || [];
+        const targetBucket = buckets.find(b => b.name === bucketName);
+        
+        if (targetBucket) {
+          return Response.json({
+            success: true,
+            bucket: targetBucket,
+            totalBuckets: buckets.length
+          }, { headers: corsHeaders });
+        } else {
+          return Response.json({
+            success: false,
+            error: `未找到存储桶: ${bucketName}`,
+            availableBuckets: buckets.map(b => b.name)
+          }, { headers: corsHeaders });
+        }
+      } else {
+        return Response.json({
+          success: false,
+          error: data.errors?.[0]?.message || '未知错误'
+        }, { headers: corsHeaders });
+      }
+    } else if (path === '/api/r2/list-files') {
+      // 列出文件
+      const url = new URL(request.url);
+      const prefix = url.searchParams.get('prefix') || '';
+      const limit = url.searchParams.get('limit') || '100';
+      
+      const params = new URLSearchParams({
+        'list-type': '2',
+        'max-keys': limit
+      });
+      
+      if (prefix) {
+        params.append('prefix', prefix);
+      }
+      
+      const r2ApiUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucketName}/objects?${params}`;
+      
+      const response = await fetch(r2ApiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        return Response.json({
+          success: true,
+          files: data.result?.objects || [],
+          truncated: data.result?.truncated || false
+        }, { headers: corsHeaders });
+      } else {
+        return Response.json({
+          success: false,
+          error: data.errors?.[0]?.message || '未知错误'
+        }, { headers: corsHeaders });
+      }
+    } else if (path.startsWith('/api/r2/delete/') && method === 'DELETE') {
+      // 删除文件
+      const fileName = decodeURIComponent(path.replace('/api/r2/delete/', ''));
+      
+      const r2ApiUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucketName}/objects/${encodeURIComponent(fileName)}`;
+      
+      const response = await fetch(r2ApiUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        return Response.json({
+          success: true,
+          message: '文件删除成功'
+        }, { headers: corsHeaders });
+      } else {
+        const data = await response.json();
+        return Response.json({
+          success: false,
+          error: data.errors?.[0]?.message || '删除失败'
+        }, { headers: corsHeaders });
+      }
+    } else if (path.startsWith('/api/r2/public-url/')) {
+      // 获取公共URL
+      const fileName = decodeURIComponent(path.replace('/api/r2/public-url/', ''));
+      const folder = new URL(request.url).searchParams.get('folder') || '';
+      
+      const filePath = folder ? `${folder}/${fileName}` : fileName;
+      const publicUrl = `https://${bucketName}.${accountId}.r2.cloudflarestorage.com/${filePath}`;
+      
+      return Response.json({
+        success: true,
+        url: publicUrl
+      }, { headers: corsHeaders });
+    }
+    
+    return Response.json({ 
+      error: '不支持的R2操作',
+      path: path 
+    }, { 
+      status: 404,
+      headers: corsHeaders 
+    });
+    
+  } catch (error) {
+    console.error('R2代理错误:', error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { 
+      status: 500,
+      headers: corsHeaders 
+    });
+  }
 }

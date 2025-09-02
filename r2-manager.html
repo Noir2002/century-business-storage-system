@@ -404,8 +404,8 @@
         }
 
         // 下载文件
-        function downloadFile(fileName) {
-            const url = r2Storage.getPublicUrl(fileName);
+        async function downloadFile(fileName) {
+            const url = await r2Storage.getPublicUrl(fileName);
             window.open(url, '_blank');
         }
 

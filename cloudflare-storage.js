@@ -17,38 +17,22 @@ class CloudflareR2Storage {
   async testConnection() {
     try {
       console.log('🔄 测试R2连接...');
-      const response = await fetch(`${this.config.endpoint}/accounts/${this.config.accountId}/r2/buckets`, {
+      // 使用Workers代理而不是直接调用Cloudflare API
+      const response = await fetch('/api/r2/test-connection', {
         method: 'GET',
-        headers: this.getAuthHeaders()
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       const data = await response.json();
       
       if (data.success) {
-        const buckets = data.result || [];
-        const targetBucket = buckets.find(b => b.name === this.config.bucketName);
-        
-        if (targetBucket) {
-          console.log('✅ R2连接成功！');
-          return {
-            success: true,
-            bucket: targetBucket,
-            totalBuckets: buckets.length
-          };
-        } else {
-          console.error('❌ 未找到指定的存储桶');
-          return {
-            success: false,
-            error: `未找到存储桶: ${this.config.bucketName}`,
-            availableBuckets: buckets.map(b => b.name)
-          };
-        }
+        console.log('✅ R2连接成功！');
+        return data;
       } else {
-        console.error('❌ API调用失败:', data.errors);
-        return {
-          success: false,
-          error: data.errors?.[0]?.message || '未知错误'
-        };
+        console.error('❌ R2连接失败:', data.error);
+        return data;
       }
     } catch (error) {
       console.error('❌ 连接失败:', error);
@@ -96,35 +80,27 @@ class CloudflareR2Storage {
     try {
       console.log(`🔄 列出文件，前缀: ${prefix || '无'}`);
       
-      const params = new URLSearchParams({
-        'list-type': '2',
-        'max-keys': limit.toString()
-      });
-      
+      const params = new URLSearchParams();
       if (prefix) {
         params.append('prefix', prefix);
       }
+      params.append('limit', limit.toString());
       
-      const response = await fetch(`${this.baseUrl}/objects?${params}`, {
+      const response = await fetch(`/api/r2/list-files?${params}`, {
         method: 'GET',
-        headers: this.getAuthHeaders()
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       const data = await response.json();
       
       if (data.success) {
-        console.log(`✅ 成功获取文件列表，共 ${data.result?.objects?.length || 0} 个文件`);
-        return {
-          success: true,
-          files: data.result?.objects || [],
-          truncated: data.result?.truncated || false
-        };
+        console.log(`✅ 成功获取文件列表，共 ${data.files?.length || 0} 个文件`);
+        return data;
       } else {
-        console.error('❌ 获取文件列表失败:', data.errors);
-        return {
-          success: false,
-          error: data.errors?.[0]?.message || '未知错误'
-        };
+        console.error('❌ 获取文件列表失败:', data.error);
+        return data;
       }
     } catch (error) {
       console.error('❌ 列出文件失败:', error);
@@ -140,24 +116,21 @@ class CloudflareR2Storage {
     try {
       console.log(`🔄 删除文件: ${fileName}`);
       
-      const response = await fetch(`${this.baseUrl}/objects/${encodeURIComponent(fileName)}`, {
+      const response = await fetch(`/api/r2/delete/${encodeURIComponent(fileName)}`, {
         method: 'DELETE',
-        headers: this.getAuthHeaders()
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
-      if (response.ok) {
+      const data = await response.json();
+      
+      if (data.success) {
         console.log('✅ 文件删除成功');
-        return {
-          success: true,
-          message: '文件删除成功'
-        };
+        return data;
       } else {
-        const data = await response.json();
-        console.error('❌ 删除失败:', data.errors);
-        return {
-          success: false,
-          error: data.errors?.[0]?.message || '删除失败'
-        };
+        console.error('❌ 删除失败:', data.error);
+        return data;
       }
     } catch (error) {
       console.error('❌ 删除文件失败:', error);
@@ -169,13 +142,33 @@ class CloudflareR2Storage {
   }
 
   // 获取文件公共URL
-  getPublicUrl(fileName, folder = '') {
-    const filePath = folder ? `${folder}/${fileName}` : fileName;
-    
-    if (this.config.customDomain) {
-      return `https://${this.config.customDomain}/${filePath}`;
-    } else {
-      // 使用默认的R2 URL格式
+  async getPublicUrl(fileName, folder = '') {
+    try {
+      const params = new URLSearchParams();
+      if (folder) {
+        params.append('folder', folder);
+      }
+      
+      const response = await fetch(`/api/r2/public-url/${encodeURIComponent(fileName)}?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.url;
+      } else {
+        // 回退到默认URL生成
+        const filePath = folder ? `${folder}/${fileName}` : fileName;
+        return `https://${this.config.bucketName}.${this.config.accountId}.r2.cloudflarestorage.com/${filePath}`;
+      }
+    } catch (error) {
+      console.error('❌ 获取公共URL失败:', error);
+      // 回退到默认URL生成
+      const filePath = folder ? `${folder}/${fileName}` : fileName;
       return `https://${this.config.bucketName}.${this.config.accountId}.r2.cloudflarestorage.com/${filePath}`;
     }
   }
