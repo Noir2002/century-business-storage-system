@@ -7,6 +7,7 @@
   <link href="./src/css/layui.css" rel="stylesheet">
   <link href="./src/css/app-header.css" rel="stylesheet">
   <script src="./api-config.js"></script>
+  <script src="./simple-r2-storage.js"></script>
   <style>
     body {
       background: #f8f9fa;
@@ -636,36 +637,31 @@
             headers['Authorization'] = 'Bearer ' + token;
           }
           
-          // 真实的文件上传
-          fetch(window.apiConfig.baseURL + '/api/files/upload', {
-            method: 'POST',
-            headers: headers,
-            body: formData
-          })
-          .then(response => response.json())
-          .then(data => {
+          // 使用简化的R2存储上传
+          window.simpleR2Storage.uploadExcelFile(currentFile)
+          .then(result => {
             layer.close(loadIndex);
             layer.close(index);
             
-            if (data.success) {
-              layer.alert('文件上传成功！<br>' +
-                '• 文件名：<strong>' + data.file.originalName + '</strong><br>' +
-                '• 工作表数：<strong>' + data.file.sheetNames.length + '</strong><br>' +
-                '• 数据行数：<strong>' + data.file.rowCount + '</strong><br>' +
-                '• 数据列数：<strong>' + data.file.colCount + '</strong>', 
+            if (result.success) {
+              layer.alert('Excel文件上传成功！<br>' +
+                '• 文件名：<strong>' + result.fileInfo.originalName + '</strong><br>' +
+                '• 文件大小：<strong>' + window.simpleR2Storage.formatFileSize(result.fileInfo.size) + '</strong><br>' +
+                '• 存储位置：<strong>R2/arc/</strong><br>' +
+                '• 上传时间：<strong>' + new Date(result.fileInfo.uploadTime).toLocaleString() + '</strong>', 
                 {icon: 1, title: '上传完成'}, function(){
                   // 跳转到表格管理页面
                   window.location.href = 'table-management.html';
                 });
             } else {
-              layer.msg('上传失败: ' + data.error, {icon: 2});
+              layer.msg('上传失败: ' + result.error, {icon: 2});
             }
           })
           .catch(error => {
             layer.close(loadIndex);
             layer.close(index);
             console.error('上传错误:', error);
-            layer.msg('网络错误，上传失败', {icon: 2});
+            layer.msg('上传失败: ' + error.message, {icon: 2});
           });
         });
       };
