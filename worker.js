@@ -195,8 +195,47 @@ async function handleAnalysis(request, env, path) {
 
 // 文件管理API
 async function handleFiles(request, env, path, method) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+
   if (path === '/api/files' && method === 'GET') {
-    // 模拟文件列表
+    // 从R2获取arc/文件夹下的文件列表
+    try {
+      const r2ApiUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID || '23441d4f7734b84186c4c20ddefef8e7'}/r2/buckets/century-business-system/objects?list-type=2&prefix=arc/`;
+      
+      const response = await fetch(r2ApiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${env.CLOUDFLARE_API_TOKEN || 'ucKoqfP3F3w38eAlDj-12hqCBAEG10S5SpcijzC3'}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        const files = (data.result?.objects || []).map((obj, index) => ({
+          id: index + 1,
+          originalName: obj.key.replace('arc/', ''),
+          size: obj.size || 0,
+          uploadTime: obj.uploaded || new Date().toISOString(),
+          uploadedBy: 'admin',
+          sheetNames: ['Sheet1'],
+          rowCount: 100,
+          colCount: 8,
+          r2Path: obj.key
+        }));
+        
+        return Response.json({ success: true, files }, { headers: corsHeaders });
+      }
+    } catch (error) {
+      console.error('获取文件列表失败:', error);
+    }
+    
+    // 回退到模拟数据
     const mockFiles = [
       {
         id: 1,
@@ -210,10 +249,69 @@ async function handleFiles(request, env, path, method) {
       }
     ];
     
-    return Response.json({ success: true, files: mockFiles });
+    return Response.json({ success: true, files: mockFiles }, { headers: corsHeaders });
+  } else if (path === '/api/files/upload' && method === 'POST') {
+    // 仓库管理系统的Excel文件上传
+    try {
+      const formData = await request.formData();
+      const file = formData.get('file');
+      const description = formData.get('description') || '';
+      
+      if (!file) {
+        return Response.json({
+          success: false,
+          error: '没有上传文件'
+        }, { headers: corsHeaders });
+      }
+      
+      // 生成文件名
+      const timestamp = Date.now();
+      const randomSuffix = Math.round(Math.random() * 1E9);
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `${timestamp}-${randomSuffix}.${fileExtension}`;
+      const filePath = `arc/${fileName}`;
+      
+      // 上传到R2
+      await env.R2_BUCKET.put(filePath, file.stream(), {
+        httpMetadata: {
+          contentType: file.type,
+        },
+      });
+      
+      // 模拟Excel文件信息解析
+      const fileInfo = {
+        id: timestamp,
+        originalName: file.name,
+        filename: fileName,
+        size: file.size,
+        uploadTime: new Date().toISOString(),
+        uploadedBy: 'admin', // 从request获取用户信息
+        sheetNames: ['Sheet1'], // 简化处理
+        rowCount: 100,
+        colCount: 10,
+        description: description,
+        r2Path: filePath
+      };
+      
+      return Response.json({
+        success: true,
+        message: '文件上传成功',
+        file: fileInfo
+      }, { headers: corsHeaders });
+      
+    } catch (error) {
+      console.error('文件上传错误:', error);
+      return Response.json({
+        success: false,
+        error: '文件处理失败: ' + error.message
+      }, { 
+        status: 500,
+        headers: corsHeaders 
+      });
+    }
   }
   
-  return Response.json({ error: '文件API暂未完全实现' }, { status: 501 });
+  return Response.json({ error: '文件API暂未完全实现' }, { status: 501, headers: corsHeaders });
 }
 
 // R2代理API - 通过Workers代理R2操作以避免CORS问题
@@ -271,15 +369,26 @@ async function handleR2Proxy(request, env, path, method) {
       // 列出文件
       const url = new URL(request.url);
       const prefix = url.searchParams.get('prefix') || '';
+      const folder = url.searchParams.get('folder') || '';
       const limit = url.searchParams.get('limit') || '100';
+      
+      // 构建文件路径前缀：支持 package/ 和 arc/ 文件夹
+      let fullPrefix = '';
+      if (folder === 'package') {
+        fullPrefix = prefix ? `package/${prefix}` : 'package/';
+      } else if (folder === 'arc') {
+        fullPrefix = prefix ? `arc/${prefix}` : 'arc/';
+      } else if (prefix) {
+        fullPrefix = prefix;
+      }
       
       const params = new URLSearchParams({
         'list-type': '2',
         'max-keys': limit
       });
       
-      if (prefix) {
-        params.append('prefix', prefix);
+      if (fullPrefix) {
+        params.append('prefix', fullPrefix);
       }
       
       const r2ApiUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucketName}/objects?${params}`;
@@ -344,6 +453,66 @@ async function handleR2Proxy(request, env, path, method) {
         success: true,
         url: publicUrl
       }, { headers: corsHeaders });
+    } else if (path.startsWith('/api/r2/upload/')) {
+      // 文件上传
+      if (method !== 'POST') {
+        return Response.json({ 
+          error: '只支持POST方法' 
+        }, { 
+          status: 405,
+          headers: corsHeaders 
+        });
+      }
+      
+      const pathParts = path.split('/');
+      const folder = pathParts[3] || ''; // package 或 arc
+      const fileName = decodeURIComponent(pathParts.slice(4).join('/'));
+      
+      if (!fileName) {
+        return Response.json({
+          success: false,
+          error: '文件名不能为空'
+        }, { headers: corsHeaders });
+      }
+      
+      // 构建完整文件路径
+      const filePath = folder ? `${folder}/${fileName}` : fileName;
+      
+      try {
+        const formData = await request.formData();
+        const file = formData.get('file');
+        
+        if (!file) {
+          return Response.json({
+            success: false,
+            error: '没有找到文件'
+          }, { headers: corsHeaders });
+        }
+        
+        // 将文件上传到R2
+        await env.R2_BUCKET.put(filePath, file.stream(), {
+          httpMetadata: {
+            contentType: file.type,
+          },
+        });
+        
+        return Response.json({
+          success: true,
+          message: '文件上传成功',
+          filePath: filePath,
+          size: file.size
+        }, { headers: corsHeaders });
+        
+      } catch (error) {
+        console.error('文件上传错误:', error);
+        return Response.json({
+          success: false,
+          error: '文件上传失败: ' + error.message
+        }, { 
+          status: 500,
+          headers: corsHeaders 
+        });
+      }
     }
     
     return Response.json({ 

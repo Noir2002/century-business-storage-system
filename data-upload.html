@@ -6,6 +6,7 @@
   <title>数据导入 - 数据管理系统</title>
   <link href="./src/css/layui.css" rel="stylesheet">
   <link href="./src/css/app-header.css" rel="stylesheet">
+  <script src="./api-config.js"></script>
   <style>
     body {
       background: #f8f9fa;
@@ -636,7 +637,7 @@
           }
           
           // 真实的文件上传
-          fetch('/api/files/upload', {
+          fetch(window.apiConfig.baseURL + '/api/files/upload', {
             method: 'POST',
             headers: headers,
             body: formData
