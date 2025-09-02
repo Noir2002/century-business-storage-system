@@ -183,23 +183,24 @@ function isExcelFile(file) {
          allowedExtensions.some(ext => fileName.endsWith(ext));
 }
 
-// 生成预签名URL用于直接上传
+// 直接通过Workers处理文件上传 - 解决CORS问题的最简单方法
 async function handlePresignedUrl(request, env, corsHeaders) {
-  console.log('🔄 生成预签名URL...');
+  console.log('🔄 处理文件上传请求...');
   
   try {
-    const body = await request.json();
-    const { fileName, fileType } = body;
+    const formData = await request.formData();
+    const file = formData.get('file');
+    const originalFileName = formData.get('fileName') || file.name;
     
-    if (!fileName) {
+    if (!file) {
       return Response.json({
         success: false,
-        error: '文件名不能为空'
+        error: '没有上传文件'
       }, { headers: corsHeaders });
     }
 
     // 验证文件类型
-    if (!isExcelFileType(fileType, fileName)) {
+    if (!isExcelFile(file)) {
       return Response.json({
         success: false,
         error: '只支持Excel文件(.xlsx, .xls)'
@@ -209,29 +210,31 @@ async function handlePresignedUrl(request, env, corsHeaders) {
     // 生成文件路径
     const timestamp = Date.now();
     const randomSuffix = Math.round(Math.random() * 1E9);
-    const fileExtension = getFileExtension(fileName);
+    const fileExtension = getFileExtension(originalFileName);
     const newFileName = `${timestamp}-${randomSuffix}.${fileExtension}`;
     const filePath = `arc/${newFileName}`;
     
-    console.log(`📁 生成预签名URL for: ${filePath}`);
+    console.log(`📁 上传文件到: ${filePath}`);
 
     if (env.R2_BUCKET) {
-      // 使用R2 binding生成预签名URL
-      const presignedUrl = await env.R2_BUCKET.sign('PUT', filePath, {
+      // 直接使用R2 binding上传文件
+      await env.R2_BUCKET.put(filePath, file.stream(), {
         httpMetadata: {
-          contentType: fileType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          contentType: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         },
         customMetadata: {
-          originalName: fileName,
+          originalName: originalFileName,
           uploadTime: new Date().toISOString()
         }
       });
       
       return Response.json({
         success: true,
-        uploadUrl: presignedUrl,
         filePath: filePath,
         newFileName: newFileName,
+        originalName: originalFileName,
+        size: file.size,
+        uploadTime: new Date().toISOString(),
         publicUrl: `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${filePath}`
       }, { headers: corsHeaders });
     } else {
@@ -239,10 +242,10 @@ async function handlePresignedUrl(request, env, corsHeaders) {
     }
     
   } catch (error) {
-    console.error('❌ 生成预签名URL失败:', error);
+    console.error('❌ 文件上传失败:', error);
     return Response.json({
       success: false,
-      error: `生成上传URL失败: ${error.message}`
+      error: `文件上传失败: ${error.message}`
     }, { 
       status: 500,
       headers: corsHeaders 

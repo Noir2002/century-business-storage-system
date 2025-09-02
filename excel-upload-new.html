@@ -331,66 +331,51 @@
                 if (!this.selectedFile) return;
 
                 this.uploadButton.disabled = true;
-                this.uploadButton.textContent = '获取上传URL...';
-                this.showStatus('正在准备上传...', 'loading');
-                this.updateProgress(10);
+                this.uploadButton.textContent = '上传中...';
+                this.showStatus('正在上传文件到R2存储...', 'loading');
+                this.updateProgress(30);
 
                 try {
-                    // 第一步：获取预签名URL
-                    console.log('🔄 获取预签名URL...');
-                    const presignedResponse = await fetch('https://century-business-api.anthonin815.workers.dev/api/files/presigned-url', {
+                    // 直接通过Workers上传文件 - 完全避免CORS问题
+                    console.log('🔄 直接上传文件到Workers...');
+                    
+                    const formData = new FormData();
+                    formData.append('file', this.selectedFile);
+                    formData.append('fileName', this.selectedFile.name);
+                    
+                    const uploadResponse = await fetch('https://century-business-api.anthonin815.workers.dev/api/files/presigned-url', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            fileName: this.selectedFile.name,
-                            fileType: this.selectedFile.type
-                        })
+                        body: formData
                     });
 
-                    const presignedData = await presignedResponse.json();
-                    
-                    if (!presignedData.success) {
-                        throw new Error(presignedData.error || '获取上传URL失败');
+                    this.updateProgress(90);
+
+                    if (!uploadResponse.ok) {
+                        throw new Error(`上传失败: HTTP ${uploadResponse.status}`);
                     }
 
-                    this.updateProgress(30);
-                    this.uploadButton.textContent = '上传中...';
-                    this.showStatus('正在上传文件到R2存储...', 'loading');
-
-                    // 第二步：使用预签名URL上传文件
-                    console.log('📁 上传文件到:', presignedData.filePath);
+                    const result = await uploadResponse.json();
                     
-                    const uploadResponse = await fetch(presignedData.uploadUrl, {
-                        method: 'PUT',
-                        body: this.selectedFile,
-                        headers: {
-                            'Content-Type': this.selectedFile.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                        }
-                    });
+                    if (!result.success) {
+                        throw new Error(result.error || '上传失败');
+                    }
 
                     this.updateProgress(100);
 
-                    if (uploadResponse.ok) {
-                        this.showStatus(
-                            `✅ 文件上传成功！<br>` +
-                            `📁 文件名: ${this.selectedFile.name}<br>` +
-                            `📊 大小: ${this.formatFileSize(this.selectedFile.size)}<br>` +
-                            `🗂️ 存储路径: ${presignedData.filePath}<br>` +
-                            `🔗 访问链接: <a href="${presignedData.publicUrl}" target="_blank">点击下载</a><br>` +
-                            `⏰ 上传时间: ${new Date().toLocaleString()}`,
-                            'success'
-                        );
-                        
-                        // 重置表单
-                        setTimeout(() => {
-                            this.resetForm();
-                        }, 5000);
-                        
-                    } else {
-                        throw new Error(`上传失败: HTTP ${uploadResponse.status}`);
-                    }
+                    this.showStatus(
+                        `✅ 文件上传成功！<br>` +
+                        `📁 原文件名: ${result.originalName}<br>` +
+                        `📊 文件大小: ${this.formatFileSize(result.size)}<br>` +
+                        `🗂️ 存储路径: ${result.filePath}<br>` +
+                        `🔗 访问链接: <a href="${result.publicUrl}" target="_blank" style="color: #667eea;">点击下载</a><br>` +
+                        `⏰ 上传时间: ${new Date(result.uploadTime).toLocaleString()}`,
+                        'success'
+                    );
+                    
+                    // 重置表单
+                    setTimeout(() => {
+                        this.resetForm();
+                    }, 5000);
 
                 } catch (error) {
                     console.error('上传错误:', error);
