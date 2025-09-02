@@ -6,6 +6,7 @@
   <title>本地数据库管理 - 数据管理系统</title>
   <link href="./src/css/layui.css" rel="stylesheet">
   <link href="./src/css/app-header.css" rel="stylesheet">
+  <script src="./api-config.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@16.0.1/dist/handsontable.full.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@16.0.1/styles/ht-theme-main.min.css">
   <style>
@@ -702,7 +703,7 @@
         }
         
         $.ajax({
-          url: '/api/localdb/wide',
+          url: window.apiConfig.baseURL + '/api/localdb/wide',
           type: 'GET',
           headers: headers,
           success: function(res) {
@@ -819,7 +820,7 @@
         }
         
         $.ajax({
-          url: '/api/localdb/records',
+          url: window.apiConfig.baseURL + '/api/localdb/records',
           type: 'GET',
           headers: headers,
           success: function(res) {
@@ -1171,7 +1172,7 @@
           }
           
           $.ajax({
-            url: '/api/localdb/wide',
+            url: window.apiConfig.baseURL + '/api/localdb/wide',
             type: 'POST',
             headers: headers,
             data: JSON.stringify({ data: updatedData }),
@@ -1237,7 +1238,7 @@
         }
         layer.msg('正在保存...', {icon: 16, time: 0});
         $.ajax({
-          url: '/api/localdb/wide',
+          url: window.apiConfig.baseURL + '/api/localdb/wide',
           type: 'POST',
           headers: headers,
           data: JSON.stringify({ data: data }),
@@ -1679,7 +1680,7 @@
           
           layer.msg('正在添加新产品...', {icon: 16, time: 0});
           $.ajax({
-            url: '/api/localdb/wide',
+            url: window.apiConfig.baseURL + '/api/localdb/wide',
             type: 'POST',
             headers: headers,
             data: JSON.stringify({ data: existingData }),

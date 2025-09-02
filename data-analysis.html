@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="./src/css/layui.css" rel="stylesheet">
   <link href="./src/css/app-header.css" rel="stylesheet">
+  <script src="./api-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
   <style>
     body {
@@ -733,7 +734,7 @@
         }
         
         // 加载统计概览
-        fetch('/api/analysis/overview', {
+        fetch(window.apiConfig.baseURL + '/api/analytics/sales', {
           headers: { 'Authorization': 'Bearer ' + token }
         })
         .then(response => response.json())
@@ -747,7 +748,7 @@
         });
         
         // 加载库存趋势
-        fetch('/api/analysis/stock-trend?days=30', {
+        fetch(window.apiConfig.baseURL + '/api/analytics/trends', {
           headers: { 'Authorization': 'Bearer ' + token }
         })
         .then(response => response.json())
@@ -761,7 +762,7 @@
         });
         
         // 加载销售趋势
-        fetch('/api/analysis/sales-trend?days=30', {
+        fetch(window.apiConfig.baseURL + '/api/inventory/data', {
           headers: { 'Authorization': 'Bearer ' + token }
         })
         .then(response => response.json())
@@ -775,7 +776,7 @@
         });
         
         // 加载SKU详细分析
-        fetch('/api/analysis/sku-details?limit=20', {
+        fetch(window.apiConfig.baseURL + '/api/inventory/summary', {
           headers: { 'Authorization': 'Bearer ' + token }
         })
         .then(response => response.json())
