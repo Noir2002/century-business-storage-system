@@ -202,22 +202,11 @@ async function handleFiles(request, env, path, method) {
   };
 
   if (path === '/api/files' && method === 'GET') {
-    // 从R2获取arc/文件夹下的文件列表
+    // 优先使用R2 binding获取文件列表
     try {
-      const r2ApiUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID || '23441d4f7734b84186c4c20ddefef8e7'}/r2/buckets/century-business-system/objects?list-type=2&prefix=arc/`;
-      
-      const response = await fetch(r2ApiUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${env.CLOUDFLARE_API_TOKEN || 'ucKoqfP3F3w38eAlDj-12hqCBAEG10S5SpcijzC3'}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        const files = (data.result?.objects || []).map((obj, index) => ({
+      if (env.R2_BUCKET) {
+        const objects = await env.R2_BUCKET.list({ prefix: 'arc/' });
+        const files = objects.objects.map((obj, index) => ({
           id: index + 1,
           originalName: obj.key.replace('arc/', ''),
           size: obj.size || 0,
@@ -230,6 +219,35 @@ async function handleFiles(request, env, path, method) {
         }));
         
         return Response.json({ success: true, files }, { headers: corsHeaders });
+      } else {
+        // 回退到REST API
+        const r2ApiUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID || '23441d4f7734b84186c4c20ddefef8e7'}/r2/buckets/century-business-system/objects?list-type=2&prefix=arc/`;
+        
+        const response = await fetch(r2ApiUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${env.CLOUDFLARE_API_TOKEN || 'ucKoqfP3F3w38eAlDj-12hqCBAEG10S5SpcijzC3'}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          const files = (data.result?.objects || []).map((obj, index) => ({
+            id: index + 1,
+            originalName: obj.key.replace('arc/', ''),
+            size: obj.size || 0,
+            uploadTime: obj.uploaded || new Date().toISOString(),
+            uploadedBy: 'admin',
+            sheetNames: ['Sheet1'],
+            rowCount: 100,
+            colCount: 8,
+            r2Path: obj.key
+          }));
+          
+          return Response.json({ success: true, files }, { headers: corsHeaders });
+        }
       }
     } catch (error) {
       console.error('获取文件列表失败:', error);
@@ -271,12 +289,37 @@ async function handleFiles(request, env, path, method) {
       const fileName = `${timestamp}-${randomSuffix}.${fileExtension}`;
       const filePath = `arc/${fileName}`;
       
-      // 上传到R2
-      await env.R2_BUCKET.put(filePath, file.stream(), {
-        httpMetadata: {
-          contentType: file.type,
+      // 优先使用S3兼容API，这是最稳定的方式
+      const fileBuffer = await file.arrayBuffer();
+      
+      // 使用S3兼容API端点
+      const s3ApiUrl = `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${filePath}`;
+      
+      const uploadResponse = await fetch(s3ApiUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+          'Content-Length': fileBuffer.byteLength.toString(),
         },
+        body: fileBuffer
       });
+
+      if (!uploadResponse.ok) {
+        console.error(`S3 API上传失败: ${uploadResponse.status}`);
+        
+        // 如果S3 API失败，回退到R2 binding
+        if (env.R2_BUCKET) {
+          console.log('回退到R2 binding...');
+          await env.R2_BUCKET.put(filePath, file.stream(), {
+            httpMetadata: {
+              contentType: file.type || 'application/octet-stream',
+            },
+          });
+        } else {
+          const errorData = await uploadResponse.text();
+          throw new Error(`文件上传失败: ${uploadResponse.status} - ${errorData}`);
+        }
+      }
       
       // 模拟Excel文件信息解析
       const fileInfo = {
@@ -489,12 +532,37 @@ async function handleR2Proxy(request, env, path, method) {
           }, { headers: corsHeaders });
         }
         
-        // 将文件上传到R2
-        await env.R2_BUCKET.put(filePath, file.stream(), {
-          httpMetadata: {
-            contentType: file.type,
+        // 使用S3兼容API上传文件
+        const fileBuffer = await file.arrayBuffer();
+        
+        // 使用S3兼容API端点
+        const s3ApiUrl = `https://${accountId}.r2.cloudflarestorage.com/${bucketName}/${filePath}`;
+        
+        const uploadResponse = await fetch(s3ApiUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type || 'application/octet-stream',
+            'Content-Length': fileBuffer.byteLength.toString(),
           },
+          body: fileBuffer
         });
+
+        if (!uploadResponse.ok) {
+          console.error(`S3 API上传失败: ${uploadResponse.status}`);
+          
+          // 如果S3 API失败，回退到R2 binding
+          if (env.R2_BUCKET) {
+            console.log('回退到R2 binding...');
+            await env.R2_BUCKET.put(filePath, file.stream(), {
+              httpMetadata: {
+                contentType: file.type || 'application/octet-stream',
+              },
+            });
+          } else {
+            const errorData = await uploadResponse.text();
+            throw new Error(`文件上传失败: ${uploadResponse.status} - ${errorData}`);
+          }
+        }
         
         return Response.json({
           success: true,
