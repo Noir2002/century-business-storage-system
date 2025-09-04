@@ -23,7 +23,9 @@ export default {
     try {
       // 路由处理：仅当 /api/ 前缀时进入 API 分发
       if (path.startsWith('/api/')) {
-        if (path === '/api/files/upload' && method === 'POST') {
+        if (path === '/api/health' && (method === 'GET' || method === 'HEAD')) {
+          return Response.json({ success: true, service: 'worker', time: new Date().toISOString() }, { headers: corsHeaders });
+        } else if (path === '/api/files/upload' && method === 'POST') {
           return await handleExcelUpload(request, env, corsHeaders);
         } else if (path === '/api/files' && method === 'GET') {
           return await handleFilesList(request, env, corsHeaders);
