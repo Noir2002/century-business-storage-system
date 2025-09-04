@@ -536,6 +536,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
   console.log('🔄 处理本地数据库请求:', path);
   
   try {
+    // 宽表相关API
     if (path === '/api/localdb/wide' && method === 'GET') {
       // 返回宽表数据
       const mockWideData = generateMockWideData();
@@ -546,13 +547,24 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
       }, { headers: corsHeaders });
     }
     
-    else if (path === '/api/localdb/records' && method === 'GET') {
-      // 返回记录列表
-      const mockRecords = generateMockRecords();
+    else if (path === '/api/localdb/wide' && method === 'POST') {
+      // 保存宽表数据
+      const requestData = await request.json();
+      console.log('💾 保存宽表数据:', requestData);
       return Response.json({
         success: true,
-        data: mockRecords,
-        total: mockRecords.length
+        message: '宽表数据保存成功',
+        data: requestData
+      }, { headers: corsHeaders });
+    }
+    
+    else if (path === '/api/localdb/wide/export' && method === 'GET') {
+      // 导出宽表数据
+      const mockWideData = generateMockWideData();
+      return Response.json({
+        success: true,
+        data: mockWideData,
+        message: '宽表数据导出成功'
       }, { headers: corsHeaders });
     }
     
@@ -567,9 +579,82 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
         processed: requestData.data ? requestData.data.length : 0
       }, { headers: corsHeaders });
     }
+    
     else if (path === '/api/localdb/wide/clear-all' && (method === 'POST' || method === 'GET')) {
       // 直接返回成功（占位实现）；支持 POST/GET 方便浏览器直接验证
       return Response.json({ success: true, message: '成功清空所有宽表数据' }, { headers: corsHeaders });
+    }
+    
+    // 记录相关API
+    else if (path === '/api/localdb/records' && method === 'GET') {
+      // 返回记录列表
+      const mockRecords = generateMockRecords();
+      return Response.json({
+        success: true,
+        data: mockRecords,
+        total: mockRecords.length
+      }, { headers: corsHeaders });
+    }
+    
+    else if (path === '/api/localdb/records' && method === 'POST') {
+      // 添加记录
+      const requestData = await request.json();
+      console.log('➕ 添加记录:', requestData);
+      return Response.json({
+        success: true,
+        message: '记录添加成功',
+        data: { ...requestData, id: Date.now() }
+      }, { headers: corsHeaders });
+    }
+    
+    else if (path.startsWith('/api/localdb/records/') && method === 'PUT') {
+      // 更新记录
+      const recordId = path.split('/').pop();
+      const requestData = await request.json();
+      console.log('✏️ 更新记录:', recordId, requestData);
+      return Response.json({
+        success: true,
+        message: '记录更新成功',
+        data: { ...requestData, id: recordId }
+      }, { headers: corsHeaders });
+    }
+    
+    else if (path.startsWith('/api/localdb/records/') && method === 'DELETE') {
+      // 删除记录
+      const recordId = path.split('/').pop();
+      console.log('🗑️ 删除记录:', recordId);
+      return Response.json({
+        success: true,
+        message: '记录删除成功'
+      }, { headers: corsHeaders });
+    }
+    
+    else if (path === '/api/localdb/records/batch' && method === 'POST') {
+      // 批量导入记录
+      const requestData = await request.json();
+      console.log('📤 批量导入记录:', requestData);
+      return Response.json({
+        success: true,
+        message: '批量记录导入成功',
+        processed: requestData.data ? requestData.data.length : 0
+      }, { headers: corsHeaders });
+    }
+    
+    else if (path === '/api/localdb/records/export' && method === 'GET') {
+      // 导出记录数据
+      const mockRecords = generateMockRecords();
+      return Response.json({
+        success: true,
+        data: mockRecords,
+        message: '记录数据导出成功'
+      }, { headers: corsHeaders });
+    }
+    
+    else if (path === '/api/localdb/records/clear-all' && (method === 'POST' || method === 'GET')) {
+      return Response.json({ 
+        success: true, 
+        message: '成功清空所有记录数据' 
+      }, { headers: corsHeaders });
     }
     
     else {
