@@ -20,8 +20,8 @@ class APIConfig {
       if (this.isLocal) {
         this.baseURL = 'http://localhost:3000';
       } else if (this.isPages) {
-        // 修改此处：让 Pages 环境使用当前 origin（即 custom domain）
-        this.baseURL = window.location.origin;
+        // Pages 环境调用 api 子域
+        this.baseURL = 'https://api.' + window.location.hostname;
         // 这样，无论是 centurybusiness.org 还是 pages.dev，都自动以当前站点为 API 域名
       } else {
         this.baseURL = 'http://localhost:3000';
