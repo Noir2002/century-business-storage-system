@@ -30,12 +30,18 @@ export default {
         return await handlePresignedUrl(request, env, corsHeaders);
       } else if (path === '/api/files/parse' && method === 'POST') {
         return await handleExcelParse(request, env, corsHeaders);
+      } else if (path.startsWith('/api/files/') && method === 'GET' && path.endsWith('/download')) {
+        return await handleFileDownload(request, env, path, corsHeaders);
+      } else if (path.startsWith('/api/files/') && method === 'GET' && path.endsWith('/analyze')) {
+        return await handleFileAnalyze(request, env, path, corsHeaders);
       } else if (path.startsWith('/api/inventory/')) {
         return await handleInventoryData(request, env, path, method, corsHeaders);
       } else if (path.startsWith('/api/analytics/')) {
         return await handleAnalyticsData(request, env, path, method, corsHeaders);
       } else if (path.startsWith('/api/localdb/')) {
         return await handleLocalDB(request, env, path, method, corsHeaders);
+      } else if (path.startsWith('/api/r2/')) {
+        return await handleR2Routes(request, env, path, method, corsHeaders);
       } else {
         return new Response('Not Found', { status: 404, headers: corsHeaders });
       }
@@ -608,4 +614,150 @@ function generateMockRecords() {
   }
   
   return records.sort((a, b) => new Date(b.uploadTime) - new Date(a.uploadTime));
+}
+
+// 下载文件：将 R2 对象流式返回
+async function handleFileDownload(request, env, path, corsHeaders) {
+  try {
+    const id = path.split('/')[3];
+    // 由于当前文件列表没有保存 id->key 的映射，使用约定：id 为时间戳前缀，匹配 arc/ 前缀下包含该前缀的对象
+    if (!env.R2_BUCKET) throw new Error('R2存储桶不可用');
+    const list = await env.R2_BUCKET.list({ prefix: 'arc/' });
+    const match = list.objects.find(o => o.key.includes(id));
+    if (!match) {
+      return Response.json({ success: false, error: '文件不存在' }, { status: 404, headers: corsHeaders });
+    }
+    const obj = await env.R2_BUCKET.get(match.key);
+    if (!obj) {
+      return Response.json({ success: false, error: '文件不存在' }, { status: 404, headers: corsHeaders });
+    }
+    const headers = new Headers(corsHeaders);
+    headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
+    headers.set('Content-Disposition', `attachment; filename="${(obj.customMetadata?.originalName)||'download.xlsx'}"`);
+    return new Response(obj.body, { headers });
+  } catch (error) {
+    console.error('下载失败:', error);
+    return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+  }
+}
+
+// 解析/预览文件：返回模拟的分页与表头数据（占位实现）
+async function handleFileAnalyze(request, env, path, corsHeaders) {
+  try {
+    const url = new URL(request.url);
+    const id = path.split('/')[3];
+    const sheet = url.searchParams.get('sheet') || 'Sheet1';
+    const page = parseInt(url.searchParams.get('page')||'1');
+    const limit = parseInt(url.searchParams.get('limit')||'20');
+
+    // 生成模拟数据（后续可改为从 R2 读取并用 XLSX 解析）
+    const headers = ['SKU','列A','列B','列C','列D','列E'];
+    const rowsTotal = 150;
+    const allRows = Array.from({length: rowsTotal}, (_,i)=>[
+      `SKU${String(i+1).padStart(6,'0')}`,'A'+(i+1),'B'+(i+1),'C'+(i+1),'D'+(i+1),'E'+(i+1)
+    ]);
+    const start = (page-1)*limit;
+    const data = allRows.slice(start, start+limit);
+
+    // 简单模拟所有工作表信息
+    const allSheets = [
+      { name:'Sheet1', rowCount: rowsTotal, colCount: headers.length, headers: headers.slice(0,6) },
+      { name:'Sheet2', rowCount: 0, colCount: 0, headers: [] }
+    ];
+
+    return Response.json({
+      success: true,
+      analysis: {
+        fileName: `文件_${id}.xlsx`,
+        currentSheet: sheet,
+        allSheets,
+        headers,
+        data,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(rowsTotal/limit),
+          totalRows: rowsTotal,
+          limit,
+          hasNext: page*limit<rowsTotal,
+          hasPrev: page>1
+        },
+        summary: {
+          uploadTime: new Date().toISOString(),
+          fileSize: 1024*1024,
+          uploadedBy: 'admin',
+          totalSheets: allSheets.length
+        },
+        performance: { processingTime: 5 }
+      }
+    }, { headers: corsHeaders });
+  } catch (error) {
+    console.error('分析失败:', error);
+    return Response.json({ success:false, error: error.message }, { status: 500, headers: corsHeaders });
+  }
+}
+
+// 处理打包系统的R2路由（/api/r2/*）
+async function handleR2Routes(request, env, path, method, corsHeaders) {
+  try {
+    // 上传：/api/r2/upload/package/<path>
+    if (path.startsWith('/api/r2/upload/package/') && method === 'POST') {
+      const targetPath = decodeURIComponent(path.replace('/api/r2/upload/package/', ''));
+      const formData = await request.formData();
+      const file = formData.get('file');
+      if (!file) {
+        return Response.json({ success: false, error: '没有上传文件' }, { headers: corsHeaders });
+      }
+      const r2Key = `package/${targetPath}`;
+      if (!env.R2_BUCKET) {
+        return Response.json({ success: false, error: 'R2存储桶不可用' }, { headers: corsHeaders, status: 500 });
+      }
+      await env.R2_BUCKET.put(r2Key, file.stream(), {
+        httpMetadata: { contentType: file.type || 'application/octet-stream' },
+        customMetadata: {
+          originalName: file.name,
+          uploadTime: new Date().toISOString()
+        }
+      });
+      return Response.json({ success: true, message: '上传成功', filePath: r2Key, size: file.size || 0 }, { headers: corsHeaders });
+    }
+
+    // 列表：/api/r2/list-files?folder=package&prefix=...&limit=...
+    if (path === '/api/r2/list-files' && method === 'GET') {
+      if (!env.R2_BUCKET) {
+        return Response.json({ success: false, error: 'R2存储桶不可用' }, { headers: corsHeaders, status: 500 });
+      }
+      const url = new URL(request.url);
+      const folder = url.searchParams.get('folder') || '';
+      const prefix = url.searchParams.get('prefix') || '';
+      const limit = parseInt(url.searchParams.get('limit') || '100');
+      const keyPrefix = folder ? `${folder}/${prefix || ''}` : prefix;
+      const res = await env.R2_BUCKET.list({ prefix: keyPrefix, limit });
+      return Response.json({ success: true, files: res.objects || [] }, { headers: corsHeaders });
+    }
+
+    // 删除：/api/r2/delete/<path>
+    if (path.startsWith('/api/r2/delete/') && method === 'DELETE') {
+      if (!env.R2_BUCKET) {
+        return Response.json({ success: false, error: 'R2存储桶不可用' }, { headers: corsHeaders, status: 500 });
+      }
+      const targetPath = decodeURIComponent(path.replace('/api/r2/delete/', ''));
+      await env.R2_BUCKET.delete(targetPath);
+      return Response.json({ success: true, message: '删除成功' }, { headers: corsHeaders });
+    }
+
+    // 公共URL：/api/r2/public-url/<filename>?folder=package
+    if (path.startsWith('/api/r2/public-url/') && method === 'GET') {
+      const url = new URL(request.url);
+      const folder = url.searchParams.get('folder') || '';
+      const fileName = decodeURIComponent(path.replace('/api/r2/public-url/', ''));
+      const key = folder ? `${folder}/${fileName}` : fileName;
+      const publicUrl = `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${key}`;
+      return Response.json({ success: true, url: publicUrl }, { headers: corsHeaders });
+    }
+
+    return Response.json({ success: false, error: '不支持的R2路由' }, { status: 404, headers: corsHeaders });
+  } catch (error) {
+    console.error('R2路由错误:', error);
+    return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+  }
 }

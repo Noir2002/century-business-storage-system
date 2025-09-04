@@ -233,10 +233,11 @@
         </div>
     </div>
 
+    <script src="api-config.js"></script>
     <script>
         class DirectR2Upload {
             constructor() {
-                this.r2Endpoint = 'https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system';
+                this.apiBase = (window.apiConfig && window.apiConfig.baseURL) ? window.apiConfig.baseURL : '';
                 this.selectedFile = null;
                 this.initializeElements();
                 this.setupEventListeners();
@@ -343,7 +344,7 @@
                     formData.append('file', this.selectedFile);
                     formData.append('fileName', this.selectedFile.name);
                     
-                    const uploadResponse = await fetch('https://century-business-api.anthonin815.workers.dev/api/files/presigned-url', {
+                    const uploadResponse = await fetch((this.apiBase ? this.apiBase : '') + '/api/files/presigned-url', {
                         method: 'POST',
                         body: formData
                     });

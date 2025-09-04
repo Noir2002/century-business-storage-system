@@ -1,7 +1,11 @@
 // 打包系统的R2存储适配器
 class R2PackageStorage {
   constructor() {
-    this.baseURL = 'https://century-business-api.anthonin815.workers.dev';
+    this.baseUrl = (window.apiConfig && window.apiConfig.baseURL) ? window.apiConfig.baseURL : '';
+  }
+
+  getApiUrl(endpoint) {
+    return this.baseUrl ? `${this.baseUrl}${endpoint}` : endpoint;
   }
 
   // 上传文件到package/文件夹
@@ -14,7 +18,7 @@ class R2PackageStorage {
       const fileName = file.name;
       const fullPath = folderPath ? `${folderPath}/${fileName}` : fileName;
       
-      const response = await fetch(`${this.baseURL}/api/r2/upload/package/${encodeURIComponent(fullPath)}`, {
+      const response = await fetch(this.getApiUrl(`/api/r2/upload/package/${encodeURIComponent(fullPath)}`), {
         method: 'POST',
         body: formData
       });
@@ -89,7 +93,7 @@ class R2PackageStorage {
         params.append('prefix', prefix);
       }
       
-      const response = await fetch(`${this.baseURL}/api/r2/list-files?${params}`, {
+      const response = await fetch(this.getApiUrl(`/api/r2/list-files?${params}`), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -124,7 +128,7 @@ class R2PackageStorage {
       // 确保文件路径包含package/前缀
       const fullPath = filePath.startsWith('package/') ? filePath : `package/${filePath}`;
       
-      const response = await fetch(`${this.baseURL}/api/r2/delete/${encodeURIComponent(fullPath)}`, {
+      const response = await fetch(this.getApiUrl(`/api/r2/delete/${encodeURIComponent(fullPath)}`), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
@@ -165,7 +169,7 @@ class R2PackageStorage {
         folder: 'package'
       });
       
-      const response = await fetch(`${this.baseURL}/api/r2/public-url/${encodeURIComponent(fullPath)}?${params}`, {
+      const response = await fetch(this.getApiUrl(`/api/r2/public-url/${encodeURIComponent(fullPath)}?${params}`), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'

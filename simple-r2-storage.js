@@ -1,7 +1,12 @@
 // 简化的R2存储处理器 - 专注于Excel文件上传
 class SimpleR2Storage {
   constructor() {
-    this.workerUrl = 'https://century-business-api.anthonin815.workers.dev';
+    this.baseUrl = (window.apiConfig && window.apiConfig.baseURL) ? window.apiConfig.baseURL : '';
+  }
+
+  getApiUrl(endpoint) {
+    // endpoint should start with '/api'
+    return this.baseUrl ? `${this.baseUrl}${endpoint}` : endpoint;
   }
 
   // 上传Excel文件到arc/文件夹
@@ -19,8 +24,8 @@ class SimpleR2Storage {
       formData.append('file', file);
       formData.append('description', `Excel文件: ${file.name}`);
 
-      // 直接上传到Workers API
-      const response = await fetch(`${this.workerUrl}/api/files/upload`, {
+      // 直接上传到后端（通过统一的 /api 路由，api-config.js 会按环境重定向）
+      const response = await fetch(this.getApiUrl('/api/files/upload'), {
         method: 'POST',
         body: formData
       });
@@ -68,7 +73,7 @@ class SimpleR2Storage {
     console.log('🔄 获取Excel文件列表...');
     
     try {
-      const response = await fetch(`${this.workerUrl}/api/files`, {
+      const response = await fetch(this.getApiUrl('/api/files'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'

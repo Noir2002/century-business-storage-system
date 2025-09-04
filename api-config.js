@@ -4,21 +4,33 @@ class APIConfig {
     // 检测当前环境
     this.isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     this.isPages = window.location.hostname.includes('.pages.dev') || window.location.hostname === 'centurybusiness.org';
+    // 允许通过 query/localStorage 覆盖后端类型：workers | local
+    const search = new URLSearchParams(window.location.search);
+    const queryOverride = search.get('api');
+    const storageOverride = localStorage.getItem('apiBaseOverride');
+    const override = (queryOverride || storageOverride || '').toLowerCase();
     
     // 根据环境设置API基础URL
-    if (this.isLocal) {
-      this.baseURL = 'http://localhost:3000';
-    } else if (this.isPages) {
-      // Cloudflare Workers API
+    if (override === 'workers') {
       this.baseURL = 'https://century-business-api.anthonin815.workers.dev';
-    } else {
-      // 默认使用本地
+    } else if (override === 'local') {
       this.baseURL = 'http://localhost:3000';
+    } else {
+      if (this.isLocal) {
+        this.baseURL = 'http://localhost:3000';
+      } else if (this.isPages) {
+        // Cloudflare Workers API
+        this.baseURL = 'https://century-business-api.anthonin815.workers.dev';
+      } else {
+        // 缺省：本地
+        this.baseURL = 'http://localhost:3000';
+      }
     }
     
     console.log('🔧 API配置:', {
       环境: this.isLocal ? '本地开发' : (this.isPages ? 'Cloudflare Pages' : '未知'),
-      API地址: this.baseURL
+      API地址: this.baseURL,
+      覆盖: override || '无'
     });
   }
   

@@ -228,10 +228,11 @@
         </div>
     </div>
 
+    <script src="api-config.js"></script>
     <script>
         class ExcelFilesList {
             constructor() {
-                this.workerUrl = 'https://century-business-api.anthonin815.workers.dev';
+                this.apiBase = (window.apiConfig && window.apiConfig.baseURL) ? window.apiConfig.baseURL : '';
                 this.initializeElements();
                 this.setupEventListeners();
                 this.loadFiles();
@@ -258,7 +259,7 @@
                 this.hideStatus();
 
                 try {
-                    const response = await fetch(`${this.workerUrl}/api/files`, {
+                    const response = await fetch(`${this.apiBase ? this.apiBase : ''}/api/files`, {
                         method: 'GET',
                         headers: {
                             'Content-Type': 'application/json'
