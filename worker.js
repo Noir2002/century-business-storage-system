@@ -565,8 +565,8 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
         processed: requestData.data ? requestData.data.length : 0
       }, { headers: corsHeaders });
     }
-    else if (path === '/api/localdb/wide/clear-all' && method === 'POST') {
-      // 直接返回成功（占位实现）
+    else if (path === '/api/localdb/wide/clear-all' && (method === 'POST' || method === 'GET')) {
+      // 直接返回成功（占位实现）；支持 POST/GET 方便浏览器直接验证
       return Response.json({ success: true, message: '成功清空所有宽表数据' }, { headers: corsHeaders });
     }
     
