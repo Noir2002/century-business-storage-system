@@ -12,6 +12,7 @@ class APIConfig {
     
     // 根据环境设置API基础URL
     if (override === 'workers') {
+      // 若您明确想使用 workers.dev，也可保留
       this.baseURL = 'https://century-business-api.anthonin815.workers.dev';
     } else if (override === 'local') {
       this.baseURL = 'http://localhost:3000';
@@ -19,10 +20,10 @@ class APIConfig {
       if (this.isLocal) {
         this.baseURL = 'http://localhost:3000';
       } else if (this.isPages) {
-        // Cloudflare Workers API
-        this.baseURL = 'https://century-business-api.anthonin815.workers.dev';
+        // 修改此处：让 Pages 环境使用当前 origin（即 custom domain）
+        this.baseURL = window.location.origin;
+        // 这样，无论是 centurybusiness.org 还是 pages.dev，都自动以当前站点为 API 域名
       } else {
-        // 缺省：本地
         this.baseURL = 'http://localhost:3000';
       }
     }
