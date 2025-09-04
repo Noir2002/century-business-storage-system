@@ -21,30 +21,40 @@ export default {
     }
 
     try {
-      // 路由处理
-      if (path === '/api/files/upload' && method === 'POST') {
-        return await handleExcelUpload(request, env, corsHeaders);
-      } else if (path === '/api/files' && method === 'GET') {
-        return await handleFilesList(request, env, corsHeaders);
-      } else if (path === '/api/files/presigned-url' && method === 'POST') {
-        return await handlePresignedUrl(request, env, corsHeaders);
-      } else if (path === '/api/files/parse' && method === 'POST') {
-        return await handleExcelParse(request, env, corsHeaders);
-      } else if (path.startsWith('/api/files/') && method === 'GET' && path.endsWith('/download')) {
-        return await handleFileDownload(request, env, path, corsHeaders);
-      } else if (path.startsWith('/api/files/') && method === 'GET' && path.endsWith('/analyze')) {
-        return await handleFileAnalyze(request, env, path, corsHeaders);
-      } else if (path.startsWith('/api/inventory/')) {
-        return await handleInventoryData(request, env, path, method, corsHeaders);
-      } else if (path.startsWith('/api/analytics/')) {
-        return await handleAnalyticsData(request, env, path, method, corsHeaders);
-      } else if (path.startsWith('/api/localdb/')) {
-        return await handleLocalDB(request, env, path, method, corsHeaders);
-      } else if (path.startsWith('/api/r2/')) {
-        return await handleR2Routes(request, env, path, method, corsHeaders);
-      } else {
-        return new Response('Not Found', { status: 404, headers: corsHeaders });
+      // 路由处理：仅当 /api/ 前缀时进入 API 分发
+      if (path.startsWith('/api/')) {
+        if (path === '/api/files/upload' && method === 'POST') {
+          return await handleExcelUpload(request, env, corsHeaders);
+        } else if (path === '/api/files' && method === 'GET') {
+          return await handleFilesList(request, env, corsHeaders);
+        } else if (path === '/api/files/presigned-url' && method === 'POST') {
+          return await handlePresignedUrl(request, env, corsHeaders);
+        } else if (path === '/api/files/parse' && method === 'POST') {
+          return await handleExcelParse(request, env, corsHeaders);
+        } else if (path.startsWith('/api/files/') && method === 'GET' && path.endsWith('/download')) {
+          return await handleFileDownload(request, env, path, corsHeaders);
+        } else if (path.startsWith('/api/files/') && method === 'GET' && path.endsWith('/analyze')) {
+          return await handleFileAnalyze(request, env, path, corsHeaders);
+        } else if (path.startsWith('/api/inventory/')) {
+          return await handleInventoryData(request, env, path, method, corsHeaders);
+        } else if (path.startsWith('/api/analytics/')) {
+          return await handleAnalyticsData(request, env, path, method, corsHeaders);
+        } else if (path.startsWith('/api/localdb/')) {
+          return await handleLocalDB(request, env, path, method, corsHeaders);
+        } else if (path.startsWith('/api/r2/')) {
+          return await handleR2Routes(request, env, path, method, corsHeaders);
+        } else {
+          return new Response('Not Found', { status: 404, headers: corsHeaders });
+        }
       }
+
+      // 非 /api/ 的请求，交给静态资产（Sites）
+      if (env.ASSETS && env.ASSETS.fetch) {
+        return await env.ASSETS.fetch(request);
+      }
+
+      // 兜底
+      return new Response('Not Found', { status: 404, headers: corsHeaders });
     } catch (error) {
       console.error('Worker Error:', error);
       return new Response(JSON.stringify({ 

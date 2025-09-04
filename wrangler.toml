@@ -1,6 +1,17 @@
-name = "century-business-api"
+name = "century-business-system"
 main = "worker.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2025-09-04"
+
+# 自定义域绑定（请填入你自己的 account_id / zone_id / route）
+account_id = "23441d4f7734b84186c4c20ddefef8e7"
+workers_dev = false
+route = "centurybusiness.org/api/*"
+zone_id = "centurybusiness.org"
+
+# 静态资源（Workers Sites / Assets）
+[assets]
+binding = "ASSETS"
+bucket = "./dist"
 
 # R2存储绑定
 [[r2_buckets]]

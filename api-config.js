@@ -3,16 +3,15 @@ class APIConfig {
   constructor() {
     // 检测当前环境
     this.isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    this.isPages = window.location.hostname.includes('.pages.dev') || window.location.hostname === 'centurybusiness.org';
+    this.isPages = window.location.hostname.includes('.pages.dev');
     // 允许通过 query/localStorage 覆盖后端类型：workers | local
     const search = new URLSearchParams(window.location.search);
     const queryOverride = search.get('api');
     const storageOverride = localStorage.getItem('apiBaseOverride');
     const override = (queryOverride || storageOverride || '').toLowerCase();
     
-    // 根据环境设置API基础URL
+    // 根据环境设置API基础URL（终极方案：同源 Worker 托管）
     if (override === 'workers') {
-      // 若您明确想使用 workers.dev，也可保留
       this.baseURL = 'https://century-business-api.anthonin815.workers.dev';
     } else if (override === 'local') {
       this.baseURL = 'http://localhost:3000';
@@ -20,11 +19,11 @@ class APIConfig {
       if (this.isLocal) {
         this.baseURL = 'http://localhost:3000';
       } else if (this.isPages) {
-        // Pages 环境调用 api 子域
-        this.baseURL = 'https://api.' + window.location.hostname;
-        // 这样，无论是 centurybusiness.org 还是 pages.dev，都自动以当前站点为 API 域名
+        // 在 Pages 环境可以继续指向 Workers 子域
+        this.baseURL = 'https://century-business-api.anthonin815.workers.dev';
       } else {
-        this.baseURL = 'http://localhost:3000';
+        // 自定义域统一同源
+        this.baseURL = window.location.origin;
       }
     }
     
