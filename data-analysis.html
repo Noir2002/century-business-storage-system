@@ -669,13 +669,18 @@
       var layer = layui.layer;
       
       var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      // 兼容Workers环境无需JWT：若无token也允许加载mock分析
+      var token = localStorage.getItem('token');
       
       // 初始化页面
       initPage();
       
       function initPage() {
         // 检查登录状态
-        if (!userInfo.username) {
+        // Workers下前端演示允许无登录继续（避免立即跳转）
+        if (!userInfo.username && (!window.apiConfig || window.apiConfig.baseURL.includes('workers.dev'))) {
+          console.warn('未登录，使用演示模式加载分析。');
+        } else if (!userInfo.username) {
           layer.msg('请先登录！', {icon: 2}, function(){
             window.location.href = 'login.html';
           });
@@ -726,12 +731,6 @@
       // 加载分析数据
       function loadAnalysisData() {
         const token = localStorage.getItem('token');
-        if (!token) {
-          layer.msg('请先登录！', {icon: 2}, function(){
-            window.location.href = 'login.html';
-          });
-          return;
-        }
         
         // 加载统计概览
         fetch(window.apiConfig.baseURL + '/api/analytics/sales', {

@@ -1297,7 +1297,7 @@
           }
           
           $.ajax({
-            url: '/api/localdb/wide/batch',
+            url: window.apiConfig.baseURL + '/api/localdb/wide/batch',
             type: 'POST',
             headers: headers,
             data: formData,
@@ -1333,7 +1333,7 @@
         }
         
         $.ajax({
-          url: '/api/localdb/wide/export',
+          url: window.apiConfig.baseURL + '/api/localdb/wide/export',
           type: 'GET',
           headers: headers,
           xhrFields: {
@@ -1378,7 +1378,7 @@
           }
           
           $.ajax({
-            url: '/api/localdb/wide/clear-all',
+            url: window.apiConfig.baseURL + '/api/localdb/wide/clear-all',
             type: 'POST',
             headers: headers,
             success: function(res) {
@@ -1432,7 +1432,7 @@
           }
           
           $.ajax({
-            url: '/api/localdb/records/batch',
+            url: window.apiConfig.baseURL + '/api/localdb/records/batch',
             type: 'POST',
             headers: headers,
             data: formData,
@@ -1468,7 +1468,7 @@
         }
         
         $.ajax({
-          url: '/api/localdb/records/export',
+          url: window.apiConfig.baseURL + '/api/localdb/records/export',
           type: 'GET',
           headers: headers,
           xhrFields: {
@@ -1519,7 +1519,7 @@
           }
           
           $.ajax({
-            url: '/api/localdb/records/clear-all',
+            url: window.apiConfig.baseURL + '/api/localdb/records/clear-all',
             type: 'POST',
             headers: headers,
             success: function(res) {
@@ -1570,7 +1570,7 @@
             }
             
             $.ajax({
-              url: '/api/localdb/records/'+data.id,
+              url: window.apiConfig.baseURL + '/api/localdb/records/'+data.id,
               type: 'DELETE',
               headers: headers,
               success: function(res){
@@ -1600,7 +1600,7 @@
       form.on('submit(submitEdit)', function(formObj){
         var editId = $('#editFormModal').data('editId');
         var method = editId ? 'PUT' : 'POST';
-        var url = '/api/localdb/records' + (editId ? ('/'+editId) : '');
+        var url = window.apiConfig.baseURL + '/api/localdb/records' + (editId ? ('/'+editId) : '');
         var data = {
           SKU: formObj.field.sku,
           '产品中文名': formObj.field.name,
