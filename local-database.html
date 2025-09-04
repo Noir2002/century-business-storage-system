@@ -608,6 +608,7 @@
       var $ = layui.$;
 
       var currentMode = 'wide'; // 当前模式：wide 或 record
+      var modeVersion = 0; // 用于避免异步回调与销毁实例的竞态
       var hot = null; // Handsontable实例
       var isEditMode = false; // 编辑模式状态
       var hasUnsavedChanges = false; // 是否有未保存的修改
@@ -637,6 +638,7 @@
 
       function switchMode(mode) {
         currentMode = mode;
+        modeVersion++;
         
         // 更新按钮状态
         $('.mode-switch .layui-btn').removeClass('active');
@@ -663,6 +665,7 @@
       function initWideTable() {
         if (hot) {
           hot.destroy();
+          hot = null;
         }
 
         // 字段定义 - 宽表模式，按日期分列
@@ -691,11 +694,12 @@
         }
 
         // 从后端加载宽表数据
-        loadWideTableData(columns, colHeaders);
+        const requestVersion = modeVersion;
+        loadWideTableData(columns, colHeaders, requestVersion);
       }
 
       // 加载宽表数据
-      function loadWideTableData(columns, colHeaders) {
+      function loadWideTableData(columns, colHeaders, requestVersion) {
         var token = localStorage.getItem('token');
         var headers = {};
         if (token) {
@@ -707,6 +711,10 @@
           type: 'GET',
           headers: headers,
           success: function(res) {
+            // 如果在请求期间用户切换了模式或实例被销毁，则丢弃结果
+            if (currentMode !== 'wide' || requestVersion !== modeVersion) {
+              return;
+            }
             if(res.success) {
               // 保存原始数据
               originalData = JSON.parse(JSON.stringify(res.data));
@@ -756,9 +764,11 @@
                   applyOfflineStyles();
                 }
               });
-              // 加载后自动计算销量
-              calculateSales(hot.getSourceData(), columns);
-              hot.render();
+              // 加载后自动计算销量（再次确认实例有效）
+              if (hot) {
+                calculateSales(hot.getSourceData(), columns);
+                hot.render();
+              }
               applyOfflineStyles();
             } else {
               layer.msg('数据加载失败: ' + res.error, {icon:2});
@@ -1741,6 +1751,19 @@
   </script>
   <!-- Handsontable JS -->
   <script src="https://cdn.jsdelivr.net/npm/handsontable@16.0.1/dist/handsontable.full.min.js"></script>
+  <script>
+    // 注册中文语言，避免 zh-CN 未找到
+    (function(){
+      try {
+        if (window.Handsontable && window.Handsontable.languages && window.Handsontable.languages.registerLanguageDictionary) {
+          const zhCN = {
+            languageCode: 'zh-CN'
+          };
+          window.Handsontable.languages.registerLanguageDictionary(zhCN);
+        }
+      } catch (e) { console.warn('Handsontable i18n 注册失败', e); }
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </body>
 </html> 

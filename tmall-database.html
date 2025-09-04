@@ -167,7 +167,7 @@
         }
       }
       function initWideTable() {
-        if (hot) hot.destroy();
+        if (hot) { hot.destroy(); hot = null; }
         const columns = [
           {data: '系统履约单号', type: 'text'},
           {data: '店铺订单时间', type: 'text'},
@@ -182,7 +182,7 @@
         var headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
         $.ajax({
-          url: '/api/tmall-orders/wide',
+          url: window.apiConfig.baseURL + '/api/tmall-orders/wide',
           type: 'GET',
           headers: headers,
           success: function(res) {
@@ -580,6 +580,16 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/handsontable@16.0.1/dist/handsontable.full.min.js"></script>
+  <script>
+    (function(){
+      try {
+        if (window.Handsontable && window.Handsontable.languages && window.Handsontable.languages.registerLanguageDictionary) {
+          const zhCN = { languageCode: 'zh-CN' };
+          window.Handsontable.languages.registerLanguageDictionary(zhCN);
+        }
+      } catch(e) { console.warn('Handsontable i18n 注册失败', e); }
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </body>
 </html> 
