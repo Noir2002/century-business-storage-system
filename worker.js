@@ -1,7 +1,9 @@
 // 简化的Cloudflare Workers - 专注于Excel文件上传到R2
 // 轻量级内存缓存：用于在同一 Worker 实例中暂存“宽表”数据，便于上传后即时刷新
 let wideTableCache = [];
+let recordsCache = [];
 const WIDE_TABLE_R2_KEY = 'wide/latest.json';
+const RECORDS_R2_KEY = 'records/latest.json';
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -652,24 +654,23 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
     
     // 记录相关API
     else if (path === '/api/localdb/records' && method === 'GET') {
-      // 返回记录列表
-      const mockRecords = generateMockRecords();
-      return Response.json({
-        success: true,
-        data: mockRecords,
-        total: mockRecords.length
-      }, { headers: corsHeaders });
+      // 返回记录列表：内存优先，其次R2
+      let data = Array.isArray(recordsCache) ? recordsCache : [];
+      if ((!data || data.length === 0) && env.R2_BUCKET) {
+        try { const obj = await env.R2_BUCKET.get(RECORDS_R2_KEY); if (obj) { const text = await obj.text(); const parsed = JSON.parse(text); if (Array.isArray(parsed)) { recordsCache = parsed; data = parsed; } } } catch(e){ console.warn('读取R2记录失败:', e); }
+      }
+      return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
     }
     
     else if (path === '/api/localdb/records' && method === 'POST') {
-      // 添加记录
+      // 添加记录（JSON）
       const requestData = await request.json();
       console.log('➕ 添加记录:', requestData);
-      return Response.json({
-        success: true,
-        message: '记录添加成功',
-        data: { ...requestData, id: Date.now() }
-      }, { headers: corsHeaders });
+      const record = { ...requestData, id: Date.now() };
+      if (!Array.isArray(recordsCache)) recordsCache = [];
+      recordsCache.unshift(record);
+      if (env.R2_BUCKET) { try { await env.R2_BUCKET.put(RECORDS_R2_KEY, JSON.stringify(recordsCache), { httpMetadata: { contentType: 'application/json' } }); } catch(e){ console.warn('写入R2记录失败:', e);} }
+      return Response.json({ success: true, message: '记录添加成功', data: record }, { headers: corsHeaders });
     }
     
     else if (path.startsWith('/api/localdb/records/') && method === 'PUT') {
@@ -677,49 +678,56 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
       const recordId = path.split('/').pop();
       const requestData = await request.json();
       console.log('✏️ 更新记录:', recordId, requestData);
-      return Response.json({
-        success: true,
-        message: '记录更新成功',
-        data: { ...requestData, id: recordId }
-      }, { headers: corsHeaders });
+      if (Array.isArray(recordsCache)) {
+        const idx = recordsCache.findIndex(r => String(r.id) === String(recordId));
+        if (idx !== -1) { recordsCache[idx] = { ...recordsCache[idx], ...requestData, id: recordsCache[idx].id }; }
+      }
+      if (env.R2_BUCKET) { try { await env.R2_BUCKET.put(RECORDS_R2_KEY, JSON.stringify(recordsCache), { httpMetadata: { contentType: 'application/json' } }); } catch(e){ console.warn('写入R2记录失败:', e);} }
+      return Response.json({ success: true, message: '记录更新成功', data: { ...requestData, id: recordId } }, { headers: corsHeaders });
     }
     
     else if (path.startsWith('/api/localdb/records/') && method === 'DELETE') {
       // 删除记录
       const recordId = path.split('/').pop();
       console.log('🗑️ 删除记录:', recordId);
-      return Response.json({
-        success: true,
-        message: '记录删除成功'
-      }, { headers: corsHeaders });
+      if (Array.isArray(recordsCache)) recordsCache = recordsCache.filter(r => String(r.id) !== String(recordId));
+      if (env.R2_BUCKET) { try { await env.R2_BUCKET.put(RECORDS_R2_KEY, JSON.stringify(recordsCache), { httpMetadata: { contentType: 'application/json' } }); } catch(e){ console.warn('写入R2记录失败:', e);} }
+      return Response.json({ success: true, message: '记录删除成功' }, { headers: corsHeaders });
     }
     
     else if (path === '/api/localdb/records/batch' && method === 'POST') {
-      // 批量导入记录
+      // 批量导入记录（JSON优先；multipart仅提示）
+      const contentType = request.headers.get('content-type') || '';
+      if (contentType.includes('multipart/form-data')) {
+        return Response.json({ success: true, message: '文件已接收；请前端解析成JSON后提交' }, { headers: corsHeaders });
+      }
       const requestData = await request.json();
-      console.log('📤 批量导入记录:', requestData);
-      return Response.json({
-        success: true,
-        message: '批量记录导入成功',
-        processed: requestData.data ? requestData.data.length : 0
-      }, { headers: corsHeaders });
+      console.log('📤 批量导入记录(JSON):', requestData);
+      if (requestData && Array.isArray(requestData.data)) {
+        if (!Array.isArray(recordsCache)) recordsCache = [];
+        // 生成id并插入到头部
+        const now = Date.now();
+        const withIds = requestData.data.map((r, i) => ({ id: now + i, ...r }));
+        recordsCache = [...withIds, ...recordsCache];
+        if (env.R2_BUCKET) { try { await env.R2_BUCKET.put(RECORDS_R2_KEY, JSON.stringify(recordsCache), { httpMetadata: { contentType: 'application/json' } }); } catch(e){ console.warn('写入R2记录失败:', e);} }
+        return Response.json({ success: true, message: '批量记录导入成功', processed: withIds.length }, { headers: corsHeaders });
+      }
+      return Response.json({ success: false, error: '数据格式不正确' }, { headers: corsHeaders });
     }
     
     else if (path === '/api/localdb/records/export' && method === 'GET') {
-      // 导出记录数据
-      const mockRecords = generateMockRecords();
-      return Response.json({
-        success: true,
-        data: mockRecords,
-        message: '记录数据导出成功'
-      }, { headers: corsHeaders });
+      // 导出记录数据（真实）
+      let data = Array.isArray(recordsCache) ? recordsCache : [];
+      if ((!data || data.length === 0) && env.R2_BUCKET) {
+        try { const obj = await env.R2_BUCKET.get(RECORDS_R2_KEY); if (obj) { const text = await obj.text(); const parsed = JSON.parse(text); if (Array.isArray(parsed)) { recordsCache = parsed; data = parsed; } } } catch(e){ console.warn('读取R2记录失败:', e); }
+      }
+      return Response.json({ success: true, data, message: '记录数据导出成功' }, { headers: corsHeaders });
     }
     
     else if (path === '/api/localdb/records/clear-all' && (method === 'POST' || method === 'GET')) {
-      return Response.json({ 
-        success: true, 
-        message: '成功清空所有记录数据' 
-      }, { headers: corsHeaders });
+      recordsCache = [];
+      if (env.R2_BUCKET) { try { await env.R2_BUCKET.delete(RECORDS_R2_KEY); } catch(e){ console.warn('删除R2记录失败:', e);} }
+      return Response.json({ success: true, message: '成功清空所有记录数据' }, { headers: corsHeaders });
     }
     
     else {
