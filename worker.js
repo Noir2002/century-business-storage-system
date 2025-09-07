@@ -133,9 +133,14 @@ export default {
         }
       }
 
-      // 非 /api/ 的请求，交给静态资产（Sites）
+      // 非 /api/ 的请求，交给静态资产（Sites），同时补充CORS响应头
       if (env.ASSETS && env.ASSETS.fetch) {
-        return await env.ASSETS.fetch(request);
+        const resp = await env.ASSETS.fetch(request);
+        const headers = new Headers(resp.headers);
+        headers.set('Access-Control-Allow-Origin', '*');
+        headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers });
       }
 
       // 兜底
