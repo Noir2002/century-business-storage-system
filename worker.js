@@ -4,6 +4,59 @@ let wideTableCache = [];
 let recordsCache = [];
 const WIDE_TABLE_R2_KEY = 'wide/latest.json';
 const RECORDS_R2_KEY = 'records/latest.json';
+
+// 工具：获取日期键（YYYY-MM-DD）
+function getDateKeysFromRow(row) {
+  return Object.keys(row || {}).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
+}
+function formatYMD(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+// 将超过最近N天的数据从宽表归档到行记录
+async function archiveOldDatesToRecords(env, keepDays = 5) {
+  if (!Array.isArray(wideTableCache) || wideTableCache.length === 0) return;
+  const today = new Date();
+  const keepSet = new Set(Array.from({length: keepDays}, (_,i)=>{
+    const d = new Date(today); d.setDate(today.getDate()-i); return formatYMD(d);
+  }));
+  let archived = [];
+  wideTableCache.forEach(row => {
+    const dateKeys = getDateKeysFromRow(row);
+    dateKeys.forEach(k => {
+      if (!keepSet.has(k)) {
+        const stock = parseInt(row[k]||0) || 0;
+        const rec = {
+          id: Date.now() + Math.floor(Math.random()*1e6),
+          SKU: row.SKU || '',
+          '产品中文名': row['产品中文名'] || '',
+          '网页链接': row['网页链接'] || '',
+          '初始库存': row['初始库存'] || 0,
+          '日期': `${k} 00:00`,
+          '库存': stock,
+          '销量': row[k + '_销量'] != null ? parseInt(row[k + '_销量']) || 0 : 0
+        };
+        archived.push(rec);
+        delete row[k];
+        delete row[k + '_销量'];
+      }
+    });
+  });
+  if (archived.length) {
+    if (!Array.isArray(recordsCache)) recordsCache = [];
+    // 新归档的放到最前面
+    recordsCache = [...archived, ...recordsCache];
+    // 持久化两份数据
+    if (env && env.R2_BUCKET) {
+      try {
+        await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), { httpMetadata: { contentType: 'application/json' } });
+        await env.R2_BUCKET.put(RECORDS_R2_KEY, JSON.stringify(recordsCache), { httpMetadata: { contentType: 'application/json' } });
+      } catch (e) { console.warn('归档持久化失败:', e); }
+    }
+  }
+}
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -560,6 +613,8 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           }
         } catch (e) { console.warn('读取R2宽表失败:', e); }
       }
+      await archiveOldDatesToRecords(env, 5);
+      data = wideTableCache;
       return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
     }
     
@@ -626,6 +681,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
                 });
               } catch (e) { console.warn('写入R2宽表失败:', e); }
             }
+            await archiveOldDatesToRecords(env, 5);
           }
           
           return Response.json({ success: true, message: '批量数据上传成功', processed: requestData.data ? requestData.data.length : 0, data: Array.isArray(wideTableCache) ? wideTableCache : [] }, { headers: corsHeaders });
