@@ -991,6 +991,30 @@ async function handleTmallOrders(request, env, path, method, corsHeaders) {
   console.log('🔄 处理天猫订单请求:', path);
   
   try {
+    // 专用：/api/tmall-orders/wide GET -> 返回按天明细行，供分析页面使用
+    if (path === '/api/tmall-orders/wide' && method === 'GET') {
+      // 确保有最新宽表数据（内存 / R2）
+      let data = Array.isArray(wideTableCache) ? wideTableCache : [];
+      if ((!data || data.length === 0) && env.R2_BUCKET) {
+        try { const obj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY); if (obj) { const text = await obj.text(); const parsed = JSON.parse(text); if (Array.isArray(parsed)) { wideTableCache = parsed; data = parsed; } } } catch(e){ console.warn('读取R2宽表失败:', e); }
+      }
+      // 展平：把各日期列转换为行 {SKU, 店铺订单时间, 商品数量}
+      const rows = [];
+      (data || []).forEach(row => {
+        const dateKeys = getDateKeysFromRow(row);
+        dateKeys.forEach(k => {
+          const sales = parseInt(row[k + '_销量']) || 0; // 优先使用已计算的销量
+          // 若没有销量字段，也可使用库存变化，但这里保守用0
+          rows.push({
+            SKU: row.SKU || '',
+            '店铺订单时间': k,
+            '商品数量': sales
+          });
+        });
+      });
+      return Response.json({ success: true, data: rows }, { headers: corsHeaders });
+    }
+
     // 将tmall-orders路径映射到localdb路径
     let mappedPath = path.replace('/api/tmall-orders/', '/api/localdb/');
     
