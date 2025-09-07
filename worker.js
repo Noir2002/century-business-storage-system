@@ -1030,31 +1030,7 @@ async function handleTmallOrders(request, env, path, method, corsHeaders) {
   console.log('🔄 处理天猫订单请求:', path);
   
   try {
-    // 天猫数据库专用：/api/tmall-orders/wide
-    if (path === '/api/tmall-orders/wide') {
-      if (method === 'GET') {
-        // 返回天猫数据库宽表（不依赖本地数据库逻辑）
-        let data = Array.isArray(tmallWideCache) ? tmallWideCache : [];
-        if ((!data || data.length === 0) && env.R2_BUCKET) {
-          try { const obj = await env.R2_BUCKET.get(TMALL_WIDE_R2_KEY); if (obj) { const text = await obj.text(); const parsed = JSON.parse(text); if (Array.isArray(parsed)) { tmallWideCache = parsed; data = parsed; } } } catch(e){ console.warn('读取R2天猫宽表失败:', e); }
-        }
-        return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
-      }
-      if (method === 'POST') {
-        // 保存天猫数据库宽表（前端应已完成解析与计算）
-        const body = await request.json();
-        if (body && Array.isArray(body.data)) {
-          tmallWideCache = body.data;
-          if (env.R2_BUCKET) {
-            try { await env.R2_BUCKET.put(TMALL_WIDE_R2_KEY, JSON.stringify(tmallWideCache), { httpMetadata:{ contentType:'application/json' } }); } catch(e){ console.warn('写入R2天猫宽表失败:', e); }
-          }
-          return Response.json({ success: true, message: '已保存', total: tmallWideCache.length }, { headers: corsHeaders });
-        }
-        return Response.json({ success:false, error:'数据格式不正确' }, { headers: corsHeaders, status:400 });
-      }
-    }
-
-    // 将tmall-orders路径映射到localdb路径
+    // 恢复：将 tmall-orders 路径简单映射到 localdb（与之前可正常显示分析图表的行为一致）
     let mappedPath = path.replace('/api/tmall-orders/', '/api/localdb/');
     
     // 特殊路径映射

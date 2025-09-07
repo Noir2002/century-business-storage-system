@@ -299,7 +299,7 @@
         if (token) headers['Authorization'] = 'Bearer ' + token;
         layer.msg('正在保存...', {icon: 16, time: 0});
         $.ajax({
-          url: window.apiConfig.baseURL + '/api/tmall-orders/wide',
+          url: '/api/tmall-orders/wide',
           type: 'POST',
           headers: headers,
           data: JSON.stringify({ data: data }),
@@ -325,7 +325,7 @@
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = 'Bearer ' + token;
             $.ajax({
-              url: window.apiConfig.baseURL + '/api/tmall-orders/wide/batch',
+              url: '/api/tmall-orders/wide/batch',
               type: 'POST',
               headers: headers,
               data: JSON.stringify({ data }),
@@ -358,7 +358,7 @@
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = 'Bearer ' + token;
             $.ajax({
-              url: window.apiConfig.baseURL + '/api/tmall-orders/wide/batch',
+              url: '/api/tmall-orders/wide/batch',
               type: 'POST',
               headers: headers,
               data: JSON.stringify({ data }),
@@ -377,7 +377,7 @@
         var headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
         $.ajax({
-          url: window.apiConfig.baseURL + '/api/tmall-orders/wide/export',
+          url: '/api/tmall-orders/wide/export',
           type: 'GET',
           headers: headers,
           xhrFields: { responseType: 'blob' },
