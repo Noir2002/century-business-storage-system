@@ -1,6 +1,7 @@
 // 简化的Cloudflare Workers - 专注于Excel文件上传到R2
 // 轻量级内存缓存：用于在同一 Worker 实例中暂存“宽表”数据，便于上传后即时刷新
 let wideTableCache = [];
+const WIDE_TABLE_R2_KEY = 'wide/latest.json';
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -542,13 +543,22 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
   try {
     // 宽表相关API
     if (path === '/api/localdb/wide' && method === 'GET') {
-      // 返回宽表数据：仅返回真实缓存（不再返回模拟数据）
-      const data = Array.isArray(wideTableCache) ? wideTableCache : [];
-      return Response.json({
-        success: true,
-        data: data,
-        total: data.length
-      }, { headers: corsHeaders });
+      // 返回宽表数据：优先内存；若为空则尝试从R2读取并缓存
+      let data = Array.isArray(wideTableCache) ? wideTableCache : [];
+      if ((!data || data.length === 0) && env.R2_BUCKET) {
+        try {
+          const obj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY);
+          if (obj) {
+            const text = await obj.text();
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed)) {
+              wideTableCache = parsed;
+              data = parsed;
+            }
+          }
+        } catch (e) { console.warn('读取R2宽表失败:', e); }
+      }
+      return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
     }
     
     else if (path === '/api/localdb/wide' && method === 'POST') {
@@ -566,13 +576,22 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
     }
     
     else if (path === '/api/localdb/wide/export' && method === 'GET') {
-      // 导出宽表数据：仅导出真实缓存
-      const data = Array.isArray(wideTableCache) ? wideTableCache : [];
-      return Response.json({
-        success: true,
-        data: data,
-        message: '宽表数据导出成功'
-      }, { headers: corsHeaders });
+      // 导出宽表数据：仅导出真实数据，必要时从R2回填
+      let data = Array.isArray(wideTableCache) ? wideTableCache : [];
+      if ((!data || data.length === 0) && env.R2_BUCKET) {
+        try {
+          const obj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY);
+          if (obj) {
+            const text = await obj.text();
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed)) {
+              wideTableCache = parsed;
+              data = parsed;
+            }
+          }
+        } catch (e) { console.warn('读取R2宽表失败:', e); }
+      }
+      return Response.json({ success: true, data, message: '宽表数据导出成功' }, { headers: corsHeaders });
     }
     
     else if (path === '/api/localdb/wide/batch' && method === 'POST') {
@@ -588,12 +607,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
             return Response.json({ success: false, error: '没有上传文件' }, { headers: corsHeaders });
           }
           console.log('📤 收到Excel文件直传(不解析):', file.name);
-          return Response.json({
-            success: true,
-            message: `文件 ${file.name} 已接收；请在前端解析后以JSON提交`,
-            processed: 0,
-            data: []
-          }, { headers: corsHeaders });
+          return Response.json({ success: true, message: `文件 ${file.name} 已接收；请在前端解析后以JSON提交`, processed: 0, data: [] }, { headers: corsHeaders });
           
         } else {
           // 处理JSON数据
@@ -601,14 +615,18 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           console.log('📤 批量JSON数据:', requestData);
           if (requestData && Array.isArray(requestData.data)) {
             wideTableCache = requestData.data;
+            // 持久化到R2
+            if (env.R2_BUCKET) {
+              try {
+                await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), {
+                  httpMetadata: { contentType: 'application/json' },
+                  customMetadata: { updatedAt: new Date().toISOString() }
+                });
+              } catch (e) { console.warn('写入R2宽表失败:', e); }
+            }
           }
           
-          return Response.json({
-            success: true,
-            message: '批量数据上传成功',
-            processed: requestData.data ? requestData.data.length : 0,
-            data: Array.isArray(wideTableCache) ? wideTableCache : []
-          }, { headers: corsHeaders });
+          return Response.json({ success: true, message: '批量数据上传成功', processed: requestData.data ? requestData.data.length : 0, data: Array.isArray(wideTableCache) ? wideTableCache : [] }, { headers: corsHeaders });
         }
         
       } catch (parseError) {
@@ -626,6 +644,9 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
     else if (path === '/api/localdb/wide/clear-all' && (method === 'POST' || method === 'GET')) {
       // 清空缓存并返回成功；支持 POST/GET 方便浏览器直接验证
       wideTableCache = [];
+      if (env.R2_BUCKET) {
+        try { await env.R2_BUCKET.delete(WIDE_TABLE_R2_KEY); } catch (e) { console.warn('删除R2宽表失败:', e); }
+      }
       return Response.json({ success: true, message: '成功清空所有宽表数据' }, { headers: corsHeaders });
     }
     
