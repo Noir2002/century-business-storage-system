@@ -1281,44 +1281,32 @@
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.xlsx,.xls,.csv';
-        input.onchange = function(e) {
+        input.onchange = async function(e) {
           const file = e.target.files[0];
           if (!file) return;
-          
-          var token = localStorage.getItem('token');
-          var formData = new FormData();
-          formData.append('file', file);
-          
-          var headers = {};
-          if (token) {
-            headers['Authorization'] = 'Bearer ' + token;
+          try {
+            layer.msg('正在解析Excel...', {icon: 16, time: 0});
+            const data = await parseExcelToLocalWideJSON(file);
+            layer.msg('正在提交数据...', {icon: 16, time: 0});
+            var token = localStorage.getItem('token');
+            var headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            $.ajax({
+              url: window.apiConfig.baseURL + '/api/localdb/wide',
+              type: 'POST',
+              headers: headers,
+              data: JSON.stringify({ data }),
+              success: function(res) {
+                layer.closeAll();
+                if(res.success) { layer.msg('导入成功', {icon:1}); initWideTable(); }
+                else { layer.msg('导入失败: ' + (res.error||'未知错误'), {icon:2}); }
+              },
+              error: function(xhr) { layer.closeAll(); if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href='login.html'; }); } else { layer.msg('导入失败', {icon:2}); } }
+            });
+          } catch (err) {
+            layer.closeAll();
+            layer.msg('解析失败: ' + err.message, {icon:2});
           }
-          
-          $.ajax({
-            url: window.apiConfig.baseURL + '/api/localdb/wide/batch',
-            type: 'POST',
-            headers: headers,
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(res) {
-              if(res.success) {
-                layer.msg('导入成功: ' + res.message, {icon:1});
-                initWideTable();
-              } else {
-                layer.msg('导入失败: ' + res.error, {icon:2});
-              }
-            },
-            error: function(xhr) {
-              if (xhr.status === 401) {
-                layer.msg('请先登录', {icon:2}, function(){
-                  window.location.href = 'login.html';
-                });
-              } else {
-                layer.msg('导入失败', {icon:2});
-              }
-            }
-          });
         };
         input.click();
       });
@@ -1501,6 +1489,39 @@
         XLSX.utils.book_append_sheet(wb, ws, '记录模板');
         XLSX.writeFile(wb, 'records-template.xlsx');
       });
+
+      // 解析“本地数据库宽表”Excel → JSON
+      async function parseExcelToLocalWideJSON(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const wb = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        if (!rows.length) throw new Error('未识别到数据');
+        // 支持两种表头：
+        // A) SKU/产品中文名/网页链接/初始库存/日期列...
+        // B) 系统履约单号/店铺订单时间/SKU/商品数量（将聚合到今天日期列）
+        const first = rows[0];
+        const hasLocalWide = ('SKU' in first) && ('产品中文名' in first);
+        const hasTmallDetail = ('系统履约单号' in first) && ('店铺订单时间' in first) && ('SKU' in first) && ('商品数量' in first);
+        const todayKey = new Date().toISOString().split('T')[0];
+        if (hasLocalWide) {
+          // 直接返回为宽表结构
+          return rows.map(r => ({ ...r }));
+        } else if (hasTmallDetail) {
+          // 将明细聚合为本地宽表结构（以今天为库存列，数量累加）
+          const skuMap = {};
+          rows.forEach(r => {
+            const sku = String(r['SKU']).trim();
+            const qty = parseInt(r['商品数量'] || 0) || 0;
+            if (!sku) return;
+            if (!skuMap[sku]) skuMap[sku] = { SKU: sku, '产品中文名': '', '网页链接': '', '初始库存': 0 };
+            skuMap[sku][todayKey] = (skuMap[sku][todayKey] || 0) + qty;
+            skuMap[sku][todayKey + '_销量'] = 0;
+          });
+          return Object.values(skuMap);
+        }
+        throw new Error('无法识别表头，请提供“SKU/产品中文名/网页链接/初始库存”或“系统履约单号/店铺订单时间/SKU/商品数量”格式');
+      }
 
       $('#clearAllRecordDataBtn').on('click', function() {
         layer.confirm('⚠️ 警告：此操作将清空所有历史记录数据，且无法恢复！确定要继续吗？', {
