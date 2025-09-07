@@ -57,6 +57,29 @@ async function archiveOldDatesToRecords(env, keepDays = 5) {
     }
   }
 }
+
+// 计算销量：根据“初始库存”和各日期库存列计算 “日期_销量” 列
+function computeSalesForWideTableRows(rows) {
+  if (!Array.isArray(rows)) return rows;
+  return rows.map(row => {
+    const dateKeys = getDateKeysFromRow(row).sort();
+    if (dateKeys.length === 0) return row;
+    const initial = parseInt(row['初始库存'] || 0) || 0;
+    let prevStock = initial;
+    dateKeys.forEach((k, idx) => {
+      const currStock = parseInt(row[k] || 0) || 0;
+      let sales = 0;
+      if (idx === 0) {
+        sales = Math.max(0, prevStock - currStock);
+      } else {
+        sales = Math.max(0, prevStock - currStock);
+      }
+      row[k + '_销量'] = sales;
+      prevStock = currStock;
+    });
+    return row;
+  });
+}
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -615,6 +638,11 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
       }
       await archiveOldDatesToRecords(env, 5);
       data = wideTableCache;
+      // 读取后计算销量列
+      wideTableCache = computeSalesForWideTableRows(wideTableCache);
+      // 归档并返回
+      await archiveOldDatesToRecords(env, 5);
+      data = wideTableCache;
       return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
     }
     
@@ -672,7 +700,8 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           console.log('📤 批量JSON数据:', requestData);
           if (requestData && Array.isArray(requestData.data)) {
             wideTableCache = requestData.data;
-            // 持久化到R2
+            // 计算销量并持久化到R2
+            wideTableCache = computeSalesForWideTableRows(wideTableCache);
             if (env.R2_BUCKET) {
               try {
                 await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), {
@@ -998,6 +1027,8 @@ async function handleTmallOrders(request, env, path, method, corsHeaders) {
       if ((!data || data.length === 0) && env.R2_BUCKET) {
         try { const obj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY); if (obj) { const text = await obj.text(); const parsed = JSON.parse(text); if (Array.isArray(parsed)) { wideTableCache = parsed; data = parsed; } } } catch(e){ console.warn('读取R2宽表失败:', e); }
       }
+      // 在展平前，确保销量列已计算
+      wideTableCache = computeSalesForWideTableRows(wideTableCache);
       // 展平：把各日期列转换为行 {SKU, 店铺订单时间, 商品数量}
       const rows = [];
       (data || []).forEach(row => {
