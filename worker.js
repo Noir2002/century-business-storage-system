@@ -17,6 +17,11 @@ function formatYMD(d) {
 }
 // 将超过最近N天的数据从宽表归档到行记录
 async function archiveOldDatesToRecords(env, keepDays = 5) {
+  // 关闭自动归档：若未显式配置 ARCHIVE_KEEP_DAYS，则不做归档
+  const configured = env && env.ARCHIVE_KEEP_DAYS !== undefined && env.ARCHIVE_KEEP_DAYS !== null;
+  const effectiveKeepDays = configured ? parseInt(env.ARCHIVE_KEEP_DAYS) || 0 : 0;
+  if (effectiveKeepDays <= 0) return;
+  keepDays = effectiveKeepDays;
   if (!Array.isArray(wideTableCache) || wideTableCache.length === 0) return;
   const today = new Date();
   const keepSet = new Set(Array.from({length: keepDays}, (_,i)=>{
@@ -643,10 +648,8 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
       }
       await archiveOldDatesToRecords(env, 5);
       data = wideTableCache;
-      // 读取后计算销量列
+      // 读取后计算销量列（不归档，避免破坏前端列结构）
       wideTableCache = computeSalesForWideTableRows(wideTableCache);
-      // 归档并返回
-      await archiveOldDatesToRecords(env, 5);
       data = wideTableCache;
       return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
     }
@@ -715,7 +718,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
                 });
               } catch (e) { console.warn('写入R2宽表失败:', e); }
             }
-            await archiveOldDatesToRecords(env, 5);
+            // 不自动归档，保持列结构不变
           }
           
           return Response.json({ success: true, message: '批量数据上传成功', processed: requestData.data ? requestData.data.length : 0, data: Array.isArray(wideTableCache) ? wideTableCache : [] }, { headers: corsHeaders });
