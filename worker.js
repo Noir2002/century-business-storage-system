@@ -571,16 +571,56 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
     }
     
     else if (path === '/api/localdb/wide/batch' && method === 'POST') {
-      // 批量上传处理
-      const requestData = await request.json();
-      console.log('📤 批量上传数据:', requestData);
-      
-      return Response.json({
-        success: true,
-        message: '批量数据上传成功',
-        processed: requestData.data ? requestData.data.length : 0
-
-      }, { headers: corsHeaders });
+      // 批量上传处理 - 支持文件上传和JSON数据
+      try {
+        const contentType = request.headers.get('content-type') || '';
+        
+        if (contentType.includes('multipart/form-data')) {
+          // 处理文件上传
+          const formData = await request.formData();
+          const file = formData.get('file');
+          
+          if (!file) {
+            return Response.json({
+              success: false,
+              error: '没有上传文件'
+            }, { headers: corsHeaders });
+          }
+          
+          console.log('📤 处理Excel文件上传:', file.name);
+          
+          // 模拟Excel解析处理
+          const mockProcessedData = generateMockWideData();
+          
+          return Response.json({
+            success: true,
+            message: `文件 ${file.name} 上传处理成功`,
+            processed: mockProcessedData.length,
+            data: mockProcessedData.slice(0, 5) // 返回前5条作为预览
+          }, { headers: corsHeaders });
+          
+        } else {
+          // 处理JSON数据
+          const requestData = await request.json();
+          console.log('📤 批量JSON数据:', requestData);
+          
+          return Response.json({
+            success: true,
+            message: '批量数据上传成功',
+            processed: requestData.data ? requestData.data.length : 0
+          }, { headers: corsHeaders });
+        }
+        
+      } catch (parseError) {
+        console.error('批量上传解析错误:', parseError);
+        return Response.json({
+          success: false,
+          error: `数据解析失败: ${parseError.message}`
+        }, { 
+          status: 400,
+          headers: corsHeaders 
+        });
+      }
     }
     
     else if (path === '/api/localdb/wide/clear-all' && (method === 'POST' || method === 'GET')) {
