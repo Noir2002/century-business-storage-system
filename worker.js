@@ -542,8 +542,8 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
   try {
     // 宽表相关API
     if (path === '/api/localdb/wide' && method === 'GET') {
-      // 返回宽表数据：优先返回缓存，其次返回模拟数据
-      const data = (wideTableCache && wideTableCache.length) ? wideTableCache : generateMockWideData();
+      // 返回宽表数据：仅返回真实缓存（不再返回模拟数据）
+      const data = Array.isArray(wideTableCache) ? wideTableCache : [];
       return Response.json({
         success: true,
         data: data,
@@ -566,8 +566,8 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
     }
     
     else if (path === '/api/localdb/wide/export' && method === 'GET') {
-      // 导出宽表数据
-      const data = (wideTableCache && wideTableCache.length) ? wideTableCache : generateMockWideData();
+      // 导出宽表数据：仅导出真实缓存
+      const data = Array.isArray(wideTableCache) ? wideTableCache : [];
       return Response.json({
         success: true,
         data: data,
@@ -581,29 +581,18 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
         const contentType = request.headers.get('content-type') || '';
         
         if (contentType.includes('multipart/form-data')) {
-          // 处理文件上传
+          // 处理文件直传：当前不在服务端解析Excel，提示前端改为JSON上传
           const formData = await request.formData();
           const file = formData.get('file');
-          
           if (!file) {
-            return Response.json({
-              success: false,
-              error: '没有上传文件'
-            }, { headers: corsHeaders });
+            return Response.json({ success: false, error: '没有上传文件' }, { headers: corsHeaders });
           }
-          
-          console.log('📤 处理Excel文件上传:', file.name);
-          
-          // 模拟Excel解析处理（可替换为真实解析）
-          const mockProcessedData = generateMockWideData();
-          // 更新缓存，便于前端刷新后立即看到新数据
-          wideTableCache = mockProcessedData;
-          
+          console.log('📤 收到Excel文件直传(不解析):', file.name);
           return Response.json({
             success: true,
-            message: `文件 ${file.name} 上传处理成功`,
-            processed: mockProcessedData.length,
-            data: mockProcessedData.slice(0, 5) // 返回前5条作为预览
+            message: `文件 ${file.name} 已接收；请在前端解析后以JSON提交`,
+            processed: 0,
+            data: []
           }, { headers: corsHeaders });
           
         } else {
@@ -617,7 +606,8 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           return Response.json({
             success: true,
             message: '批量数据上传成功',
-            processed: requestData.data ? requestData.data.length : 0
+            processed: requestData.data ? requestData.data.length : 0,
+            data: Array.isArray(wideTableCache) ? wideTableCache : []
           }, { headers: corsHeaders });
         }
         

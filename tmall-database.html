@@ -314,28 +314,32 @@
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.xlsx,.xls,.csv';
-        input.onchange = function(e) {
+        input.onchange = async function(e) {
           const file = e.target.files[0];
           if (!file) return;
-          var token = localStorage.getItem('token');
-          var formData = new FormData();
-          formData.append('file', file);
-          var headers = {};
-          if (token) headers['Authorization'] = 'Bearer ' + token;
-          layer.msg('正在智能导入数据...', {icon: 16, time: 0});
-          $.ajax({
-            url: window.apiConfig.baseURL + '/api/tmall-orders/smart-import',
-            type: 'POST',
-            headers: headers,
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(res) {
-              layer.closeAll();
-              if(res.success) { layer.msg('智能导入成功: ' + res.message, {icon:1}); initWideTable(); if (currentMode === 'record') { renderRecordTable(); } } else { layer.msg('智能导入失败: ' + res.error, {icon:2}); }
-            },
-            error: function(xhr) { layer.closeAll(); if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('智能导入失败', {icon:2}); } }
-          });
+          try {
+            layer.msg('正在解析Excel...', {icon: 16, time: 0});
+            const data = await parseExcelToWideJSON(file);
+            layer.msg('正在提交数据...', {icon: 16, time: 0});
+            const token = localStorage.getItem('token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            $.ajax({
+              url: window.apiConfig.baseURL + '/api/tmall-orders/wide/batch',
+              type: 'POST',
+              headers: headers,
+              data: JSON.stringify({ data }),
+              success: function(res) {
+                layer.closeAll();
+                if(res.success) { layer.msg('导入成功', {icon:1}); initWideTable(); if (currentMode === 'record') { renderRecordTable(); } }
+                else { layer.msg('导入失败: ' + (res.error||'未知错误'), {icon:2}); }
+              },
+              error: function(xhr) { layer.closeAll(); if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导入失败', {icon:2}); } }
+            });
+          } catch (err) {
+            layer.closeAll();
+            layer.msg('解析失败: ' + err.message, {icon:2});
+          }
         };
         input.click();
       });
@@ -343,24 +347,28 @@
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.xlsx,.xls,.csv';
-        input.onchange = function(e) {
+        input.onchange = async function(e) {
           const file = e.target.files[0];
           if (!file) return;
-          var token = localStorage.getItem('token');
-          var formData = new FormData();
-          formData.append('file', file);
-          var headers = {};
-          if (token) headers['Authorization'] = 'Bearer ' + token;
-          $.ajax({
-            url: window.apiConfig.baseURL + '/api/tmall-orders/wide/batch',
-            type: 'POST',
-            headers: headers,
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(res) { if(res.success) { layer.msg('导入成功: ' + res.message, {icon:1}); initWideTable(); } else { layer.msg('导入失败: ' + res.error, {icon:2}); } },
-            error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导入失败', {icon:2}); } }
-          });
+          try {
+            layer.msg('正在解析Excel...', {icon: 16, time: 0});
+            const data = await parseExcelToWideJSON(file);
+            layer.msg('正在提交数据...', {icon: 16, time: 0});
+            const token = localStorage.getItem('token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            $.ajax({
+              url: window.apiConfig.baseURL + '/api/tmall-orders/wide/batch',
+              type: 'POST',
+              headers: headers,
+              data: JSON.stringify({ data }),
+              success: function(res) { layer.closeAll(); if(res.success) { layer.msg('导入成功', {icon:1}); initWideTable(); } else { layer.msg('导入失败: ' + (res.error||'未知错误'), {icon:2}); } },
+              error: function(xhr) { layer.closeAll(); if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导入失败', {icon:2}); } }
+            });
+          } catch (err) {
+            layer.closeAll();
+            layer.msg('解析失败: ' + err.message, {icon:2});
+          }
         };
         input.click();
       });
@@ -402,6 +410,34 @@
         XLSX.utils.book_append_sheet(wb, ws, '天猫宽表模板');
         XLSX.writeFile(wb, 'tmall-wide-table-template.xlsx');
       });
+
+      // 解析Excel为宽表JSON（系统履约单号/店铺订单时间/SKU/商品数量）
+      async function parseExcelToWideJSON(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const wb = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+        // 尝试根据常见中文列头自动匹配
+        const mapKey = (obj, keys) => keys.find(k => Object.prototype.hasOwnProperty.call(obj, k));
+        const data = rows.map((row, idx) => {
+          const idKey = mapKey(row, ['系统履约单号','系统履约单编号','系统履约单号 ']);
+          const timeKey = mapKey(row, ['店铺订单时间','下单时间','店铺下单时间']);
+          const skuKey = mapKey(row, ['SKU','Sku','sku']);
+          const qtyKey = mapKey(row, ['商品数量','数量','件数','qty','Qty']);
+
+          const item = {
+            '系统履约单号': idKey ? String(row[idKey]).trim() : String(row['A']||'').trim(),
+            '店铺订单时间': timeKey ? String(row[timeKey]).trim() : '',
+            'SKU': skuKey ? String(row[skuKey]).trim() : '',
+            '商品数量': qtyKey ? Number(row[qtyKey]||0) : 0
+          };
+          return item;
+        }).filter(x => x['系统履约单号'] || x['SKU']);
+
+        if (!data.length) throw new Error('未识别到有效数据，请检查表头是否为：系统履约单号/店铺订单时间/SKU/商品数量');
+        return data;
+      }
       $('#clearOldDataBtn').on('click', function() {
         layer.confirm('确定要清理5天前的数据吗？清理后的数据将移动到历史记录中。', function(index) {
           var token = localStorage.getItem('token');
