@@ -130,6 +130,7 @@
   </div>
   <script src="./src/modules/jquery.js"></script>
   <script src="./src/layui.js"></script>
+  <script src="./api-config.js"></script>
   <script>
     layui.use(['table', 'layer', 'form'], function(){
       var table = layui.table;
@@ -246,7 +247,7 @@
         var headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
         $.ajax({
-          url: '/api/tmall-orders/records',
+          url: window.apiConfig.baseURL + '/api/tmall-orders/records',
           type: 'GET',
           headers: headers,
           success: function(res) {
@@ -298,7 +299,7 @@
         if (token) headers['Authorization'] = 'Bearer ' + token;
         layer.msg('正在保存...', {icon: 16, time: 0});
         $.ajax({
-          url: '/api/tmall-orders/wide',
+          url: window.apiConfig.baseURL + '/api/tmall-orders/wide',
           type: 'POST',
           headers: headers,
           data: JSON.stringify({ data: data }),
@@ -323,7 +324,7 @@
           if (token) headers['Authorization'] = 'Bearer ' + token;
           layer.msg('正在智能导入数据...', {icon: 16, time: 0});
           $.ajax({
-            url: '/api/tmall-orders/smart-import',
+            url: window.apiConfig.baseURL + '/api/tmall-orders/smart-import',
             type: 'POST',
             headers: headers,
             data: formData,
@@ -351,7 +352,7 @@
           var headers = {};
           if (token) headers['Authorization'] = 'Bearer ' + token;
           $.ajax({
-            url: '/api/tmall-orders/wide/batch',
+            url: window.apiConfig.baseURL + '/api/tmall-orders/wide/batch',
             type: 'POST',
             headers: headers,
             data: formData,
@@ -368,7 +369,7 @@
         var headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
         $.ajax({
-          url: '/api/tmall-orders/wide/export',
+          url: window.apiConfig.baseURL + '/api/tmall-orders/wide/export',
           type: 'GET',
           headers: headers,
           xhrFields: { responseType: 'blob' },
@@ -407,7 +408,7 @@
           var headers = {};
           if (token) headers['Authorization'] = 'Bearer ' + token;
           $.ajax({
-            url: '/api/tmall-orders/wide/clear',
+            url: window.apiConfig.baseURL + '/api/tmall-orders/wide/clear',
             type: 'POST',
             headers: headers,
             success: function(res) { if(res.success) { layer.msg('清理成功: ' + res.message, {icon:1}); initWideTable(); } else { layer.msg('清理失败: ' + res.error, {icon:2}); } },
@@ -424,7 +425,7 @@
           var headers = {};
           if (token) headers['Authorization'] = 'Bearer ' + token;
           $.ajax({
-            url: '/api/tmall-orders/wide/clear-all',
+            url: window.apiConfig.baseURL + '/api/tmall-orders/wide/clear-all',
             type: 'POST',
             headers: headers,
             success: function(res) { if(res.success) { layer.msg('清空成功: ' + res.message, {icon:1}); initWideTable(); } else { layer.msg('清空失败: ' + res.error, {icon:2}); } },
@@ -448,7 +449,7 @@
           var headers = {};
           if (token) headers['Authorization'] = 'Bearer ' + token;
           $.ajax({
-            url: '/api/tmall-orders/records/batch',
+            url: window.apiConfig.baseURL + '/api/tmall-orders/records/batch',
             type: 'POST',
             headers: headers,
             data: formData,
@@ -465,7 +466,7 @@
         var headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
         $.ajax({
-          url: '/api/tmall-orders/records/export',
+          url: window.apiConfig.baseURL + '/api/tmall-orders/records/export',
           type: 'GET',
           headers: headers,
           xhrFields: { responseType: 'blob' },
@@ -499,7 +500,7 @@
           var headers = {};
           if (token) headers['Authorization'] = 'Bearer ' + token;
           $.ajax({
-            url: '/api/tmall-orders/records/clear-all',
+            url: window.apiConfig.baseURL + '/api/tmall-orders/records/clear-all',
             type: 'POST',
             headers: headers,
             success: function(res) { if(res.success) { layer.msg('清空成功: ' + res.message, {icon:1}); renderRecordTable(); } else { layer.msg('清空失败: ' + res.error, {icon:2}); } },
@@ -527,7 +528,7 @@
             var headers = {};
             if (token) headers['Authorization'] = 'Bearer ' + token;
             $.ajax({
-              url: '/api/tmall-orders/records/'+data.id,
+              url: window.apiConfig.baseURL + '/api/tmall-orders/records/'+data.id,
               type: 'DELETE',
               headers: headers,
               success: function(res){ if(res.success){ layer.msg('删除成功', {icon:1}); renderRecordTable(); }else{ layer.msg('删除失败: '+res.error, {icon:2}); } },
@@ -540,7 +541,7 @@
       form.on('submit(submitEdit)', function(formObj){
         var editId = $('#editFormModal').data('editId');
         var method = editId ? 'PUT' : 'POST';
-        var url = '/api/tmall-orders/records' + (editId ? ('/'+editId) : '');
+        var url = window.apiConfig.baseURL + '/api/tmall-orders/records' + (editId ? ('/'+editId) : '');
         var data = {
           SKU: formObj.field.sku,
           '产品中文名': formObj.field.name,

@@ -43,6 +43,8 @@ export default {
           return await handleAnalyticsData(request, env, path, method, corsHeaders);
         } else if (path.startsWith('/api/localdb/')) {
           return await handleLocalDB(request, env, path, method, corsHeaders);
+        } else if (path.startsWith('/api/tmall-orders/')) {
+          return await handleTmallOrders(request, env, path, method, corsHeaders);
         } else if (path.startsWith('/api/r2/')) {
           return await handleR2Routes(request, env, path, method, corsHeaders);
         } else {
@@ -577,6 +579,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
         success: true,
         message: '批量数据上传成功',
         processed: requestData.data ? requestData.data.length : 0
+
       }, { headers: corsHeaders });
     }
     
@@ -860,5 +863,37 @@ async function handleR2Routes(request, env, path, method, corsHeaders) {
   } catch (error) {
     console.error('R2路由错误:', error);
     return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+  }
+}
+
+// 处理天猫订单API请求 - 映射到localdb功能
+async function handleTmallOrders(request, env, path, method, corsHeaders) {
+  console.log('🔄 处理天猫订单请求:', path);
+  
+  try {
+    // 将tmall-orders路径映射到localdb路径
+    let mappedPath = path.replace('/api/tmall-orders/', '/api/localdb/');
+    
+    // 特殊路径映射
+    if (path.includes('/smart-import')) {
+      mappedPath = '/api/localdb/wide/batch';
+    } else if (path.includes('/clear')) {
+      mappedPath = mappedPath.replace('/clear', '/clear-all');
+    }
+    
+    console.log(`📍 路径映射: ${path} → ${mappedPath}`);
+    
+    // 调用现有的localdb处理函数
+    return await handleLocalDB(request, env, mappedPath, method, corsHeaders);
+    
+  } catch (error) {
+    console.error('❌ 天猫订单API错误:', error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { 
+      status: 500,
+      headers: corsHeaders 
+    });
   }
 }

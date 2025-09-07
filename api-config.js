@@ -12,15 +12,15 @@ class APIConfig {
     
     // 根据环境设置API基础URL（终极方案：同源 Worker 托管）
     if (override === 'workers') {
-      this.baseURL = 'https://century-business-api.anthonin815.workers.dev';
+      this.baseURL = 'https://century-business-system.anthonin815.workers.dev';
     } else if (override === 'local') {
       this.baseURL = 'http://localhost:3000';
     } else {
       if (this.isLocal) {
         this.baseURL = 'http://localhost:3000';
       } else if (this.isPages) {
-        // 在 Pages 环境可以继续指向 Workers 子域
-        this.baseURL = 'https://century-business-api.anthonin815.workers.dev';
+        // 在 Pages 环境可以继续指向 Workers 子域（使用正确的Worker名称）
+        this.baseURL = 'https://century-business-system.anthonin815.workers.dev';
       } else {
         // 自定义域统一同源
         this.baseURL = window.location.origin;
