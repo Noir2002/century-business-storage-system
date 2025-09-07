@@ -1,4 +1,6 @@
 // 简化的Cloudflare Workers - 专注于Excel文件上传到R2
+// 轻量级内存缓存：用于在同一 Worker 实例中暂存“宽表”数据，便于上传后即时刷新
+let wideTableCache = [];
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -540,12 +542,12 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
   try {
     // 宽表相关API
     if (path === '/api/localdb/wide' && method === 'GET') {
-      // 返回宽表数据
-      const mockWideData = generateMockWideData();
+      // 返回宽表数据：优先返回缓存，其次返回模拟数据
+      const data = (wideTableCache && wideTableCache.length) ? wideTableCache : generateMockWideData();
       return Response.json({
         success: true,
-        data: mockWideData,
-        total: mockWideData.length
+        data: data,
+        total: data.length
       }, { headers: corsHeaders });
     }
     
@@ -553,6 +555,9 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
       // 保存宽表数据
       const requestData = await request.json();
       console.log('💾 保存宽表数据:', requestData);
+      if (requestData && Array.isArray(requestData.data)) {
+        wideTableCache = requestData.data;
+      }
       return Response.json({
         success: true,
         message: '宽表数据保存成功',
@@ -562,10 +567,10 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
     
     else if (path === '/api/localdb/wide/export' && method === 'GET') {
       // 导出宽表数据
-      const mockWideData = generateMockWideData();
+      const data = (wideTableCache && wideTableCache.length) ? wideTableCache : generateMockWideData();
       return Response.json({
         success: true,
-        data: mockWideData,
+        data: data,
         message: '宽表数据导出成功'
       }, { headers: corsHeaders });
     }
@@ -589,8 +594,10 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           
           console.log('📤 处理Excel文件上传:', file.name);
           
-          // 模拟Excel解析处理
+          // 模拟Excel解析处理（可替换为真实解析）
           const mockProcessedData = generateMockWideData();
+          // 更新缓存，便于前端刷新后立即看到新数据
+          wideTableCache = mockProcessedData;
           
           return Response.json({
             success: true,
@@ -603,6 +610,9 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           // 处理JSON数据
           const requestData = await request.json();
           console.log('📤 批量JSON数据:', requestData);
+          if (requestData && Array.isArray(requestData.data)) {
+            wideTableCache = requestData.data;
+          }
           
           return Response.json({
             success: true,
@@ -624,7 +634,8 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
     }
     
     else if (path === '/api/localdb/wide/clear-all' && (method === 'POST' || method === 'GET')) {
-      // 直接返回成功（占位实现）；支持 POST/GET 方便浏览器直接验证
+      // 清空缓存并返回成功；支持 POST/GET 方便浏览器直接验证
+      wideTableCache = [];
       return Response.json({ success: true, message: '成功清空所有宽表数据' }, { headers: corsHeaders });
     }
     
@@ -915,10 +926,13 @@ async function handleTmallOrders(request, env, path, method, corsHeaders) {
     let mappedPath = path.replace('/api/tmall-orders/', '/api/localdb/');
     
     // 特殊路径映射
-    if (path.includes('/smart-import')) {
+    if (path.endsWith('/smart-import')) {
       mappedPath = '/api/localdb/wide/batch';
-    } else if (path.includes('/clear')) {
-      mappedPath = mappedPath.replace('/clear', '/clear-all');
+    } else if (path.endsWith('/wide/clear-all')) {
+      // 明确处理 clear-all，避免将 "clear-all" 再次替换成 "clear-all-all"
+      mappedPath = '/api/localdb/wide/clear-all';
+    } else if (path.endsWith('/wide/clear')) {
+      mappedPath = '/api/localdb/wide/clear-all';
     }
     
     console.log(`📍 路径映射: ${path} → ${mappedPath}`);
