@@ -730,26 +730,20 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
 // 生成模拟宽表数据
 function generateMockWideData() {
   const data = [];
-  const categories = ['手机', '平板', '笔记本', '配件', '耳机'];
-  const suppliers = ['供应商A', '供应商B', '供应商C', '供应商D'];
-  
+  const now = Date.now();
+  const format = (d) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const dt = new Date(d);
+    return `${dt.getFullYear()}/${pad(dt.getMonth()+1)}/${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+  };
   for (let i = 1; i <= 50; i++) {
     data.push({
-      id: i,
-      SKU: `SKU${String(i).padStart(6, '0')}`,
-      商品名称: `商品${i}`,
-      分类: categories[Math.floor(Math.random() * categories.length)],
-      供应商: suppliers[Math.floor(Math.random() * suppliers.length)],
-      最新库存: Math.floor(Math.random() * 1000) + 10,
-      动态库存: Math.floor(Math.random() * 1000) + 10,
-      销售数量: Math.floor(Math.random() * 100),
-      单价: (Math.random() * 2000 + 100).toFixed(2),
-      成本: (Math.random() * 1000 + 50).toFixed(2),
-      状态: Math.random() > 0.1 ? '正常' : '缺货',
-      最后更新: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      '系统履约单号': `${Date.now()}${String(i).padStart(4,'0')}`,
+      '店铺订单时间': format(now - i * 1234567),
+      'SKU': `X${String(774305 + i).padStart(6,'0')}NA`,
+      '商品数量': 1
     });
   }
-  
   return data;
 }
 
