@@ -10,8 +10,8 @@ workers_dev = true
 
 # 静态资源（Workers Sites / Assets）
 [assets]
+directory = "."
 binding = "ASSETS"
-bucket = "."
 
 # R2存储绑定
 [[r2_buckets]]
