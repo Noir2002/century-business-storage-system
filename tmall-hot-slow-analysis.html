@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="src/css/layui.css">
   <script src="src/modules/jquery.js"></script>
   <script src="src/layui.js"></script>
+  <script src="api-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
   <style>
     body { background: #f8f9fa; }
@@ -141,7 +142,7 @@
         var headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
         $.ajax({
-          url: '/api/tmall-orders/wide',
+          url: window.apiConfig.baseURL + '/api/tmall-orders/wide',
           type: 'GET',
           headers: headers,
           success: function(res) {
