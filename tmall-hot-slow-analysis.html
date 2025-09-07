@@ -156,6 +156,22 @@
           error: function() { layer.msg('数据加载失败', {icon:2}); }
         });
       }
+      function normalizeDateToYMD(value){
+        if (value === undefined || value === null) return '';
+        if (typeof value === 'number' && isFinite(value)) {
+          const epoch = new Date(Date.UTC(1899, 11, 30));
+          const d = new Date(epoch.getTime() + value * 86400000);
+          return d.toISOString().split('T')[0];
+        }
+        let s = String(value).trim();
+        if (!s) return '';
+        s = s.replace(/[.]/g, '-').replace(/\//g, '-');
+        const onlyDate = s.split(' ')[0];
+        if (/^\d{8}$/.test(onlyDate)) return `${onlyDate.slice(0,4)}-${onlyDate.slice(4,6)}-${onlyDate.slice(6,8)}`;
+        const d = new Date(onlyDate);
+        if (!isNaN(d)) return d.toISOString().split('T')[0];
+        return '';
+      }
       function processData() {
         // 1. 过滤时间范围
         var now = new Date();
@@ -168,11 +184,7 @@
           var timeRaw = row['店铺订单时间'] || row['订单时间'] || row['时间'];
           var qty = parseInt(row['商品数量'] || row['数量'] || 0);
           if (!sku || !timeRaw || !qty) return;
-          var dateStr = '';
-          try {
-            var d = new Date(timeRaw.replace(/[./]/g, '-'));
-            if (!isNaN(d)) dateStr = d.toISOString().split('T')[0];
-          } catch(e) {}
+          var dateStr = normalizeDateToYMD(timeRaw);
           if (!dateStr) return;
           if (new Date(dateStr) < startDate) return;
           if (!skuMap[sku]) skuMap[sku] = { sku: sku, totalSales: 0, salesByDate: {}, salesList: [] };
