@@ -22,8 +22,14 @@ class APIConfig {
         // 在 Pages 环境可以继续指向 Workers 子域（使用正确的Worker名称）
         this.baseURL = 'https://century-business-system.anthonin815.workers.dev';
       } else {
-        // 自定义域统一同源
-        this.baseURL = window.location.origin;
+        // 对于自定义域名，检查是否有存储的Worker URL，否则使用默认
+        const storedWorkerUrl = localStorage.getItem('workerBaseURL');
+        if (storedWorkerUrl) {
+          this.baseURL = storedWorkerUrl;
+        } else {
+          // 使用正确的Worker URL
+          this.baseURL = 'https://century-business-system.anthonin815.workers.dev';
+        }
       }
     }
     
@@ -72,6 +78,13 @@ class APIConfig {
       
       throw error;
     }
+  }
+  
+  // 设置Worker URL的便捷方法
+  setWorkerURL(workerUrl) {
+    this.baseURL = workerUrl;
+    localStorage.setItem('workerBaseURL', workerUrl);
+    console.log('✅ Worker URL已更新:', this.baseURL);
   }
   
   // 便捷方法
