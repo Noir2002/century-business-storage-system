@@ -2,8 +2,10 @@
 // 轻量级内存缓存：用于在同一 Worker 实例中暂存“宽表”数据，便于上传后即时刷新
 let wideTableCache = [];
 let recordsCache = [];
+let tmallWideCache = [];
 const WIDE_TABLE_R2_KEY = 'wide/latest.json';
 const RECORDS_R2_KEY = 'records/latest.json';
+const TMALL_WIDE_R2_KEY = 'tmall/wide.json';
 
 // 工具：获取日期键（YYYY-MM-DD）
 function getDateKeysFromRow(row) {
@@ -1028,30 +1030,28 @@ async function handleTmallOrders(request, env, path, method, corsHeaders) {
   console.log('🔄 处理天猫订单请求:', path);
   
   try {
-    // 专用：/api/tmall-orders/wide GET -> 返回按天明细行，供分析页面使用
-    if (path === '/api/tmall-orders/wide' && method === 'GET') {
-      // 确保有最新宽表数据（内存 / R2）
-      let data = Array.isArray(wideTableCache) ? wideTableCache : [];
-      if ((!data || data.length === 0) && env.R2_BUCKET) {
-        try { const obj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY); if (obj) { const text = await obj.text(); const parsed = JSON.parse(text); if (Array.isArray(parsed)) { wideTableCache = parsed; data = parsed; } } } catch(e){ console.warn('读取R2宽表失败:', e); }
+    // 天猫数据库专用：/api/tmall-orders/wide
+    if (path === '/api/tmall-orders/wide') {
+      if (method === 'GET') {
+        // 返回天猫数据库宽表（不依赖本地数据库逻辑）
+        let data = Array.isArray(tmallWideCache) ? tmallWideCache : [];
+        if ((!data || data.length === 0) && env.R2_BUCKET) {
+          try { const obj = await env.R2_BUCKET.get(TMALL_WIDE_R2_KEY); if (obj) { const text = await obj.text(); const parsed = JSON.parse(text); if (Array.isArray(parsed)) { tmallWideCache = parsed; data = parsed; } } } catch(e){ console.warn('读取R2天猫宽表失败:', e); }
+        }
+        return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
       }
-      // 在展平前，确保销量列已计算
-      wideTableCache = computeSalesForWideTableRows(wideTableCache);
-      // 展平：把各日期列转换为行 {SKU, 店铺订单时间, 商品数量}
-      const rows = [];
-      (data || []).forEach(row => {
-        const dateKeys = getDateKeysFromRow(row);
-        dateKeys.forEach(k => {
-          const sales = parseInt(row[k + '_销量']) || 0; // 优先使用已计算的销量
-          // 若没有销量字段，也可使用库存变化，但这里保守用0
-          rows.push({
-            SKU: row.SKU || '',
-            '店铺订单时间': k,
-            '商品数量': sales
-          });
-        });
-      });
-      return Response.json({ success: true, data: rows }, { headers: corsHeaders });
+      if (method === 'POST') {
+        // 保存天猫数据库宽表（前端应已完成解析与计算）
+        const body = await request.json();
+        if (body && Array.isArray(body.data)) {
+          tmallWideCache = body.data;
+          if (env.R2_BUCKET) {
+            try { await env.R2_BUCKET.put(TMALL_WIDE_R2_KEY, JSON.stringify(tmallWideCache), { httpMetadata:{ contentType:'application/json' } }); } catch(e){ console.warn('写入R2天猫宽表失败:', e); }
+          }
+          return Response.json({ success: true, message: '已保存', total: tmallWideCache.length }, { headers: corsHeaders });
+        }
+        return Response.json({ success:false, error:'数据格式不正确' }, { headers: corsHeaders, status:400 });
+      }
     }
 
     // 将tmall-orders路径映射到localdb路径
