@@ -109,14 +109,20 @@ var worker_default = {
           return Response.json({ success: true, service: "worker", time: (/* @__PURE__ */ new Date()).toISOString() }, { headers: corsHeaders });
         } else if (path === "/api/files/upload" && method === "POST") {
           return await handleExcelUpload(request, env, corsHeaders);
+        } else if (path === "/api/package/upload" && method === "POST") {
+          return await handlePackageUpload(request, env, corsHeaders);
         } else if (path === "/api/files" && method === "GET") {
           return await handleFilesList(request, env, corsHeaders);
+        } else if (path === "/api/package/files" && method === "GET") {
+          return await handlePackageFilesList(request, env, corsHeaders);
         } else if (path === "/api/files/presigned-url" && method === "POST") {
           return await handlePresignedUrl(request, env, corsHeaders);
         } else if (path === "/api/files/parse" && method === "POST") {
           return await handleExcelParse(request, env, corsHeaders);
         } else if (path.startsWith("/api/files/") && method === "GET" && path.endsWith("/download")) {
           return await handleFileDownload(request, env, path, corsHeaders);
+        } else if (path.startsWith("/api/package/") && method === "GET" && path.endsWith("/download")) {
+          return await handlePackageFileDownload(request, env, path, corsHeaders);
         } else if (path.startsWith("/api/files/") && method === "GET" && path.endsWith("/analyze")) {
           return await handleFileAnalyze(request, env, path, corsHeaders);
         } else if (path.startsWith("/api/inventory/")) {
@@ -156,6 +162,65 @@ var worker_default = {
     }
   }
 };
+async function handlePackageUpload(request, env, corsHeaders) {
+  console.log("\u{1F504} \u5904\u7406\u6253\u5305\u7CFB\u7EDF\u6587\u4EF6\u4E0A\u4F20...");
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file");
+    const description = formData.get("description") || "";
+    if (!file) {
+      return Response.json({
+        success: false,
+        error: "\u6CA1\u6709\u4E0A\u4F20\u6587\u4EF6"
+      }, { headers: corsHeaders });
+    }
+    const timestamp = Date.now();
+    const randomSuffix = Math.round(Math.random() * 1e9);
+    const fileExtension = getFileExtension(file.name);
+    const fileName = `${timestamp}-${randomSuffix}.${fileExtension}`;
+    const filePath = `package/${fileName}`;
+    console.log(`\u{1F4C1} \u4E0A\u4F20\u6587\u4EF6\u8DEF\u5F84: ${filePath}`);
+    if (env.R2_BUCKET) {
+      console.log("\u{1F4E6} \u4F7F\u7528R2 Bucket\u4E0A\u4F20...");
+      await env.R2_BUCKET.put(filePath, file.stream(), {
+        httpMetadata: {
+          contentType: file.type || "application/octet-stream"
+        },
+        customMetadata: {
+          originalName: file.name,
+          uploadTime: (/* @__PURE__ */ new Date()).toISOString(),
+          description
+        }
+      });
+    } else {
+      throw new Error("R2\u5B58\u50A8\u6876\u4E0D\u53EF\u7528");
+    }
+    const fileInfo = {
+      id: timestamp,
+      originalName: file.name,
+      fileName,
+      size: file.size,
+      uploadTime: (/* @__PURE__ */ new Date()).toISOString(),
+      uploadedBy: "package-system",
+      description,
+      r2Path: filePath,
+      publicUrl: `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${filePath}`
+    };
+    console.log("\u2705 \u6253\u5305\u7CFB\u7EDF\u6587\u4EF6\u4E0A\u4F20\u6210\u529F:", fileName);
+    return Response.json({
+      success: true,
+      message: "\u6587\u4EF6\u4E0A\u4F20\u6210\u529F",
+      file: fileInfo
+    }, { headers: corsHeaders });
+  } catch (error) {
+    console.error("\u274C \u6253\u5305\u7CFB\u7EDF\u6587\u4EF6\u4E0A\u4F20\u5931\u8D25:", error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { status: 500, headers: corsHeaders });
+  }
+}
+__name(handlePackageUpload, "handlePackageUpload");
 async function handleExcelUpload(request, env, corsHeaders) {
   console.log("\u{1F504} \u5904\u7406Excel\u6587\u4EF6\u4E0A\u4F20...");
   try {
@@ -224,6 +289,47 @@ async function handleExcelUpload(request, env, corsHeaders) {
   }
 }
 __name(handleExcelUpload, "handleExcelUpload");
+async function handlePackageFilesList(request, env, corsHeaders) {
+  console.log("\u{1F504} \u83B7\u53D6\u6253\u5305\u6587\u4EF6\u5217\u8868...");
+  try {
+    if (!env.R2_BUCKET) {
+      throw new Error("R2\u5B58\u50A8\u6876\u4E0D\u53EF\u7528");
+    }
+    const list = await env.R2_BUCKET.list({ prefix: "package/" });
+    const files = [];
+    for (const obj of list.objects) {
+      try {
+        const fileObj = await env.R2_BUCKET.get(obj.key);
+        if (fileObj) {
+          files.push({
+            id: extractIdFromFileName(obj.key),
+            originalName: fileObj.customMetadata?.originalName || obj.key.split("/").pop(),
+            fileName: obj.key.split("/").pop(),
+            size: obj.size,
+            uploadTime: fileObj.customMetadata?.uploadTime || obj.uploaded.toISOString(),
+            description: fileObj.customMetadata?.description || "",
+            r2Path: obj.key,
+            publicUrl: `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${obj.key}`
+          });
+        }
+      } catch (err) {
+        console.warn("\u83B7\u53D6\u6587\u4EF6\u5143\u6570\u636E\u5931\u8D25:", obj.key, err.message);
+      }
+    }
+    console.log(`\u2705 \u627E\u5230 ${files.length} \u4E2A\u6253\u5305\u6587\u4EF6`);
+    return Response.json({
+      success: true,
+      files
+    }, { headers: corsHeaders });
+  } catch (error) {
+    console.error("\u274C \u83B7\u53D6\u6253\u5305\u6587\u4EF6\u5217\u8868\u5931\u8D25:", error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { status: 500, headers: corsHeaders });
+  }
+}
+__name(handlePackageFilesList, "handlePackageFilesList");
 async function handleFilesList(request, env, corsHeaders) {
   console.log("\u{1F504} \u83B7\u53D6\u6587\u4EF6\u5217\u8868...");
   try {
@@ -753,6 +859,35 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
   }
 }
 __name(handleLocalDB, "handleLocalDB");
+function extractIdFromFileName(filePath) {
+  const fileName = filePath.split("/").pop();
+  const match = fileName.match(/^(\d+)-/);
+  return match ? match[1] : fileName;
+}
+__name(extractIdFromFileName, "extractIdFromFileName");
+async function handlePackageFileDownload(request, env, path, corsHeaders) {
+  try {
+    const id = path.split("/")[3];
+    if (!env.R2_BUCKET) throw new Error("R2\u5B58\u50A8\u6876\u4E0D\u53EF\u7528");
+    const list = await env.R2_BUCKET.list({ prefix: "package/" });
+    const match = list.objects.find((o) => o.key.includes(id));
+    if (!match) {
+      return Response.json({ success: false, error: "\u6587\u4EF6\u4E0D\u5B58\u5728" }, { status: 404, headers: corsHeaders });
+    }
+    const obj = await env.R2_BUCKET.get(match.key);
+    if (!obj) {
+      return Response.json({ success: false, error: "\u6587\u4EF6\u4E0D\u5B58\u5728" }, { status: 404, headers: corsHeaders });
+    }
+    const headers = new Headers(corsHeaders);
+    headers.set("Content-Type", obj.httpMetadata?.contentType || "application/octet-stream");
+    headers.set("Content-Disposition", `attachment; filename="${obj.customMetadata?.originalName || "download"}"`);
+    return new Response(obj.body, { headers });
+  } catch (error) {
+    console.error("\u4E0B\u8F7D\u6253\u5305\u6587\u4EF6\u5931\u8D25:", error);
+    return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+  }
+}
+__name(handlePackageFileDownload, "handlePackageFileDownload");
 async function handleFileDownload(request, env, path, corsHeaders) {
   try {
     const id = path.split("/")[3];

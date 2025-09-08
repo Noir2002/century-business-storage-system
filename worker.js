@@ -115,14 +115,20 @@ export default {
           return Response.json({ success: true, service: 'worker', time: new Date().toISOString() }, { headers: corsHeaders });
         } else if (path === '/api/files/upload' && method === 'POST') {
           return await handleExcelUpload(request, env, corsHeaders);
+        } else if (path === '/api/package/upload' && method === 'POST') {
+          return await handlePackageUpload(request, env, corsHeaders);
         } else if (path === '/api/files' && method === 'GET') {
           return await handleFilesList(request, env, corsHeaders);
+        } else if (path === '/api/package/files' && method === 'GET') {
+          return await handlePackageFilesList(request, env, corsHeaders);
         } else if (path === '/api/files/presigned-url' && method === 'POST') {
           return await handlePresignedUrl(request, env, corsHeaders);
         } else if (path === '/api/files/parse' && method === 'POST') {
           return await handleExcelParse(request, env, corsHeaders);
         } else if (path.startsWith('/api/files/') && method === 'GET' && path.endsWith('/download')) {
           return await handleFileDownload(request, env, path, corsHeaders);
+        } else if (path.startsWith('/api/package/') && method === 'GET' && path.endsWith('/download')) {
+          return await handlePackageFileDownload(request, env, path, corsHeaders);
         } else if (path.startsWith('/api/files/') && method === 'GET' && path.endsWith('/analyze')) {
           return await handleFileAnalyze(request, env, path, corsHeaders);
         } else if (path.startsWith('/api/inventory/')) {
@@ -166,6 +172,78 @@ export default {
     }
   }
 };
+
+// 处理打包系统文件上传（支持所有文件类型）
+async function handlePackageUpload(request, env, corsHeaders) {
+  console.log('🔄 处理打包系统文件上传...');
+  
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file');
+    const description = formData.get('description') || '';
+    
+    if (!file) {
+      return Response.json({
+        success: false,
+        error: '没有上传文件'
+      }, { headers: corsHeaders });
+    }
+
+    // 生成文件名
+    const timestamp = Date.now();
+    const randomSuffix = Math.round(Math.random() * 1E9);
+    const fileExtension = getFileExtension(file.name);
+    const fileName = `${timestamp}-${randomSuffix}.${fileExtension}`;
+    const filePath = `package/${fileName}`;
+    
+    console.log(`📁 上传文件路径: ${filePath}`);
+
+    // 上传到R2
+    if (env.R2_BUCKET) {
+      console.log('📦 使用R2 Bucket上传...');
+      await env.R2_BUCKET.put(filePath, file.stream(), {
+        httpMetadata: {
+          contentType: file.type || 'application/octet-stream',
+        },
+        customMetadata: {
+          originalName: file.name,
+          uploadTime: new Date().toISOString(),
+          description: description
+        }
+      });
+    } else {
+      throw new Error('R2存储桶不可用');
+    }
+    
+    // 构建文件信息
+    const fileInfo = {
+      id: timestamp,
+      originalName: file.name,
+      fileName: fileName,
+      size: file.size,
+      uploadTime: new Date().toISOString(),
+      uploadedBy: 'package-system',
+      description: description,
+      r2Path: filePath,
+      publicUrl: `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${filePath}`
+    };
+
+    console.log('✅ 打包系统文件上传成功:', fileName);
+    
+    return Response.json({
+      success: true,
+      message: '文件上传成功',
+      file: fileInfo
+    }, { headers: corsHeaders });
+
+  } catch (error) {
+    console.error('❌ 打包系统文件上传失败:', error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { status: 500, headers: corsHeaders });
+  }
+}
 
 // 处理Excel文件上传
 async function handleExcelUpload(request, env, corsHeaders) {
@@ -247,6 +325,56 @@ async function handleExcelUpload(request, env, corsHeaders) {
       status: 500,
       headers: corsHeaders 
     });
+  }
+}
+
+// 获取打包文件列表
+async function handlePackageFilesList(request, env, corsHeaders) {
+  console.log('🔄 获取打包文件列表...');
+
+  try {
+    if (!env.R2_BUCKET) {
+      throw new Error('R2存储桶不可用');
+    }
+
+    // 列出 package/ 前缀下的所有文件
+    const list = await env.R2_BUCKET.list({ prefix: 'package/' });
+    
+    const files = [];
+    for (const obj of list.objects) {
+      try {
+        // 获取文件元数据
+        const fileObj = await env.R2_BUCKET.get(obj.key);
+        if (fileObj) {
+          files.push({
+            id: extractIdFromFileName(obj.key),
+            originalName: fileObj.customMetadata?.originalName || obj.key.split('/').pop(),
+            fileName: obj.key.split('/').pop(),
+            size: obj.size,
+            uploadTime: fileObj.customMetadata?.uploadTime || obj.uploaded.toISOString(),
+            description: fileObj.customMetadata?.description || '',
+            r2Path: obj.key,
+            publicUrl: `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${obj.key}`
+          });
+        }
+      } catch (err) {
+        console.warn('获取文件元数据失败:', obj.key, err.message);
+      }
+    }
+
+    console.log(`✅ 找到 ${files.length} 个打包文件`);
+    
+    return Response.json({
+      success: true,
+      files: files
+    }, { headers: corsHeaders });
+
+  } catch (error) {
+    console.error('❌ 获取打包文件列表失败:', error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { status: 500, headers: corsHeaders });
   }
 }
 
@@ -879,6 +1007,42 @@ function generateMockRecords() {
   }
   
   return records.sort((a, b) => new Date(b.uploadTime) - new Date(a.uploadTime));
+}
+
+// 从文件名中提取ID
+function extractIdFromFileName(filePath) {
+  const fileName = filePath.split('/').pop();
+  const match = fileName.match(/^(\d+)-/);
+  return match ? match[1] : fileName;
+}
+
+// 下载打包文件
+async function handlePackageFileDownload(request, env, path, corsHeaders) {
+  try {
+    const id = path.split('/')[3];
+    if (!env.R2_BUCKET) throw new Error('R2存储桶不可用');
+    
+    // 在 package/ 前缀下查找包含该ID的文件
+    const list = await env.R2_BUCKET.list({ prefix: 'package/' });
+    const match = list.objects.find(o => o.key.includes(id));
+    
+    if (!match) {
+      return Response.json({ success: false, error: '文件不存在' }, { status: 404, headers: corsHeaders });
+    }
+    
+    const obj = await env.R2_BUCKET.get(match.key);
+    if (!obj) {
+      return Response.json({ success: false, error: '文件不存在' }, { status: 404, headers: corsHeaders });
+    }
+    
+    const headers = new Headers(corsHeaders);
+    headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
+    headers.set('Content-Disposition', `attachment; filename="${(obj.customMetadata?.originalName)||'download'}"`);
+    return new Response(obj.body, { headers });
+  } catch (error) {
+    console.error('下载打包文件失败:', error);
+    return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+  }
 }
 
 // 下载文件：将 R2 对象流式返回

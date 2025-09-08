@@ -1817,7 +1817,7 @@
                         formData.append('description', `LP号:${lpNumber} 文件夹:${folderName}`);
                         
                         const baseURL = getBaseURL();
-                        const uploadResponse = await fetch(`${baseURL}/api/files/upload`, {
+                        const uploadResponse = await fetch(`${baseURL}/api/package/upload`, {
                             method: 'POST',
                             body: formData
                         });
@@ -1840,7 +1840,7 @@
                             contractNumber: contractNumber,
                             size: file.size,
                             url: uploadResult.file.publicUrl || '',
-                            downloadUrl: `${baseURL}/api/files/${uploadResult.file.id}/download`,
+                            downloadUrl: `${baseURL}/api/package/${uploadResult.file.id}/download`,
                             uploadTime: uploadResult.file.uploadTime || new Date().toISOString(),
                             r2Path: uploadResult.file.r2Path,
                             id: uploadResult.file.id
@@ -3535,7 +3535,7 @@
         async function loadServerFiles() {
             try {
                 const baseURL = getBaseURL();
-                const response = await fetch(`${baseURL}/api/files`);
+                const response = await fetch(`${baseURL}/api/package/files`);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -3548,12 +3548,12 @@
                         const fileRecord = {
                             name: file.originalName,
                             fileName: file.fileName,
-                            folder: extractFolderFromPath(file.r2Path || ''),
+                            folder: extractFolderFromDescription(file.description || ''),
                             lpNumber: extractLPFromDescription(file.description || ''),
                             contractNumber: '',
                             size: file.size,
                             url: file.publicUrl || '',
-                            downloadUrl: `${baseURL}/api/files/${file.id}/download`,
+                            downloadUrl: `${baseURL}/api/package/${file.id}/download`,
                             uploadTime: file.uploadTime,
                             r2Path: file.r2Path,
                             id: file.id
@@ -3575,9 +3575,20 @@
             return match ? match[1] : '';
         }
         
+        // 辅助函数：从描述中提取文件夹名
+        function extractFolderFromDescription(description) {
+            const match = description.match(/文件夹:([^\s]+)/);
+            return match ? match[1] : '';
+        }
+        
         // 辅助函数：从路径中提取文件夹名
         function extractFolderFromPath(path) {
-            // 从 arc/filename 或类似路径提取文件夹信息
+            // 对于打包文件，路径是 package/filename，我们需要从描述中提取文件夹信息
+            // 先检查是否是 package/ 路径
+            if (path.startsWith('package/')) {
+                return 'package'; // 统一归类为 package 文件夹
+            }
+            // 兼容旧格式：arc/filename
             const parts = path.split('/');
             return parts.length > 1 ? parts[0] : '';
         }
