@@ -1810,34 +1810,58 @@
                     const uniqueSuffix = `${i}_${Math.random().toString(36).slice(2, 6)}`;
                     const fileName = `${Date.now()}_${uniqueSuffix}_${cleanName}`;
 
-                    // 模拟文件上传成功（临时方案）
+                    // 真正上传到 R2 存储
                     try {
-                        // 生成本地文件记录，模拟成功上传
-                        const mockUrl = `mock://package/${folderName}/${fileName}`;
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('description', `LP号:${lpNumber} 文件夹:${folderName}`);
+                        
+                        const baseURL = getBaseURL();
+                        const uploadResponse = await fetch(`${baseURL}/api/files/upload`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!uploadResponse.ok) {
+                            throw new Error(`上传失败: ${uploadResponse.status} ${uploadResponse.statusText}`);
+                        }
+                        
+                        const uploadResult = await uploadResponse.json();
+                        if (!uploadResult.success) {
+                            throw new Error(uploadResult.error || '上传失败');
+                        }
+                        
+                        // 生成文件记录
                         const fileRecord = {
                             name: file.name,
-                            fileName: fileName,
+                            fileName: uploadResult.file.fileName,
                             folder: folderName,
                             lpNumber: lpNumber,
                             contractNumber: contractNumber,
                             size: file.size,
-                            url: mockUrl,
-                            downloadUrl: mockUrl,
-                            uploadTime: new Date().toISOString(),
-                            mockFile: true, // 标记为模拟文件
-                            fileData: file // 保存文件对象用于预览
+                            url: uploadResult.file.publicUrl || '',
+                            downloadUrl: `${baseURL}/api/files/${uploadResult.file.id}/download`,
+                            uploadTime: uploadResult.file.uploadTime || new Date().toISOString(),
+                            r2Path: uploadResult.file.r2Path,
+                            id: uploadResult.file.id
                         };
                         
-                        uploadedFiles.set(fileName, fileRecord);
+                        uploadedFiles.set(uploadResult.file.fileName, fileRecord);
                         successCount++;
-                        console.log(`✅ 文件记录已保存: ${file.name}`);
+                        console.log(`✅ 文件上传成功: ${file.name} -> ${uploadResult.file.fileName}`);
                     } catch (error) {
-                        failedFiles.push(file.name);
-                        console.error(`文件记录保存失败: ${file.name}`, error);
+                        console.error(`❌ 上传失败 ${file.name}:`, error);
+                        failedFiles.push({
+                            name: file.name,
+                            error: error.message
+                        });
                     }
                 } catch (error) {
-                    failedFiles.push(file.name);
-                    console.error(`文件上传异常: ${file.name}`, error);
+                    console.error(`❌ 文件处理失败 ${file.name}:`, error);
+                    failedFiles.push({
+                        name: file.name,
+                        error: error.message
+                    });
                 }
 
                 // 文件间加入小幅延迟，避免请求过于频繁
@@ -3507,6 +3531,57 @@
             }
         }
         
+        // 从服务器加载文件列表
+        async function loadServerFiles() {
+            try {
+                const baseURL = getBaseURL();
+                const response = await fetch(`${baseURL}/api/files`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                if (result.success && result.files) {
+                    // 将服务器文件转换为本地格式
+                    result.files.forEach(file => {
+                        const fileRecord = {
+                            name: file.originalName,
+                            fileName: file.fileName,
+                            folder: extractFolderFromPath(file.r2Path || ''),
+                            lpNumber: extractLPFromDescription(file.description || ''),
+                            contractNumber: '',
+                            size: file.size,
+                            url: file.publicUrl || '',
+                            downloadUrl: `${baseURL}/api/files/${file.id}/download`,
+                            uploadTime: file.uploadTime,
+                            r2Path: file.r2Path,
+                            id: file.id
+                        };
+                        uploadedFiles.set(file.fileName, fileRecord);
+                    });
+                    console.log(`✅ 从服务器加载了 ${result.files.length} 个文件`);
+                    return true;
+                }
+            } catch (error) {
+                console.warn('从服务器加载文件列表失败:', error);
+                return false;
+            }
+        }
+        
+        // 辅助函数：从描述中提取LP号
+        function extractLPFromDescription(description) {
+            const match = description.match(/LP号:(\d+)/);
+            return match ? match[1] : '';
+        }
+        
+        // 辅助函数：从路径中提取文件夹名
+        function extractFolderFromPath(path) {
+            // 从 arc/filename 或类似路径提取文件夹信息
+            const parts = path.split('/');
+            return parts.length > 1 ? parts[0] : '';
+        }
+        
         async function loadFilesFromServer() {
             try {
                 // 从服务器加载
@@ -3670,6 +3745,9 @@
             
             // 执行数据同步
             await performDataSync();
+            
+            // 从服务器加载文件列表
+            await loadServerFiles();
             
             updateDatabaseDisplay();
             displayFileList();
