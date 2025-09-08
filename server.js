@@ -1783,6 +1783,125 @@ app.post('/api/tmall-orders/upload', (req, res) => {
   }
 });
 
+// ===== 打包系统API =====
+
+// 读写打包系统数据库
+function readPackageDatabase() {
+  try {
+    const filePath = './data/package-database.json';
+    if (fs.existsSync(filePath)) {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+    return { data: {}, importDate: null, version: 1 };
+  } catch (error) {
+    console.error('读取打包数据库失败:', error);
+    return { data: {}, importDate: null, version: 1 };
+  }
+}
+
+function writePackageDatabase(data) {
+  try {
+    const filePath = './data/package-database.json';
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('写入打包数据库失败:', error);
+    return false;
+  }
+}
+
+// 读写打包系统文件注册表
+function readPackageFiles() {
+  try {
+    const filePath = './data/package-files.json';
+    if (fs.existsSync(filePath)) {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+    return { files: {}, version: 1 };
+  } catch (error) {
+    console.error('读取打包文件注册表失败:', error);
+    return { files: {}, version: 1 };
+  }
+}
+
+function writePackageFiles(data) {
+  try {
+    const filePath = './data/package-files.json';
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('写入打包文件注册表失败:', error);
+    return false;
+  }
+}
+
+// 打包系统数据库同步API
+app.post('/api/package-sync/database', (req, res) => {
+  try {
+    const { data, importDate, version, timestamp } = req.body;
+    
+    const syncData = {
+      data: data || {},
+      importDate: importDate || null,
+      version: version || 1,
+      timestamp: timestamp || Date.now(),
+      lastSync: new Date().toISOString()
+    };
+    
+    if (writePackageDatabase(syncData)) {
+      res.json({ success: true, message: '打包数据库同步成功' });
+    } else {
+      res.status(500).json({ success: false, error: '数据库写入失败' });
+    }
+  } catch (error) {
+    console.error('打包数据库同步失败:', error);
+    res.status(500).json({ success: false, error: '同步失败: ' + error.message });
+  }
+});
+
+app.get('/api/package-sync/database', (req, res) => {
+  try {
+    const data = readPackageDatabase();
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('获取打包数据库失败:', error);
+    res.status(500).json({ success: false, error: '获取失败: ' + error.message });
+  }
+});
+
+// 打包系统文件注册表同步API
+app.post('/api/package-sync/files', (req, res) => {
+  try {
+    const { files, version, timestamp } = req.body;
+    
+    const syncData = {
+      files: files || {},
+      version: version || 1,
+      timestamp: timestamp || Date.now(),
+      lastSync: new Date().toISOString()
+    };
+    
+    if (writePackageFiles(syncData)) {
+      res.json({ success: true, message: '文件注册表同步成功' });
+    } else {
+      res.status(500).json({ success: false, error: '文件注册表写入失败' });
+    }
+  } catch (error) {
+    console.error('文件注册表同步失败:', error);
+    res.status(500).json({ success: false, error: '同步失败: ' + error.message });
+  }
+});
+
+app.get('/api/package-sync/files', (req, res) => {
+  try {
+    const data = readPackageFiles();
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('获取文件注册表失败:', error);
+    res.status(500).json({ success: false, error: '获取失败: ' + error.message });
+  }
+});
+
 // 健康检查
 app.get('/api/health', (req, res) => {
   res.json({ 

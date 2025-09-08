@@ -670,7 +670,7 @@
             }
             
             .main-container {
-                margin: 10px auto;
+                margin: 20px auto 10px auto; /* 增加顶部边距，避免与导航栏重叠 */
                 padding: 0 10px;
             }
             
@@ -678,8 +678,11 @@
                 padding: 20px;
             }
             
-            .page-header h1 {
+            .page-header h1,
+            .page h2:first-child,
+            .page h1:first-child {
                 font-size: 1.8rem;
+                margin-top: 10px; /* 增加顶部边距 */
             }
             
             .file-item {
@@ -2395,17 +2398,37 @@
 
             // 依据文件夹名中的履约单号与数据库匹配，统计"已打包文件夹"
             for (const folder of folderToLPs.keys()) {
-                const m = folder.match(new RegExp(`^${dateStr}_(.+)$`));
-                if (!m) continue;
-                const namePartRaw = m[1] || '';
-                const namePart = namePartRaw.trim();
-                // 已在前面统计过未匹配（四位数字后缀）的，这里只处理带履约单号的
-                if (result.unmatchedFolders.has(folder)) continue;
-                if (result.requiredContracts.has(namePart)) {
-                    result.packedFolders.add(folder);
-                    const lpForContract = result.contractToLP.get(namePart) || '';
-                    if (lpForContract) result.packedLPs.add(lpForContract);
-                    result.packedDetails.push({ lp: lpForContract, contract: namePart, folder });
+                let namePart = '';
+                let matchedContract = '';
+                
+                // 检查新格式：package/YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号
+                const targetDateStr = dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+                const hierarchyMatch = folder.match(/^package\/\d{4}-\d{2}\/(\d{4}-\d{2}-\d{2})\/\d{4}-\d{2}-\d{2}-(.+)$/);
+                
+                if (hierarchyMatch) {
+                    const [, folderDate, contractNumber] = hierarchyMatch;
+                    if (folderDate === targetDateStr) {
+                        namePart = contractNumber;
+                        matchedContract = contractNumber;
+                    }
+                } else {
+                    // 兼容旧格式：YYYYMMDD_履约单号
+                    const oldMatch = folder.match(new RegExp(`^${dateStr}_(.+)$`));
+                    if (oldMatch) {
+                        const namePartRaw = oldMatch[1] || '';
+                        namePart = namePartRaw.trim();
+                        matchedContract = namePart;
+                    }
+                }
+                
+                // 如果找到匹配的履约单号
+                if (namePart && !result.unmatchedFolders.has(folder)) {
+                    if (result.requiredContracts.has(matchedContract)) {
+                        result.packedFolders.add(folder);
+                        const lpForContract = result.contractToLP.get(matchedContract) || '';
+                        if (lpForContract) result.packedLPs.add(lpForContract);
+                        result.packedDetails.push({ lp: lpForContract, contract: matchedContract, folder });
+                    }
                 }
             }
 
@@ -3162,38 +3185,76 @@
                     timestamp: Date.now()
                 };
                 
-                // 临时方案：使用localStorage + 跨窗口通信
-                localStorage.setItem('SYNC_DATABASE_GLOBAL', JSON.stringify(dataToSync));
-                localStorage.setItem('SYNC_DATABASE_TIMESTAMP', Date.now().toString());
+                // 发送到服务器
+                const response = await fetch('/api/package-sync/database', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dataToSync)
+                });
                 
-                // 触发其他窗口同步
-                window.dispatchEvent(new CustomEvent('database-sync', { detail: dataToSync }));
-                
-                console.log('✅ 数据库已同步到本地存储');
-                return true;
+                const result = await response.json();
+                if (result.success) {
+                    console.log('✅ 数据库已同步到服务器');
+                    
+                    // 同时保存到本地存储作为备份
+                    localStorage.setItem('SYNC_DATABASE_GLOBAL', JSON.stringify(dataToSync));
+                    localStorage.setItem('SYNC_DATABASE_TIMESTAMP', Date.now().toString());
+                    
+                    // 触发其他窗口同步
+                    window.dispatchEvent(new CustomEvent('database-sync', { detail: dataToSync }));
+                    
+                    return true;
+                } else {
+                    throw new Error(result.error || '服务器同步失败');
+                }
             } catch (error) {
                 console.warn('数据库同步异常:', error);
-                return false;
+                // 回退到本地存储
+                try {
+                    const dataObject = {};
+                    databaseData.forEach((value, key) => {
+                        dataObject[key] = value;
+                    });
+                    
+                    const dataToSync = {
+                        version: DATA_VERSION,
+                        data: dataObject,
+                        importDate: databaseImportDate,
+                        timestamp: Date.now()
+                    };
+                    
+                    localStorage.setItem('SYNC_DATABASE_GLOBAL', JSON.stringify(dataToSync));
+                    localStorage.setItem('SYNC_DATABASE_TIMESTAMP', Date.now().toString());
+                    window.dispatchEvent(new CustomEvent('database-sync', { detail: dataToSync }));
+                    
+                    console.log('⚠️ 服务器同步失败，已保存到本地存储');
+                    return false;
+                } catch (localError) {
+                    console.error('本地存储也失败:', localError);
+                    return false;
+                }
             }
         }
         
         async function loadDatabaseFromServer() {
             try {
-                // 临时方案：从全局localStorage加载
-                const globalData = localStorage.getItem('SYNC_DATABASE_GLOBAL');
-                const globalTimestamp = parseInt(localStorage.getItem('SYNC_DATABASE_TIMESTAMP') || '0');
+                // 从服务器加载
+                const response = await fetch('/api/package-sync/database');
+                const result = await response.json();
                 
-                if (globalData) {
-                    const serverData = JSON.parse(globalData);
+                if (result.success && result.data) {
+                    const serverData = result.data;
                     const serverTimestamp = serverData.timestamp || 0;
                     
                     // 检查本地时间戳
                     const localTimestamp = localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || 0;
                     
-                    // 如果全局数据更新，则同步到本地
+                    // 如果服务器数据更新，则同步到本地
                     if (serverTimestamp > localTimestamp) {
                         databaseData.clear();
-                        Object.entries(serverData.data).forEach(([key, value]) => {
+                        Object.entries(serverData.data || {}).forEach(([key, value]) => {
                             databaseData.set(key, value);
                         });
                         
@@ -3205,13 +3266,73 @@
                         saveDatabaseToLocal();
                         localStorage.setItem(STORAGE_KEYS.DATABASE + '_timestamp', serverTimestamp);
                         
-                        console.log('✅ 数据库已从全局同步加载');
+                        // 同时保存到本地存储作为备份
+                        localStorage.setItem('SYNC_DATABASE_GLOBAL', JSON.stringify(serverData));
+                        localStorage.setItem('SYNC_DATABASE_TIMESTAMP', serverTimestamp.toString());
+                        
+                        console.log('✅ 数据库已从服务器同步加载');
                         return true;
                     }
                 }
+                
+                // 如果服务器失败，尝试从本地存储加载
+                const globalData = localStorage.getItem('SYNC_DATABASE_GLOBAL');
+                if (globalData) {
+                    const localData = JSON.parse(globalData);
+                    const localTimestamp = localData.timestamp || 0;
+                    const currentTimestamp = localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || 0;
+                    
+                    if (localTimestamp > currentTimestamp) {
+                        databaseData.clear();
+                        Object.entries(localData.data || {}).forEach(([key, value]) => {
+                            databaseData.set(key, value);
+                        });
+                        
+                        if (localData.importDate) {
+                            databaseImportDate = localData.importDate;
+                            localStorage.setItem(STORAGE_KEYS.DATABASE_DATE, databaseImportDate);
+                        }
+                        
+                        saveDatabaseToLocal();
+                        localStorage.setItem(STORAGE_KEYS.DATABASE + '_timestamp', localTimestamp);
+                        
+                        console.log('✅ 数据库已从本地存储同步加载');
+                        return true;
+                    }
+                }
+                
                 return false;
             } catch (error) {
-                console.warn('从全局存储加载数据库失败:', error);
+                console.warn('从服务器加载数据库失败:', error);
+                // 回退到本地存储
+                try {
+                    const globalData = localStorage.getItem('SYNC_DATABASE_GLOBAL');
+                    if (globalData) {
+                        const localData = JSON.parse(globalData);
+                        const localTimestamp = localData.timestamp || 0;
+                        const currentTimestamp = localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || 0;
+                        
+                        if (localTimestamp > currentTimestamp) {
+                            databaseData.clear();
+                            Object.entries(localData.data || {}).forEach(([key, value]) => {
+                                databaseData.set(key, value);
+                            });
+                            
+                            if (localData.importDate) {
+                                databaseImportDate = localData.importDate;
+                                localStorage.setItem(STORAGE_KEYS.DATABASE_DATE, databaseImportDate);
+                            }
+                            
+                            saveDatabaseToLocal();
+                            localStorage.setItem(STORAGE_KEYS.DATABASE + '_timestamp', localTimestamp);
+                            
+                            console.log('⚠️ 服务器加载失败，已从本地存储加载');
+                            return true;
+                        }
+                    }
+                } catch (localError) {
+                    console.error('本地存储加载也失败:', localError);
+                }
                 return false;
             }
         }
@@ -3225,54 +3346,142 @@
                 
                 const dataToSync = {
                     version: DATA_VERSION,
-                    data: filesObject,
+                    files: filesObject,
                     timestamp: Date.now()
                 };
                 
-                // 临时方案：使用localStorage + 跨窗口通信
-                localStorage.setItem('SYNC_FILES_GLOBAL', JSON.stringify(dataToSync));
-                localStorage.setItem('SYNC_FILES_TIMESTAMP', Date.now().toString());
+                // 发送到服务器
+                const response = await fetch('/api/package-sync/files', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dataToSync)
+                });
                 
-                // 触发其他窗口同步
-                window.dispatchEvent(new CustomEvent('files-sync', { detail: dataToSync }));
-                
-                console.log('✅ 文件注册表已同步到本地存储');
-                return true;
+                const result = await response.json();
+                if (result.success) {
+                    console.log('✅ 文件注册表已同步到服务器');
+                    
+                    // 同时保存到本地存储作为备份
+                    localStorage.setItem('SYNC_FILES_GLOBAL', JSON.stringify(dataToSync));
+                    localStorage.setItem('SYNC_FILES_TIMESTAMP', Date.now().toString());
+                    
+                    // 触发其他窗口同步
+                    window.dispatchEvent(new CustomEvent('files-sync', { detail: dataToSync }));
+                    
+                    return true;
+                } else {
+                    throw new Error(result.error || '服务器同步失败');
+                }
             } catch (error) {
                 console.warn('文件注册表同步异常:', error);
-                return false;
+                // 回退到本地存储
+                try {
+                    const filesObject = {};
+                    uploadedFiles.forEach((value, key) => {
+                        filesObject[key] = value;
+                    });
+                    
+                    const dataToSync = {
+                        version: DATA_VERSION,
+                        files: filesObject,
+                        timestamp: Date.now()
+                    };
+                    
+                    localStorage.setItem('SYNC_FILES_GLOBAL', JSON.stringify(dataToSync));
+                    localStorage.setItem('SYNC_FILES_TIMESTAMP', Date.now().toString());
+                    window.dispatchEvent(new CustomEvent('files-sync', { detail: dataToSync }));
+                    
+                    console.log('⚠️ 服务器同步失败，已保存到本地存储');
+                    return false;
+                } catch (localError) {
+                    console.error('本地存储也失败:', localError);
+                    return false;
+                }
             }
         }
         
         async function loadFilesFromServer() {
             try {
-                // 临时方案：从全局localStorage加载
-                const globalData = localStorage.getItem('SYNC_FILES_GLOBAL');
+                // 从服务器加载
+                const response = await fetch('/api/package-sync/files');
+                const result = await response.json();
                 
-                if (globalData) {
-                    const serverData = JSON.parse(globalData);
+                if (result.success && result.data) {
+                    const serverData = result.data;
                     const serverTimestamp = serverData.timestamp || 0;
                     
                     // 检查本地时间戳
                     const localTimestamp = localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || 0;
                     
-                    // 如果全局数据更新，则同步到本地
+                    // 如果服务器数据更新，则同步到本地
                     if (serverTimestamp > localTimestamp) {
                         uploadedFiles.clear();
-                        Object.entries(serverData.data).forEach(([key, value]) => {
+                        Object.entries(serverData.files || {}).forEach(([key, value]) => {
                             uploadedFiles.set(key, value);
                         });
                         
                         saveFilesToLocal();
                         localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', serverTimestamp);
                         
-                        console.log('✅ 文件注册表已从全局同步加载');
+                        // 同时保存到本地存储作为备份
+                        localStorage.setItem('SYNC_FILES_GLOBAL', JSON.stringify(serverData));
+                        localStorage.setItem('SYNC_FILES_TIMESTAMP', serverTimestamp.toString());
+                        
+                        console.log('✅ 文件注册表已从服务器同步加载');
                         return true;
                     }
                 }
+                
+                // 如果服务器失败，尝试从本地存储加载
+                const globalData = localStorage.getItem('SYNC_FILES_GLOBAL');
+                if (globalData) {
+                    const localData = JSON.parse(globalData);
+                    const localTimestamp = localData.timestamp || 0;
+                    const currentTimestamp = localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || 0;
+                    
+                    if (localTimestamp > currentTimestamp) {
+                        uploadedFiles.clear();
+                        Object.entries(localData.files || serverData.data || {}).forEach(([key, value]) => {
+                            uploadedFiles.set(key, value);
+                        });
+                        
+                        saveFilesToLocal();
+                        localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', localTimestamp);
+                        
+                        console.log('✅ 文件注册表已从本地存储同步加载');
+                        return true;
+                    }
+                }
+                
                 return false;
             } catch (error) {
-                console.warn('从全局存储加载文件注册表失败:', error);
+                console.warn('从服务器加载文件注册表失败:', error);
+                // 回退到本地存储
+                try {
+                    const globalData = localStorage.getItem('SYNC_FILES_GLOBAL');
+                    if (globalData) {
+                        const localData = JSON.parse(globalData);
+                        const localTimestamp = localData.timestamp || 0;
+                        const currentTimestamp = localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || 0;
+                        
+                        if (localTimestamp > currentTimestamp) {
+                            uploadedFiles.clear();
+                            Object.entries(localData.files || localData.data || {}).forEach(([key, value]) => {
+                                uploadedFiles.set(key, value);
+                            });
+                            
+                            saveFilesToLocal();
+                            localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', localTimestamp);
+                            
+                            console.log('⚠️ 服务器加载失败，已从本地存储加载');
+                            return true;
+                        }
+                    }
+                } catch (localError) {
+                    console.error('本地存储加载也失败:', localError);
+                }
                 return false;
             }
         }
