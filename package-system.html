@@ -964,8 +964,7 @@
                     <button onclick="refreshFileList()" class="btn">🔄 刷新列表</button>
                     <button onclick="exportAllFiles()" class="btn btn-success">📦 导出所有文件</button>
                     <button onclick="openDeleteByFolderModal()" class="btn btn-danger">🗑️ 删除文件</button>
-                    <button onclick="rebuildRegistryFromRepo('today')" class="btn btn-secondary">🔍 重建注册表(当天)</button>
-                    <button onclick="rebuildRegistryFromRepo('all')" class="btn btn-secondary">🛠️ 重建注册表(全量)</button>
+                    <!-- GitHub重建功能已移除 -->
                 </div>
 
                 <div id="packingInfo" class="database-info" style="display:none;">
@@ -1539,10 +1538,10 @@
                 databaseImportDate = new Date().toISOString();
                 localStorage.setItem(STORAGE_KEYS.DATABASE_DATE, databaseImportDate);
 
-                // 保存到本地存储和GitHub
+                // 保存到本地存储并同步到服务器
                 saveDatabaseToLocal();
-                saveDatabaseToGitHub().catch(error => {
-                    console.warn('保存到GitHub失败:', error.message);
+                syncDatabaseToServer().catch(error => {
+                    console.warn('同步到服务器失败:', error);
                 });
 
                 updateDatabaseDisplay();
@@ -1599,10 +1598,7 @@
             localStorage.removeItem(STORAGE_KEYS.DATABASE);
             localStorage.removeItem(STORAGE_KEYS.DATABASE_DATE);
             
-            // 删除GitHub上的数据库文件
-            saveDatabaseToGitHub().catch(error => {
-                console.warn('删除GitHub数据库失败:', error.message);
-            });
+            // GitHub相关功能已移除
 
             updateDatabaseDisplay();
             showStatus('databaseStatus', '✅ 数据库已删除', 'success');
@@ -1807,11 +1803,11 @@
                     const fileName = `${Date.now()}_${uniqueSuffix}_${cleanName}`;
 
                     // 使用R2存储适配器上传文件
-                    const result = await r2PackageStorage.uploadFile(file, folderName);
+                    const result = await window.r2PackageStorage.uploadFile(file, folderName);
                     
                     if (result.success) {
                         successCount++;
-                        const publicUrl = await r2PackageStorage.getPublicUrl(result.filePath);
+                        const publicUrl = await window.r2PackageStorage.getPublicUrl(result.filePath);
                         
                         const fileRecord = {
                             name: file.name,
@@ -1844,7 +1840,10 @@
 
             if (successCount > 0) {
                 saveFilesToLocal();
-                // R2存储无需额外的注册表保存
+                // 同步文件注册表到服务器
+                syncFilesToServer().catch(error => {
+                    console.warn('文件注册表同步失败:', error);
+                });
             }
 
             if (failedFiles.length === 0) {
@@ -2927,9 +2926,6 @@
             
             uploadedFiles.delete(fileName);
             saveFilesToLocal();
-            saveFilesRegistryToGitHub().catch(error => {
-                console.warn('更新GitHub文件注册表失败:', error.message);
-            });
             
             displayFileList();
             showStatus('fileManageStatus', '✅ 文件已从列表中删除', 'success');
@@ -3071,76 +3067,7 @@
 
         // 数据同步相关函数
 
-        // 从仓库扫描并重建注册表（today: 仅当天；all: 全量）
-        async function rebuildRegistryFromRepo(scope) {
-            try {
-                if (!GITHUB_CONFIG.owner || !GITHUB_CONFIG.repo || !GITHUB_CONFIG.branch || !GITHUB_CONFIG.token) {
-                    showStatus('fileManageStatus', '⚠️ 请先配置 GitHub 信息', 'error');
-                    return;
-                }
-                const dateStr = getImportDateStr();
-                showStatus('fileManageStatus', scope==='today' ? `正在扫描并重建 ${dateStr} 的注册表...` : '正在全量扫描并重建注册表...', 'info');
-
-                // 读取仓库树
-                const treeUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/git/trees/${GITHUB_CONFIG.branch}?recursive=1`;
-                const treeRes = await fetch(treeUrl, {
-                    headers: { 'Authorization': `token ${GITHUB_CONFIG.token}`, 'User-Agent': 'FileUploader' }
-                });
-                if (!treeRes.ok) {
-                    throw new Error(`读取仓库树失败: ${treeRes.status}`);
-                }
-                const treeData = await treeRes.json();
-                const paths = (treeData.tree || []).filter(n => n.type === 'blob').map(n => n.path);
-
-                // 过滤出我们关心的文件：YYYYMMDD_xxx/<file>
-                const fileEntries = [];
-                const dateRegex = /^([0-9]{8})_([^\/]+)\//;
-                for (const p of paths) {
-                    const m = p.match(dateRegex);
-                    if (!m) continue;
-                    const d = m[1];
-                    if (scope === 'today' && d !== dateStr) continue;
-                    const folder = p.split('/')[0];
-                    const fileName = p.split('/').slice(-1)[0];
-                    fileEntries.push({ folder, fileName, path: p, date: d });
-                }
-
-                if (fileEntries.length === 0) {
-                    showStatus('fileManageStatus', '未在仓库中发现可用文件', 'warning');
-                    return;
-                }
-
-                // 将扫描结果合并到 uploadedFiles 结构中（保持已有字段尽量完整）
-                const newMap = new Map(uploadedFiles);
-                for (const fe of fileEntries) {
-                    // 用路径末端文件名作为 key，如果原注册表存在相同key则跳过
-                    const key = fe.fileName.startsWith('http') ? fe.path : fe.fileName;
-                    if (!newMap.has(key)) {
-                        newMap.set(key, {
-                            name: fe.fileName,
-                            fileName: fe.fileName,
-                            folder: fe.folder,
-                            size: undefined,
-                            url: `https://cdn.jsdelivr.net/gh/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}@${GITHUB_CONFIG.branch}/${fe.path}`,
-                            downloadUrl: `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${fe.path}`,
-                            uploadTime: new Date().toISOString()
-                        });
-                    }
-                }
-
-                uploadedFiles = newMap;
-                // 持久化并推送注册表，带 409 重试
-                saveFilesToLocal();
-                await saveFilesRegistryToGitHub();
-
-                displayFileList();
-                updatePackingInfo();
-                showStatus('fileManageStatus', '✅ 注册表已重建并同步', 'success');
-            } catch (e) {
-                console.warn('重建注册表失败:', e);
-                showStatus('fileManageStatus', `❌ 重建注册表失败：${e.message}`, 'error');
-            }
-        }
+        // GitHub相关功能已移除
 
         // 存储相关函数
         function saveDatabaseToLocal() {
@@ -3215,173 +3142,165 @@
             }
         }
 
-        // GitHub数据同步函数
-        async function saveDatabaseToGitHub() {
-            const dataObject = {};
-            databaseData.forEach((value, key) => {
-                dataObject[key] = value;
-            });
-            
-            const dataToSave = {
-                version: DATA_VERSION,
-                data: dataObject,
-                importDate: databaseImportDate,
-                timestamp: Date.now()
-            };
-            
-            return await saveDataToGitHub(GITHUB_FILES.DATABASE, dataToSave);
-        }
-
-        async function loadDatabaseFromGitHub() {
-            const data = await loadDataFromGitHub(GITHUB_FILES.DATABASE);
-            if (data && data.data) {
-                databaseData.clear();
-                Object.entries(data.data).forEach(([key, value]) => {
-                    databaseData.set(key, value);
-                });
-                
-                if (data.importDate) {
-                    databaseImportDate = data.importDate;
-                    localStorage.setItem(STORAGE_KEYS.DATABASE_DATE, databaseImportDate);
-                }
-                
-                saveDatabaseToLocal();
-            }
-        }
-
-        async function saveFilesRegistryToGitHub() {
-            const filesObject = {};
-            uploadedFiles.forEach((value, key) => {
-                filesObject[key] = value;
-            });
-            
-            const dataToSave = {
-                version: DATA_VERSION,
-                data: filesObject,
-                timestamp: Date.now()
-            };
-            
-            return await saveDataToGitHub(GITHUB_FILES.FILES_REGISTRY, dataToSave);
-        }
-
-        async function loadFilesRegistryFromGitHub() {
-            const data = await loadDataFromGitHub(GITHUB_FILES.FILES_REGISTRY);
-            if (data && data.data) {
-                uploadedFiles.clear();
-                Object.entries(data.data).forEach(([key, value]) => {
-                    uploadedFiles.set(key, value);
-                });
-                saveFilesToLocal();
-            }
-        }
-
-        async function saveDataToGitHub(fileName, data) {
-            if (GITHUB_CONFIG.useProxy && GITHUB_CONFIG.proxyEndpoint) {
-                return; // 代理模式暂不支持数据同步
-            }
-            
-            const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${fileName}`;
-            
-            // 获取文件SHA
-            let sha = null;
+        // 数据同步功能（基于服务器API）
+        async function syncDatabaseToServer() {
             try {
-                const existingResponse = await fetch(url, {
-                    headers: {
-                        'Authorization': `token ${GITHUB_CONFIG.token}`,
-                        'User-Agent': 'FileUploader'
-                    }
+                const dataObject = {};
+                databaseData.forEach((value, key) => {
+                    dataObject[key] = value;
                 });
                 
-                if (existingResponse.ok) {
-                    const existing = await existingResponse.json();
-                    sha = existing.sha;
+                const dataToSync = {
+                    version: DATA_VERSION,
+                    data: dataObject,
+                    importDate: databaseImportDate,
+                    timestamp: Date.now()
+                };
+                
+                const response = await fetch('/api/package-sync/database', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dataToSync)
+                });
+                
+                const result = await response.json();
+                if (!result.success) {
+                    console.warn('数据库同步失败:', result.error);
                 }
+                return result.success;
             } catch (error) {
-                // 文件不存在，继续创建
-            }
-            
-            const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
-            
-            const payload = {
-                message: `Update ${fileName}`,
-                content: content,
-                branch: GITHUB_CONFIG.branch
-            };
-            
-            if (sha) {
-                payload.sha = sha;
-            }
-            
-            // 写入并处理 409 冲突：重取 sha 后重试
-            for (let attempt = 0; attempt < 3; attempt++) {
-                const response = await fetch(url, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `token ${GITHUB_CONFIG.token}`,
-                        'Content-Type': 'application/json',
-                        'User-Agent': 'FileUploader'
-                    },
-                    body: JSON.stringify(payload)
-                });
-                if (response.ok) break;
-                if (response.status === 409) {
-                    // 重新获取最新 sha 合并重试
-                    try {
-                        const existingResponse = await fetch(url, {
-                            headers: {
-                                'Authorization': `token ${GITHUB_CONFIG.token}`,
-                                'User-Agent': 'FileUploader'
-                            }
-                        });
-                        if (existingResponse.ok) {
-                            const existing = await existingResponse.json();
-                            payload.sha = existing.sha;
-                            continue; // retry
-                        }
-                    } catch (_) {}
-                }
-                throw new Error(`保存${fileName}失败: ${response.status}`);
+                console.warn('数据库同步异常:', error);
+                return false;
             }
         }
-
-        async function loadDataFromGitHub(fileName) {
-            if (GITHUB_CONFIG.useProxy && GITHUB_CONFIG.proxyEndpoint) {
-                throw new Error('代理模式不支持数据同步');
-            }
-            
-            const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${fileName}`;
-            
-            const response = await fetch(url, {
-                headers: {
-                    'Authorization': `token ${GITHUB_CONFIG.token}`,
-                    'User-Agent': 'FileUploader'
-                }
-            });
-            
-            if (!response.ok) {
-                if (response.status === 404) {
-                    return null; // 文件不存在
-                }
-                throw new Error(`加载${fileName}失败: ${response.status}`);
-            }
-            
-            const result = await response.json();
-            // base64 兼容：去除换行符，再解码；失败兜底使用 TextDecoder
-            let contentText = '';
+        
+        async function loadDatabaseFromServer() {
             try {
-                const cleaned = (result.content || '').replace(/\n/g, '');
-                contentText = decodeURIComponent(escape(atob(cleaned)));
-            } catch (_) {
-                try {
-                    const cleaned = (result.content || '').replace(/\n/g, '');
-                    const binary = atob(cleaned);
-                    const bytes = new Uint8Array([...binary].map(c => c.charCodeAt(0)));
-                    contentText = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-                } catch (e2) {
-                    throw new Error('内容解码失败');
+                const response = await fetch('/api/package-sync/database');
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.data) {
+                    const serverData = result.data;
+                    const serverTimestamp = serverData.timestamp || 0;
+                    
+                    // 检查本地时间戳
+                    const localTimestamp = localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || 0;
+                    
+                    // 如果服务器数据更新，则同步到本地
+                    if (serverTimestamp > localTimestamp) {
+                        databaseData.clear();
+                        Object.entries(serverData.data).forEach(([key, value]) => {
+                            databaseData.set(key, value);
+                        });
+                        
+                        if (serverData.importDate) {
+                            databaseImportDate = serverData.importDate;
+                            localStorage.setItem(STORAGE_KEYS.DATABASE_DATE, databaseImportDate);
+                        }
+                        
+                        saveDatabaseToLocal();
+                        localStorage.setItem(STORAGE_KEYS.DATABASE + '_timestamp', serverTimestamp);
+                        
+                        console.log('数据库已从服务器同步');
+                        return true;
+                    }
                 }
+                return false;
+            } catch (error) {
+                console.warn('从服务器加载数据库失败:', error);
+                return false;
             }
-            return JSON.parse(contentText);
+        }
+        
+        async function syncFilesToServer() {
+            try {
+                const filesObject = {};
+                uploadedFiles.forEach((value, key) => {
+                    filesObject[key] = value;
+                });
+                
+                const dataToSync = {
+                    version: DATA_VERSION,
+                    data: filesObject,
+                    timestamp: Date.now()
+                };
+                
+                const response = await fetch('/api/package-sync/files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dataToSync)
+                });
+                
+                const result = await response.json();
+                if (!result.success) {
+                    console.warn('文件注册表同步失败:', result.error);
+                }
+                return result.success;
+            } catch (error) {
+                console.warn('文件注册表同步异常:', error);
+                return false;
+            }
+        }
+        
+        async function loadFilesFromServer() {
+            try {
+                const response = await fetch('/api/package-sync/files');
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.data) {
+                    const serverData = result.data;
+                    const serverTimestamp = serverData.timestamp || 0;
+                    
+                    // 检查本地时间戳
+                    const localTimestamp = localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || 0;
+                    
+                    // 如果服务器数据更新，则同步到本地
+                    if (serverTimestamp > localTimestamp) {
+                        uploadedFiles.clear();
+                        Object.entries(serverData.data).forEach(([key, value]) => {
+                            uploadedFiles.set(key, value);
+                        });
+                        
+                        saveFilesToLocal();
+                        localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', serverTimestamp);
+                        
+                        console.log('文件注册表已从服务器同步');
+                        return true;
+                    }
+                }
+                return false;
+            } catch (error) {
+                console.warn('从服务器加载文件注册表失败:', error);
+                return false;
+            }
+        }
+        
+        // 定期数据同步
+        async function performDataSync() {
+            try {
+                // 先从服务器加载，然后上传本地更新
+                const dbSynced = await loadDatabaseFromServer();
+                const filesSynced = await loadFilesFromServer();
+                
+                // 如果本地有数据，同步到服务器
+                if (databaseData.size > 0) {
+                    await syncDatabaseToServer();
+                }
+                if (uploadedFiles.size > 0) {
+                    await syncFilesToServer();
+                }
+                
+                // 如果有数据被同步，更新显示
+                if (dbSynced || filesSynced) {
+                    updateDatabaseDisplay();
+                    displayFileList();
+                    updatePackingInfo();
+                }
+                
+                console.log('数据同步完成');
+            } catch (error) {
+                console.warn('数据同步失败:', error);
+            }
         }
 
         // 工具函数
@@ -3420,14 +3339,16 @@
 
         // 初始化
         document.addEventListener('DOMContentLoaded', async function() {
-            loadGitHubConfig();
-            
             // 初始化移动端UI
             initMobileUI();
             
             // 加载本地数据
             loadDatabaseFromLocal();
             loadFilesFromLocal();
+            
+            // 执行数据同步
+            await performDataSync();
+            
             updateDatabaseDisplay();
             displayFileList();
             // 恢复上次打开页面
@@ -3438,9 +3359,8 @@
                 }
             } catch (e) {}
             
-            
-            updateUploadModeButton();
-            checkGitHubConfig();
+            // 设置定期数据同步（每60秒）
+            setInterval(performDataSync, AUTO_SYNC_INTERVAL);
         });
 
         // 点击模态框外部关闭

@@ -135,6 +135,8 @@ export default {
           return await handleTmallOrders(request, env, path, method, corsHeaders);
         } else if (path.startsWith('/api/r2/')) {
           return await handleR2Routes(request, env, path, method, corsHeaders);
+        } else if (path.startsWith('/api/package-sync/')) {
+          return await handlePackageSync(request, env, path, method, corsHeaders);
         } else {
           return new Response('Not Found', { status: 404, headers: corsHeaders });
         }
@@ -1057,5 +1059,89 @@ async function handleTmallOrders(request, env, path, method, corsHeaders) {
       status: 500,
       headers: corsHeaders 
     });
+  }
+}
+
+// 处理打包系统数据同步（/api/package-sync/*）
+async function handlePackageSync(request, env, path, method, corsHeaders) {
+  try {
+    // 上传数据库：/api/package-sync/database
+    if (path === '/api/package-sync/database' && method === 'POST') {
+      const data = await request.json();
+      const key = 'package-sync/database.json';
+      
+      if (!env.R2_BUCKET) {
+        return Response.json({ success: false, error: 'R2存储桶不可用' }, { headers: corsHeaders, status: 500 });
+      }
+      
+      // 保存到R2
+      await env.R2_BUCKET.put(key, JSON.stringify({
+        ...data,
+        lastSync: new Date().toISOString()
+      }), {
+        httpMetadata: { contentType: 'application/json' }
+      });
+      
+      return Response.json({ success: true, message: '数据库同步成功' }, { headers: corsHeaders });
+    }
+    
+    // 下载数据库：/api/package-sync/database
+    if (path === '/api/package-sync/database' && method === 'GET') {
+      const key = 'package-sync/database.json';
+      
+      if (!env.R2_BUCKET) {
+        return Response.json({ success: false, error: 'R2存储桶不可用' }, { headers: corsHeaders, status: 500 });
+      }
+      
+      const object = await env.R2_BUCKET.get(key);
+      if (!object) {
+        return Response.json({ success: false, data: null, message: '暂无同步数据' }, { headers: corsHeaders });
+      }
+      
+      const data = await object.json();
+      return Response.json({ success: true, data }, { headers: corsHeaders });
+    }
+    
+    // 上传文件注册表：/api/package-sync/files
+    if (path === '/api/package-sync/files' && method === 'POST') {
+      const data = await request.json();
+      const key = 'package-sync/files.json';
+      
+      if (!env.R2_BUCKET) {
+        return Response.json({ success: false, error: 'R2存储桶不可用' }, { headers: corsHeaders, status: 500 });
+      }
+      
+      // 保存到R2
+      await env.R2_BUCKET.put(key, JSON.stringify({
+        ...data,
+        lastSync: new Date().toISOString()
+      }), {
+        httpMetadata: { contentType: 'application/json' }
+      });
+      
+      return Response.json({ success: true, message: '文件注册表同步成功' }, { headers: corsHeaders });
+    }
+    
+    // 下载文件注册表：/api/package-sync/files
+    if (path === '/api/package-sync/files' && method === 'GET') {
+      const key = 'package-sync/files.json';
+      
+      if (!env.R2_BUCKET) {
+        return Response.json({ success: false, error: 'R2存储桶不可用' }, { headers: corsHeaders, status: 500 });
+      }
+      
+      const object = await env.R2_BUCKET.get(key);
+      if (!object) {
+        return Response.json({ success: false, data: null, message: '暂无同步数据' }, { headers: corsHeaders });
+      }
+      
+      const data = await object.json();
+      return Response.json({ success: true, data }, { headers: corsHeaders });
+    }
+    
+    return Response.json({ success: false, error: '不支持的同步操作' }, { status: 404, headers: corsHeaders });
+  } catch (error) {
+    console.error('数据同步失败:', error);
+    return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
   }
 }
