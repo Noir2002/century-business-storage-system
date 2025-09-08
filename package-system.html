@@ -3226,11 +3226,11 @@
                 return window.location.origin;
             }
             
-            // 如果是file://协议，优先尝试 Cloudflare Worker 域名
-            // 用户需要根据实际部署的 Worker 域名修改此处
+            // 如果是file://协议，优先尝试 Worker 域名（API 可用）
+            // 备用 Worker 域名
             const cloudflareWorkerUrl = 'https://century-business-system.anthonin815.workers.dev';
             
-            // 如果有自定义域名，在此配置
+            // 用户的自定义域名（当前 API 不可用）
             const customDomain = 'https://centurybusiness.org';
             
             return cloudflareWorkerUrl;
