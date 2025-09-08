@@ -3219,6 +3219,23 @@
             }
         }
 
+        // API基础URL配置
+        function getBaseURL() {
+            // 优先使用当前域名（Cloudflare Worker 域名）
+            if (window.location.protocol !== 'file:') {
+                return window.location.origin;
+            }
+            
+            // 如果是file://协议，优先尝试 Cloudflare Worker 域名
+            // 用户需要根据实际部署的 Worker 域名修改此处
+            const cloudflareWorkerUrl = 'https://century-business-system.xiaol-worker-subdomain.workers.dev';
+            
+            // 如果有自定义域名，在此配置
+            // const customDomain = 'https://your-domain.com';
+            
+            return cloudflareWorkerUrl;
+        }
+
         // 数据同步功能（临时使用LocalStorage跨域同步）
         async function syncDatabaseToServer() {
             try {
@@ -3235,7 +3252,8 @@
                 };
                 
                 // 发送到服务器
-                const response = await fetch('/api/package-sync/database', {
+                const baseURL = getBaseURL();
+                const response = await fetch(`${baseURL}/api/package-sync/database`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3260,6 +3278,27 @@
                 }
             } catch (error) {
                 console.warn('数据库同步异常:', error);
+                
+                // 检查是否是网络连接问题
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    console.warn('⚠️ 网络连接失败，请检查：');
+                    console.warn('  1. 是否通过 Cloudflare Worker 域名访问？');
+                    console.warn('  2. Worker 是否正确部署？');
+                    console.warn('  3. 网络连接是否正常？');
+                } else if (error.message.includes('404')) {
+                    console.warn('⚠️ API路径不存在，可能原因：');
+                    console.warn('  1. Worker 未正确部署到 Cloudflare');
+                    console.warn('  2. 正在访问错误的域名（应使用 Worker 域名）');
+                    console.warn('  3. Worker 代码中缺少对应的路由');
+                } else if (error.message.includes('R2存储桶不可用')) {
+                    console.warn('⚠️ R2存储桶配置问题，请检查：');
+                    console.warn('  1. wrangler.toml 中的 R2 绑定配置');
+                    console.warn('  2. 存储桶是否正确创建');
+                    console.warn('  3. Cloudflare 账户权限');
+                } else {
+                    console.warn('⚠️ 同步失败:', error.message);
+                }
+                
                 // 回退到本地存储
                 try {
                     const dataObject = {};
@@ -3290,7 +3329,13 @@
         async function loadDatabaseFromServer() {
             try {
                 // 从服务器加载
-                const response = await fetch('/api/package-sync/database');
+                const baseURL = getBaseURL();
+                const response = await fetch(`${baseURL}/api/package-sync/database`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const result = await response.json();
                 
                 if (result.success && result.data) {
@@ -3400,7 +3445,8 @@
                 };
                 
                 // 发送到服务器
-                const response = await fetch('/api/package-sync/files', {
+                const baseURL = getBaseURL();
+                const response = await fetch(`${baseURL}/api/package-sync/files`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3425,6 +3471,16 @@
                 }
             } catch (error) {
                 console.warn('文件注册表同步异常:', error);
+                
+                // 检查是否是网络连接问题
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    console.warn('⚠️ 网络连接失败，请检查服务器是否启动 (http://localhost:3000)');
+                } else if (error.message.includes('404')) {
+                    console.warn('⚠️ API路径不存在，请检查服务器配置');
+                } else {
+                    console.warn('⚠️ 服务器同步失败:', error.message);
+                }
+                
                 // 回退到本地存储
                 try {
                     const filesObject = {};
@@ -3454,7 +3510,13 @@
         async function loadFilesFromServer() {
             try {
                 // 从服务器加载
-                const response = await fetch('/api/package-sync/files');
+                const baseURL = getBaseURL();
+                const response = await fetch(`${baseURL}/api/package-sync/files`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const result = await response.json();
                 
                 if (result.success && result.data) {
