@@ -1,0 +1,9 @@
+# 排除大文件和不需要的文件
+data/
+node_modules/
+*.md
+*.log
+*.bat
+.git/
+.env
+.wrangler/
