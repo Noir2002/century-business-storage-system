@@ -46,6 +46,81 @@
     .wide-table-container.active, .record-table-container.active { display: block; }
     .handsontable-container { padding: 20px; }
     .layui-table-cell { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    /* 移动端适配 */
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        padding: 10px;
+      }
+      
+      .main-nav {
+        margin: 10px 0 0 0;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      
+      .main-nav .layui-nav-item {
+        flex-shrink: 0;
+      }
+      
+      .main-nav .layui-nav-item a {
+        padding: 0 10px;
+        font-size: 12px;
+      }
+      
+      .content-wrapper {
+        padding: 10px;
+      }
+      
+      .action-buttons {
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-bottom: 10px;
+      }
+      
+      .action-buttons .layui-btn {
+        margin: 2px;
+        font-size: 12px;
+        padding: 8px 12px;
+        flex-shrink: 0;
+      }
+      
+      .handsontable-container {
+        padding: 10px;
+        overflow-x: auto;
+      }
+      
+      .mode-switch .layui-btn {
+        margin: 5px;
+        font-size: 12px;
+        padding: 8px 15px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .page-title {
+        font-size: 18px;
+      }
+      
+      .page-subtitle {
+        font-size: 14px;
+      }
+      
+      .action-buttons .layui-btn {
+        font-size: 10px;
+        padding: 6px 10px;
+      }
+      
+      .mode-switch {
+        text-align: left;
+      }
+      
+      .mode-switch .layui-btn {
+        width: 48%;
+        margin: 1%;
+      }
+    }
   </style>
 </head>
 <body>

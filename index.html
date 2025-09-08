@@ -178,6 +178,75 @@
       color: #666;
       font-size: 14px;
     }
+    
+    /* 移动端适配 */
+    @media (max-width: 768px) {
+      .main-container {
+        padding: 20px 10px;
+      }
+      
+      .header-section h1 {
+        font-size: 32px;
+      }
+      
+      .header-section p {
+        font-size: 16px;
+      }
+      
+      .nav-cards {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      
+      .nav-card {
+        padding: 20px;
+      }
+      
+      .nav-card .card-icon {
+        font-size: 48px;
+      }
+      
+      .nav-card .card-title {
+        font-size: 20px;
+      }
+      
+      .demo-accounts {
+        flex-direction: column;
+        gap: 15px;
+      }
+      
+      .demo-account {
+        min-width: auto;
+      }
+      
+      .features-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .header-section h1 {
+        font-size: 28px;
+      }
+      
+      .nav-card .card-icon {
+        font-size: 40px;
+        margin-bottom: 15px;
+      }
+      
+      .nav-card .card-title {
+        font-size: 18px;
+      }
+      
+      .demo-title, .features-title {
+        font-size: 20px;
+      }
+      
+      .demo-account h4 {
+        font-size: 16px;
+      }
+    }
   </style>
 </head>
 <body>

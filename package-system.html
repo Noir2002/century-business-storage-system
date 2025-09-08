@@ -639,9 +639,6 @@
                     <a href="#" class="nav-link active" onclick="showPage('dashboard', event)">🏠 仪表板</a>
                 </li>
                 <li class="nav-item">
-                    <a href="#" class="nav-link" onclick="showPage('config', event)">⚙️ 存储配置</a>
-                </li>
-                <li class="nav-item">
                     <a href="#" class="nav-link" onclick="showPage('database', event)">🗃️ 数据库管理</a>
                 </li>
                 <li class="nav-item">
@@ -651,7 +648,10 @@
                     <a href="#" class="nav-link" onclick="showPage('manage', event)">📂 文件管理</a>
                 </li>
                 <li class="nav-item">
-                    <a href="#" class="nav-link" onclick="showPage('inventory', event)">📊 库存管理</a>
+                    <a href="#" class="nav-link" onclick="showPage('inventory', event)">📊 数据库管理</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" onclick="logout()" style="background-color: rgba(255,0,0,0.2);">🚪 退出</a>
                 </li>
             </ul>
         </div>
@@ -677,7 +677,7 @@
                     
                     <div class="dashboard-card" onclick="showPage('inventory', event)">
                         <div class="card-icon">📊</div>
-                        <h3>库存管理</h3>
+                        <h3>数据库管理</h3>
                         <p>Excel文件管理和数据分析</p>
                         <div class="card-stats">
                             <span id="inventoryFileCount">0</span> 个表格
@@ -723,26 +723,6 @@
             </div>
         </div>
 
-        <!-- R2存储配置页面 -->
-        <div id="configPage" class="page">
-            <div class="page-header">
-                <h1>☁️ R2 存储配置</h1>
-                <p>使用 Cloudflare R2 存储，无需额外配置</p>
-            </div>
-            <div class="page-content">
-                <div class="alert alert-success">
-                    ✅ R2 存储已就绪，无需额外配置
-                    <br><br>
-                    <strong>目录结构说明：</strong><br>
-                    • 根目录：package/<br>
-                    • 月份目录：package/YYYY-MM/<br>
-                    • 日期目录：package/YYYY-MM/YYYY-MM-JJ/<br>
-                    • 打包目录：package/YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号/<br>
-                    <br>
-                    例如：package/2024-01/2024-01-15/2024-01-15-ABC123/
-                </div>
-            </div>
-        </div>
 
         <!-- 数据库管理页面 -->
         <div id="databasePage" class="page">
@@ -1907,7 +1887,6 @@
                 if (changed) {
                     // 持久化修正后的数据
                     saveFilesToLocal();
-                    saveFilesRegistryToGitHub().catch(err => console.warn('清理后同步失败:', err.message));
                 }
             } catch (e) {
                 console.warn('清理文件记录失败:', e);
@@ -2348,7 +2327,6 @@
                 }
                 if (changed) {
                     saveFilesToLocal();
-                    saveFilesRegistryToGitHub().catch(err => console.warn('自动修正同步失败:', err.message));
                     displayFileList();
                     updatePackingInfo();
                     showStatus('autoFixStatus', `✅ 已修正 ${folder} → ${newFolder}`, 'success');
@@ -2394,7 +2372,6 @@
                 })(it.folder, it.contract, it.lp);
             }
             saveFilesToLocal();
-            saveFilesRegistryToGitHub().catch(err => console.warn('自动修正同步失败:', err.message));
             displayFileList();
             updatePackingInfo();
             showStatus('autoFixStatus', `✅ 已修正 ${total} 个文件夹`, 'success');
@@ -2585,7 +2562,6 @@
                 }
 
                 saveFilesToLocal();
-                saveFilesRegistryToGitHub().catch(err => console.warn('修正同步失败:', err.message));
 
                 displayFileList();
                 updatePackingInfo();
@@ -2639,7 +2615,6 @@
             }
             if (changed) {
                 saveFilesToLocal();
-                saveFilesRegistryToGitHub().catch(err => console.warn('删除后同步失败:', err.message));
             }
             closeDeleteByFolderModal();
             displayFileList();
@@ -2658,7 +2633,6 @@
             }
             if (changed) {
                 saveFilesToLocal();
-                saveFilesRegistryToGitHub().catch(err => console.warn('删除后同步失败:', err.message));
             }
             displayFileList();
             showStatus('fileManageStatus', `✅ 已删除 ${dateStr} 的所有文件夹记录`, 'success');
@@ -2676,7 +2650,6 @@
             }
             if (changed) {
                 saveFilesToLocal();
-                saveFilesRegistryToGitHub().catch(err => console.warn('删除后同步失败:', err.message));
             }
             displayFileList();
             showStatus('fileManageStatus', `✅ 已删除文件夹 ${folder} 的记录`, 'success');
@@ -2830,26 +2803,6 @@
         }
 
         // 数据同步相关函数
-        async function syncDataFromGitHub() {
-            try {
-                showStatus('fileManageStatus', '正在从GitHub同步数据...', 'info');
-                
-                await Promise.all([
-                    loadDatabaseFromGitHub(),
-                    loadFilesRegistryFromGitHub()
-                ]);
-                
-                updateDatabaseDisplay();
-                displayFileList();
-                showStatus('fileManageStatus', '✅ 数据同步完成', 'success');
-                
-            } catch (error) {
-                console.warn('GitHub同步失败，使用本地数据:', error.message);
-                loadDatabaseFromLocal();
-                loadFilesFromLocal();
-                showStatus('fileManageStatus', '⚠️ GitHub同步失败，已加载本地数据', 'warning');
-            }
-        }
 
         // 从仓库扫描并重建注册表（today: 仅当天；all: 全量）
         async function rebuildRegistryFromRepo(scope) {
@@ -3215,16 +3168,6 @@
                 }
             } catch (e) {}
             
-            // 尝试从GitHub同步数据
-            try {
-                if (GITHUB_CONFIG.owner !== 'your-username' && 
-                    GITHUB_CONFIG.repo !== 'your-repo' && 
-                    GITHUB_CONFIG.token !== 'your-token') {
-                    await syncDataFromGitHub();
-                }
-            } catch (error) {
-                console.warn('初始化GitHub同步失败:', error.message);
-            }
             
             updateUploadModeButton();
             checkGitHubConfig();
@@ -3247,6 +3190,15 @@
             const autoFix = document.getElementById('autoFixModal');
             if (event.target === autoFix) {
                 closeAutoFixModal();
+            }
+        }
+
+        // 退出登录函数
+        function logout() {
+            if (confirm('确定要退出系统吗？')) {
+                localStorage.clear();
+                alert('已退出系统！');
+                window.location.href = 'index.html';
             }
         }
     </script>
