@@ -768,9 +768,6 @@
                     <a href="#" class="nav-link" onclick="showPage('manage', event)">📂 文件管理</a>
                 </li>
                 <li class="nav-item">
-                    <a href="#" class="nav-link" onclick="showPage('database', event)">📊 数据库管理</a>
-                </li>
-                <li class="nav-item">
                     <a href="#" class="nav-link" onclick="logout()" style="background-color: rgba(255,0,0,0.2);">🚪 退出</a>
                 </li>
             </ul>
@@ -795,14 +792,6 @@
                         </div>
                     </div>
                     
-                    <div class="dashboard-card" onclick="showPage('inventory', event)">
-                        <div class="card-icon">📊</div>
-                        <h3>数据库管理</h3>
-                        <p>Excel文件管理和数据分析</p>
-                        <div class="card-stats">
-                            <span id="inventoryFileCount">0</span> 个表格
-                        </div>
-                    </div>
                     
                     <div class="dashboard-card" onclick="showPage('manage', event)">
                         <div class="card-icon">📂</div>
@@ -1413,6 +1402,71 @@
             }
         }
 
+        // 自动创建当日文件夹和设置待完成打包数量
+        async function createTodayFolderAndSetPackingTargets() {
+            try {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const yearMonth = `${year}-${month}`;
+                const yearMonthDay = `${year}-${month}-${day}`;
+                
+                // 创建当日文件夹结构（空文件夹作为标记）
+                const folderPath = `${yearMonth}/${yearMonthDay}`;
+                
+                // 检查是否已存在当日文件夹
+                let folderExists = false;
+                for (const [, file] of uploadedFiles.entries()) {
+                    if (file && file.folder && file.folder.startsWith(folderPath)) {
+                        folderExists = true;
+                        break;
+                    }
+                }
+                
+                if (!folderExists) {
+                    // 创建空的标记文件来创建文件夹结构
+                    const markerFileName = `${yearMonthDay}-目录已创建.txt`;
+                    const markerContent = `当日打包目录已创建\n创建时间: ${new Date().toLocaleString()}\n待完成打包数量: ${databaseData.size} 个履约单号`;
+                    
+                    // 使用blob创建文件
+                    const markerFile = new File([markerContent], markerFileName, { type: 'text/plain' });
+                    
+                    // 上传标记文件
+                    const result = await uploadToGitHub(markerFile, folderPath, markerFileName);
+                    if (result.success) {
+                        console.log('当日文件夹创建成功:', folderPath);
+                        
+                        // 更新本地文件记录
+                        const fileRecord = {
+                            fileName: markerFileName,
+                            folder: folderPath,
+                            size: markerFile.size,
+                            uploadTime: new Date().toISOString(),
+                            url: result.url,
+                            filePath: result.filePath
+                        };
+                        
+                        uploadedFiles.set(markerFileName, fileRecord);
+                        saveFilesToLocal();
+                        
+                        // 更新显示
+                        displayFileList();
+                        updatePackingInfo();
+                    }
+                }
+                
+                // 更新打包信息显示
+                updatePackingInfo();
+                
+                console.log(`当日文件夹设置完成，待完成打包数量: ${databaseData.size}`);
+                
+            } catch (error) {
+                console.error('创建当日文件夹失败:', error);
+                showStatus('databaseStatus', `⚠️ 文件夹创建失败: ${error.message}`, 'warning');
+            }
+        }
+
         // 导入数据库
         async function importDatabase() {
             const fileInput = document.getElementById('databaseFile');
@@ -1496,7 +1550,11 @@
                 });
 
                 updateDatabaseDisplay();
-                showStatus('databaseStatus', `✅ 数据库导入成功！共导入 ${validRecords} 条有效记录`, 'success');
+                
+                // 自动创建当日文件夹和设置待完成打包数量
+                await createTodayFolderAndSetPackingTargets();
+                
+                showStatus('databaseStatus', `✅ 数据库导入成功！共导入 ${validRecords} 条有效记录，已创建当日文件夹`, 'success');
                 
             } catch (error) {
                 showStatus('databaseStatus', `❌ 数据库导入失败：${error.message}`, 'error');
@@ -2378,7 +2436,24 @@
             const folderToFilesCount = new Map(); // folder -> count
             for (const [, file] of uploadedFiles.entries()) {
                 const folder = file && file.folder ? String(file.folder) : '';
-                if (!folder.startsWith(dateStr)) continue; // 仅当日
+                // 检查是否为当日文件夹（支持新旧格式）
+                let isToday = false;
+                if (folder.includes('/')) {
+                    // 新格式: YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号
+                    const pathParts = folder.split('/');
+                    if (pathParts.length >= 2) {
+                        const dayPart = pathParts[1];
+                        const dayMatch = dayPart.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        if (dayMatch) {
+                            const folderDateStr = `${dayMatch[1]}${dayMatch[2]}${dayMatch[3]}`;
+                            isToday = folderDateStr === dateStr;
+                        }
+                    }
+                } else {
+                    // 旧格式: YYYYMMDD_...
+                    isToday = folder.startsWith(dateStr);
+                }
+                if (!isToday) continue;
                 const lp = file && file.lpNumber ? String(file.lpNumber) : '';
                 if (!folderToLPs.has(folder)) folderToLPs.set(folder, new Set());
                 if (!folderToFilesCount.has(folder)) folderToFilesCount.set(folder, 0);
@@ -2388,10 +2463,29 @@
 
             // 依据文件夹名中的履约单号与数据库匹配，统计"已打包文件夹"
             for (const folder of folderToLPs.keys()) {
-                const m = folder.match(new RegExp(`^${dateStr}_(.+)$`));
-                if (!m) continue;
-                const namePartRaw = m[1] || '';
-                const namePart = namePartRaw.trim();
+                let contractFromFolder = '';
+                
+                // 支持新旧格式解析履约单号
+                if (folder.includes('/')) {
+                    // 新格式: YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号
+                    const pathParts = folder.split('/');
+                    if (pathParts.length >= 3) {
+                        const folderName = pathParts[2];
+                        const match = folderName.match(/^\d{4}-\d{2}-\d{2}-(.+)$/);
+                        if (match) {
+                            contractFromFolder = match[1];
+                        }
+                    }
+                } else {
+                    // 旧格式: YYYYMMDD_履约单号
+                    const m = folder.match(new RegExp(`^${dateStr}_(.+)$`));
+                    if (m) {
+                        contractFromFolder = m[1];
+                    }
+                }
+                
+                if (!contractFromFolder) continue;
+                const namePart = contractFromFolder.trim();
                 // 已在前面统计过未匹配（四位数字后缀）的，这里只处理带履约单号的
                 if (result.unmatchedFolders.has(folder)) continue;
                 if (result.requiredContracts.has(namePart)) {
@@ -2548,11 +2642,37 @@
             // 重用 confirmFixUnmatchedFolder 的核心逻辑，但参数化
             try {
                 const dateStr = getImportDateStr();
-                if (!dateStr || !folder.startsWith(dateStr + '_')) {
+                // 检查是否为当日文件夹（支持新旧格式）
+                let isValidFolder = false;
+                if (folder.includes('/')) {
+                    // 新格式检查
+                    const pathParts = folder.split('/');
+                    if (pathParts.length >= 2) {
+                        const dayPart = pathParts[1];
+                        const dayMatch = dayPart.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        if (dayMatch) {
+                            const folderDateStr = `${dayMatch[1]}${dayMatch[2]}${dayMatch[3]}`;
+                            isValidFolder = folderDateStr === dateStr;
+                        }
+                    }
+                } else {
+                    // 旧格式检查
+                    isValidFolder = folder.startsWith(dateStr + '_');
+                }
+                
+                if (!dateStr || !isValidFolder) {
                     showStatus('autoFixStatus', '仅允许修正当日文件夹', 'error');
                     return;
                 }
-                const newFolder = `${dateStr}_${contract}`;
+                
+                // 创建新格式文件夹路径
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const yearMonth = `${year}-${month}`;
+                const yearMonthDay = `${year}-${month}-${day}`;
+                const newFolder = `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${contract}`;
                 let changed = false;
                 for (const [key, file] of Array.from(uploadedFiles.entries())) {
                     if (file && String(file.folder) === folder) {

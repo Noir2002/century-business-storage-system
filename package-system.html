@@ -775,9 +775,6 @@
                     <a href="#" class="nav-link" onclick="showPage('manage', event)">📂 文件管理</a>
                 </li>
                 <li class="nav-item">
-                    <a href="#" class="nav-link" onclick="showPage('database', event)">📊 数据库管理</a>
-                </li>
-                <li class="nav-item">
                     <a href="#" class="nav-link" onclick="logout()" style="background-color: rgba(255,0,0,0.2);">🚪 退出</a>
                 </li>
             </ul>
@@ -802,14 +799,6 @@
                         </div>
                     </div>
                     
-                    <div class="dashboard-card" onclick="showPage('inventory', event)">
-                        <div class="card-icon">📊</div>
-                        <h3>数据库管理</h3>
-                        <p>Excel文件管理和数据分析</p>
-                        <div class="card-stats">
-                            <span id="inventoryFileCount">0</span> 个表格
-                        </div>
-                    </div>
                     
                     <div class="dashboard-card" onclick="showPage('manage', event)">
                         <div class="card-icon">📂</div>
@@ -1409,6 +1398,71 @@
             }
         }
 
+        // 自动创建当日文件夹和设置待完成打包数量
+        async function createTodayFolderAndSetPackingTargets() {
+            try {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const yearMonth = `${year}-${month}`;
+                const yearMonthDay = `${year}-${month}-${day}`;
+                
+                // 创建当日文件夹结构（空文件夹作为标记）
+                const folderPath = `${yearMonth}/${yearMonthDay}`;
+                
+                // 检查是否已存在当日文件夹
+                let folderExists = false;
+                for (const [, file] of uploadedFiles.entries()) {
+                    if (file && file.folder && file.folder.startsWith(folderPath)) {
+                        folderExists = true;
+                        break;
+                    }
+                }
+                
+                if (!folderExists) {
+                    // 创建空的标记文件来创建文件夹结构
+                    const markerFileName = `${yearMonthDay}-目录已创建.txt`;
+                    const markerContent = `当日打包目录已创建\n创建时间: ${new Date().toLocaleString()}\n待完成打包数量: ${databaseData.size} 个履约单号`;
+                    
+                    // 使用blob创建文件
+                    const markerFile = new File([markerContent], markerFileName, { type: 'text/plain' });
+                    
+                    // 上传标记文件
+                    const result = await uploadToR2(markerFile, folderPath, markerFileName);
+                    if (result.success) {
+                        console.log('当日文件夹创建成功:', folderPath);
+                        
+                        // 更新本地文件记录
+                        const fileRecord = {
+                            fileName: markerFileName,
+                            folder: folderPath,
+                            size: markerFile.size,
+                            uploadTime: new Date().toISOString(),
+                            url: result.url,
+                            filePath: result.filePath
+                        };
+                        
+                        uploadedFiles.set(markerFileName, fileRecord);
+                        saveFilesToLocal();
+                        
+                        // 更新显示
+                        displayFileList();
+                        updatePackingInfo();
+                    }
+                }
+                
+                // 更新打包信息显示
+                updatePackingInfo();
+                
+                console.log(`当日文件夹设置完成，待完成打包数量: ${databaseData.size}`);
+                
+            } catch (error) {
+                console.error('创建当日文件夹失败:', error);
+                showStatus('databaseStatus', `⚠️ 文件夹创建失败: ${error.message}`, 'warning');
+            }
+        }
+
         // 导入数据库
         async function importDatabase() {
             const fileInput = document.getElementById('databaseFile');
@@ -1492,7 +1546,11 @@
                 });
 
                 updateDatabaseDisplay();
-                showStatus('databaseStatus', `✅ 数据库导入成功！共导入 ${validRecords} 条有效记录`, 'success');
+                
+                // 自动创建当日文件夹和设置待完成打包数量
+                await createTodayFolderAndSetPackingTargets();
+                
+                showStatus('databaseStatus', `✅ 数据库导入成功！共导入 ${validRecords} 条有效记录，已创建当日文件夹`, 'success');
                 
             } catch (error) {
                 showStatus('databaseStatus', `❌ 数据库导入失败：${error.message}`, 'error');
@@ -1810,9 +1868,9 @@
             const startTime = Date.now();
             
             try {
-                // 文件大小检查 (R2限制更宽松，设为500MB)
-                if (file.size > 500 * 1024 * 1024) {
-                    throw new Error(`文件过大: ${formatFileSize(file.size)}，限制500MB`);
+                // 文件大小检查 (R2限制设为200MB)
+                if (file.size > 200 * 1024 * 1024) {
+                    throw new Error(`文件过大: ${formatFileSize(file.size)}，限制200MB`);
                 }
 
                 // 使用R2存储适配器上传文件
