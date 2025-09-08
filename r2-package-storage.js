@@ -6,21 +6,26 @@ class R2PackageStorage {
   }
   
   getBaseUrl() {
-    // 检查当前域名，优先使用本地服务器
+    // 检查当前域名
     const hostname = window.location.hostname;
+    const port = window.location.port;
     
-    // 本地开发环境
+    console.log('🔍 检测环境:', { hostname, port, protocol: window.location.protocol });
+    
+    // 如果当前就在localhost:3000，直接使用相对路径
+    if (hostname === 'localhost' && port === '3000') {
+      console.log('✅ 检测到localhost:3000，使用相对路径');
+      return '';
+    }
+    
+    // 本地开发环境，明确指向服务器
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      console.log('✅ 本地环境，使用http://localhost:3000');
       return 'http://localhost:3000';
     }
     
-    // 如果有本地server.js运行，使用相对路径
-    // 这样可以避免跨域问题
-    if (window.location.protocol === 'file:' || window.location.port === '3000') {
-      return '';  // 使用相对路径
-    }
-    
-    // 其他情况使用当前域名的相对路径
+    // 其他情况使用相对路径
+    console.log('✅ 其他环境，使用相对路径');
     return '';
   }
 

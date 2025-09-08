@@ -2396,41 +2396,90 @@
                 folderToFilesCount.set(folder, (folderToFilesCount.get(folder) || 0) + 1);
             }
 
-            // 依据文件夹名中的履约单号与数据库匹配，统计"已打包文件夹"
-            for (const folder of folderToLPs.keys()) {
-                let namePart = '';
-                let matchedContract = '';
+            // 🔥 重新设计：直接从上传文件中统计已打包文件夹
+            console.log('📊 开始统计已打包文件夹...');
+            console.log('📅 目标日期:', dateStr);
+            console.log('📋 需要的履约单号:', Array.from(result.requiredContracts));
+            console.log('📁 所有已上传文件数量:', uploadedFiles.size);
+            
+            const targetDateStr = dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+            
+            // 直接从uploadedFiles扫描，不依赖folderToLPs
+            for (const [fileName, fileInfo] of uploadedFiles.entries()) {
+                if (!fileInfo || !fileInfo.folder) continue;
+                
+                const folder = fileInfo.folder;
+                console.log(`🗂️ 检查文件: ${fileName} -> 文件夹: ${folder}`);
                 
                 // 检查新格式：package/YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号
-                const targetDateStr = dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-                const hierarchyMatch = folder.match(/^package\/\d{4}-\d{2}\/(\d{4}-\d{2}-\d{2})\/\d{4}-\d{2}-\d{2}-(.+)$/);
+                const hierarchyMatch = folder.match(/^package\/\d{4}-\d{2}\/(\d{4}-\d{2}-\d{2})\/(\d{4}-\d{2}-\d{2})-(.+)$/);
                 
                 if (hierarchyMatch) {
-                    const [, folderDate, contractNumber] = hierarchyMatch;
-                    if (folderDate === targetDateStr) {
-                        namePart = contractNumber;
-                        matchedContract = contractNumber;
+                    const [, yearMonthDay, fullDate, contractNumber] = hierarchyMatch;
+                    console.log(`📁 新格式匹配: 日期=${fullDate}, 履约单号=${contractNumber}`);
+                    
+                    // 检查是否是当天
+                    if (fullDate === targetDateStr) {
+                        console.log('✅ 是当天的文件夹');
+                        
+                        // 检查履约单号是否在数据库中
+                        if (result.requiredContracts.has(contractNumber)) {
+                            console.log(`✅ 履约单号匹配: ${contractNumber}`);
+                            result.packedFolders.add(folder);
+                            
+                            const lpForContract = result.contractToLP.get(contractNumber);
+                            if (lpForContract) {
+                                result.packedLPs.add(lpForContract);
+                                // 避免重复添加相同文件夹的详情
+                                const existingDetail = result.packedDetails.find(d => d.folder === folder);
+                                if (!existingDetail) {
+                                    result.packedDetails.push({ 
+                                        lp: lpForContract, 
+                                        contract: contractNumber, 
+                                        folder 
+                                    });
+                                }
+                            }
+                        } else {
+                            console.log(`⚠️ 履约单号不在数据库中: ${contractNumber}`);
+                        }
+                    } else {
+                        console.log(`⚠️ 不是当天的文件夹: ${fullDate} !== ${targetDateStr}`);
                     }
                 } else {
+                    console.log('⚠️ 文件夹格式不匹配新格式，尝试旧格式');
+                    
                     // 兼容旧格式：YYYYMMDD_履约单号
                     const oldMatch = folder.match(new RegExp(`^${dateStr}_(.+)$`));
                     if (oldMatch) {
-                        const namePartRaw = oldMatch[1] || '';
-                        namePart = namePartRaw.trim();
-                        matchedContract = namePart;
-                    }
-                }
-                
-                // 如果找到匹配的履约单号
-                if (namePart && !result.unmatchedFolders.has(folder)) {
-                    if (result.requiredContracts.has(matchedContract)) {
-                        result.packedFolders.add(folder);
-                        const lpForContract = result.contractToLP.get(matchedContract) || '';
-                        if (lpForContract) result.packedLPs.add(lpForContract);
-                        result.packedDetails.push({ lp: lpForContract, contract: matchedContract, folder });
+                        const contractNumber = oldMatch[1].trim();
+                        console.log(`📁 旧格式匹配: ${contractNumber}`);
+                        
+                        if (result.requiredContracts.has(contractNumber)) {
+                            console.log(`✅ 旧格式履约单号匹配: ${contractNumber}`);
+                            result.packedFolders.add(folder);
+                            
+                            const lpForContract = result.contractToLP.get(contractNumber);
+                            if (lpForContract) {
+                                result.packedLPs.add(lpForContract);
+                                const existingDetail = result.packedDetails.find(d => d.folder === folder);
+                                if (!existingDetail) {
+                                    result.packedDetails.push({ 
+                                        lp: lpForContract, 
+                                        contract: contractNumber, 
+                                        folder 
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
             }
+
+            console.log('📊 统计完成:');
+            console.log(`📦 当天已打包文件夹数量: ${result.packedFolders.size}`);
+            console.log('📋 已打包的履约单号:', Array.from(result.packedLPs));
+            console.log('📁 已打包的文件夹:', Array.from(result.packedFolders));
 
             // 未打包集合
             for (const lp of result.requiredLPs) {
