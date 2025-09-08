@@ -806,7 +806,7 @@
         <div id="uploadPage" class="page">
             <div class="page-header">
                 <h1>📤 文件上传</h1>
-                <p>根据 LP 号后缀上传文件到 GitHub</p>
+                <p>根据 LP 号后缀上传文件到 R2 存储</p>
             </div>
             <div class="page-content">
                 <div class="form-group">
@@ -851,7 +851,6 @@
                 <div style="margin-bottom: 20px;">
                     <button onclick="refreshFileList()" class="btn">🔄 刷新列表</button>
                     <button onclick="exportAllFiles()" class="btn btn-success">📦 导出所有文件</button>
-                    <button onclick="syncDataFromGitHub()" class="btn btn-secondary">☁️ 从GitHub同步</button>
                     <button onclick="openDeleteByFolderModal()" class="btn btn-danger">🗑️ 删除文件</button>
                     <button onclick="rebuildRegistryFromRepo('today')" class="btn btn-secondary">🔍 重建注册表(当天)</button>
                     <button onclick="rebuildRegistryFromRepo('all')" class="btn btn-secondary">🛠️ 重建注册表(全量)</button>

@@ -723,41 +723,23 @@
             </div>
         </div>
 
-        <!-- 存储配置页面 -->
+        <!-- R2存储配置页面 -->
         <div id="configPage" class="page">
             <div class="page-header">
-                <h1>⚙️ 存储配置</h1>
-                <p>配置 GitHub 存储信息，支持自动保存</p>
+                <h1>☁️ R2 存储配置</h1>
+                <p>使用 Cloudflare R2 存储，无需额外配置</p>
             </div>
             <div class="page-content">
-                <div class="form-group">
-                    <label for="ghOwner">GitHub 用户名/组织名：</label>
-                    <input type="text" id="ghOwner" placeholder="例如：your-username">
-                </div>
-                <div class="form-group">
-                    <label for="ghRepo">仓库名：</label>
-                    <input type="text" id="ghRepo" placeholder="例如：file-storage">
-                </div>
-                <div class="form-group">
-                    <label for="ghBranch">分支名：</label>
-                    <input type="text" id="ghBranch" value="main" placeholder="例如：main">
-                </div>
-                <div class="form-group">
-                    <label for="ghToken">Personal Access Token：</label>
-                    <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
-                    <small style="color: #718096; margin-top: 5px; display: block;">
-                        Token 将自动保存到本地，新设备需重新输入
-                    </small>
-                </div>
-                
-                <div style="margin: 20px 0;">
-                    <button onclick="saveGitHubConfig()" class="btn">💾 保存配置</button>
-                    <button onclick="checkGitHubConfig()" class="btn btn-secondary">🔍 检查配置</button>
-                    <button onclick="toggleUploadMode()" class="btn btn-secondary" id="uploadModeBtn">🔄 切换上传模式</button>
-                </div>
-
-                <div id="githubConfigStatus" class="alert alert-error">
-                    ❌ 未配置 GitHub 存储信息
+                <div class="alert alert-success">
+                    ✅ R2 存储已就绪，无需额外配置
+                    <br><br>
+                    <strong>目录结构说明：</strong><br>
+                    • 根目录：package/<br>
+                    • 月份目录：package/YYYY-MM/<br>
+                    • 日期目录：package/YYYY-MM/YYYY-MM-JJ/<br>
+                    • 打包目录：package/YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号/<br>
+                    <br>
+                    例如：package/2024-01/2024-01-15/2024-01-15-ABC123/
                 </div>
             </div>
         </div>
@@ -807,7 +789,7 @@
         <div id="uploadPage" class="page">
             <div class="page-header">
                 <h1>📤 文件上传</h1>
-                <p>根据 LP 号后缀上传文件到 GitHub</p>
+                <p>根据 LP 号后缀上传文件到 R2 存储</p>
             </div>
             <div class="page-content">
                 <div class="form-group">
@@ -852,7 +834,6 @@
                 <div style="margin-bottom: 20px;">
                     <button onclick="refreshFileList()" class="btn">🔄 刷新列表</button>
                     <button onclick="exportAllFiles()" class="btn btn-success">📦 导出所有文件</button>
-                    <button onclick="syncDataFromGitHub()" class="btn btn-secondary">☁️ 从GitHub同步</button>
                     <button onclick="openDeleteByFolderModal()" class="btn btn-danger">🗑️ 删除文件</button>
                     <button onclick="rebuildRegistryFromRepo('today')" class="btn btn-secondary">🔍 重建注册表(当天)</button>
                     <button onclick="rebuildRegistryFromRepo('all')" class="btn btn-secondary">🛠️ 重建注册表(全量)</button>
@@ -1001,32 +982,18 @@
         let previewObjectUrls = [];
         let lastPackingComputation = null;
 
-        // GitHub 配置
-        const GITHUB_CONFIG = {
-            owner: 'your-username',
-            repo: 'your-repo',
-            branch: 'main',
-            token: 'your-token',
-            useProxy: false,
-            proxyEndpoint: ''
-        };
+        // R2存储配置（无需额外配置，使用环境变量）
 
         // 存储配置
         const STORAGE_KEYS = {
             DATABASE: 'fileStorage_database',
             FILES: 'fileStorage_files',
-            GITHUB_CONFIG: 'fileStorage_github_config',
             DATABASE_DATE: 'fileStorage_database_date',
             LAST_PAGE: 'fileStorage_last_page'
         };
 
         const DATA_VERSION = '1.2';
 
-        // GitHub数据文件
-        const GITHUB_FILES = {
-            DATABASE: 'database.json',
-            FILES_REGISTRY: 'files-registry.json'
-        };
 
         // 自动同步设置
         const AUTO_SYNC_INTERVAL = 60000; // 60秒
@@ -1522,13 +1489,17 @@
             const files = ctx.files;
 
             const today = new Date();
-            const dateStr = today.getFullYear() +
-                String(today.getMonth() + 1).padStart(2, '0') +
-                String(today.getDate()).padStart(2, '0');
-
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const dateStr = `${year}${month}${day}`;
+            
+            // 创建层级目录结构: YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号
+            const yearMonth = `${year}-${month}`;
+            const yearMonthDay = `${year}-${month}-${day}`;
             const folderName = chosenContractNumber ?
-                `${dateStr}_${chosenContractNumber}` :
-                `${dateStr}_${lpSuffix}`;
+                `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${chosenContractNumber}` :
+                `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${lpSuffix}`;
 
             showStatus('uploadStatus', `正在上传到R2存储: ${folderName}` , 'info');
             showUploadProgress(0);
@@ -1645,122 +1616,36 @@
             updateSelectedFilesPreview();
         }
 
-        // 上传单个文件到GitHub
-        async function uploadToGitHub(file, folderPath, fileName) {
-            const isMobile = isMobileDevice();
+        // 上传单个文件到R2
+        async function uploadToR2(file, folderPath, fileName) {
             const startTime = Date.now();
             
             try {
-                // 文件大小检查
-                if (file.size > 100 * 1024 * 1024) {
-                    throw new Error(`文件过大: ${formatFileSize(file.size)}，GitHub限制100MB`);
+                // 文件大小检查 (R2限制更宽松，设为500MB)
+                if (file.size > 500 * 1024 * 1024) {
+                    throw new Error(`文件过大: ${formatFileSize(file.size)}，限制500MB`);
                 }
 
-                // 移动端特殊限制
-                if (isMobile && file.size > 50 * 1024 * 1024) {
-                    throw new Error(`移动端文件过大: ${formatFileSize(file.size)}，建议不超过50MB`);
-                }
-
-                const base64 = await fileToBase64(file);
-                const content = base64.split(',')[1];
-
-                // 智能选择上传模式
-                if (GITHUB_CONFIG.useProxy && GITHUB_CONFIG.proxyEndpoint) {
-                    try {
-                        const requestBody = {
-                            owner: GITHUB_CONFIG.owner,
-                            repo: GITHUB_CONFIG.repo,
-                            branch: GITHUB_CONFIG.branch,
-                            folderPath,
-                            fileName,
-                            contentBase64: content
-                        };
-                        
-                        const proxyRes = await fetch(GITHUB_CONFIG.proxyEndpoint, {
-                            method: 'POST',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'User-Agent': isMobile ? 'Mobile-FileUploader' : 'Desktop-FileUploader'
-                            },
-                            body: JSON.stringify(requestBody)
-                        });
-                        
-                        if (proxyRes.ok) {
-                            const data = await proxyRes.json();
-                            if (data.success) {
-                                return data;
-                            } else {
-                                throw new Error(data.error || 'Proxy返回失败');
-                            }
-                        } else {
-                            throw new Error(`代理服务器错误 ${proxyRes.status}`);
-                        }
-                        
-                    } catch (proxyError) {
-                        console.warn('代理模式失败，切换到直传模式:', proxyError.message);
-                    }
-                }
-
-                // 直传模式
-                const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${folderPath}/${fileName}`;
+                // 使用R2存储适配器上传文件
+                const result = await window.r2PackageStorage.uploadFile(file, folderPath);
                 
-                const requestHeaders = {
-                    'Authorization': `token ${GITHUB_CONFIG.token}`,
-                    'Content-Type': 'application/json'
-                };
-                
-                if (isMobile) {
-                    requestHeaders['User-Agent'] = 'Mobile-FileUploader';
-                }
-                
-                const requestPayload = {
-                    message: `Upload ${fileName} from ${isMobile ? 'mobile' : 'desktop'}`,
-                    content: content,
-                    branch: GITHUB_CONFIG.branch
-                };
-                
-                // 移动端使用XMLHttpRequest，桌面端使用Fetch；均增加重试与退避
-                if (isMobile) {
-                    let attempt = 0;
-                    while (attempt < 3) {
-                        try {
-                            return await uploadWithXHR(url, requestHeaders, requestPayload, startTime);
-                        } catch (e) {
-                            attempt++;
-                            if (attempt >= 3) throw e;
-                            const backoff = 600 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 300);
-                            await sleep(backoff);
-                        }
-                    }
+                if (result.success) {
+                    const duration = Date.now() - startTime;
+                    const publicUrl = await window.r2PackageStorage.getPublicUrl(result.filePath);
+                    
+                    return {
+                        success: true,
+                        message: `文件已上传: ${fileName} (${formatFileSize(file.size)})`,
+                        duration: duration,
+                        url: publicUrl,
+                        filePath: result.filePath,
+                        size: file.size
+                    };
                 } else {
-                    let attempt = 0;
-                    while (attempt < 3) {
-                        const response = await fetch(url, {
-                            method: 'PUT',
-                            headers: requestHeaders,
-                            body: JSON.stringify(requestPayload)
-                        });
-                        if (response.ok) {
-                            const result = await response.json();
-                            return { 
-                                success: true, 
-                                url: `https://cdn.jsdelivr.net/gh/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}@${GITHUB_CONFIG.branch}/${folderPath}/${fileName}`, 
-                                downloadUrl: result.content.download_url 
-                            };
-                        }
-                        const errorText = await response.text();
-                        let errorData;
-                        try { errorData = JSON.parse(errorText); } catch { errorData = { message: errorText }; }
-                        attempt++;
-                        if (attempt >= 3) {
-                            throw new Error(`GitHub API错误 ${response.status}: ${errorData.message || '未知错误'}`);
-                        }
-                        const backoff = 700 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 400);
-                        await sleep(backoff);
-                    }
+                    throw new Error(result.error);
                 }
             } catch (error) {
-                console.error('上传到GitHub失败:', error);
+                console.error('上传到R2失败:', error);
                 return { success: false, error: error.message };
             }
         }
@@ -2143,7 +2028,25 @@
 
             for (const [key, file] of entries) {
                 const folder = file.folder || 'unknown';
-                const date = /^[0-9]{8}/.test(folder) ? folder.slice(0, 8) : 'unknown';
+                // 新的目录结构: YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号
+                // 从文件夹路径中提取日期信息
+                let date = 'unknown';
+                if (folder !== 'unknown') {
+                    // 尝试从新格式中提取日期: YYYY-MM/YYYY-MM-JJ/...
+                    const pathParts = folder.split('/');
+                    if (pathParts.length >= 3) {
+                        const dateMatch = pathParts[1].match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                        if (dateMatch) {
+                            date = `${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}`;
+                        }
+                    } else {
+                        // 兼容旧格式: YYYYMMDD_...
+                        const oldDateMatch = folder.match(/^(\d{8})/);
+                        if (oldDateMatch) {
+                            date = oldDateMatch[1];
+                        }
+                    }
+                }
 
                 // 在界面层隐藏 unknown
                 if (folder === 'unknown' || date === 'unknown') {
@@ -2215,7 +2118,24 @@
             const folderToFilesCount = new Map(); // folder -> count
             for (const [, file] of uploadedFiles.entries()) {
                 const folder = file && file.folder ? String(file.folder) : '';
-                if (!folder.startsWith(dateStr)) continue; // 仅当日
+                // 检查是否为当日文件夹（支持新旧格式）
+                let isToday = false;
+                if (folder.includes('/')) {
+                    // 新格式: YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号
+                    const pathParts = folder.split('/');
+                    if (pathParts.length >= 2) {
+                        const dayPart = pathParts[1];
+                        const dayMatch = dayPart.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        if (dayMatch) {
+                            const folderDateStr = `${dayMatch[1]}${dayMatch[2]}${dayMatch[3]}`;
+                            isToday = folderDateStr === dateStr;
+                        }
+                    }
+                } else {
+                    // 旧格式: YYYYMMDD_...
+                    isToday = folder.startsWith(dateStr);
+                }
+                if (!isToday) continue;
                 const lp = file && file.lpNumber ? String(file.lpNumber) : '';
                 if (!folderToLPs.has(folder)) folderToLPs.set(folder, new Set());
                 if (!folderToFilesCount.has(folder)) folderToFilesCount.set(folder, 0);
@@ -2385,11 +2305,37 @@
             // 重用 confirmFixUnmatchedFolder 的核心逻辑，但参数化
             try {
                 const dateStr = getImportDateStr();
-                if (!dateStr || !folder.startsWith(dateStr + '_')) {
+                // 检查是否为当日文件夹（支持新旧格式）
+                let isValidFolder = false;
+                if (folder.includes('/')) {
+                    // 新格式检查
+                    const pathParts = folder.split('/');
+                    if (pathParts.length >= 2) {
+                        const dayPart = pathParts[1];
+                        const dayMatch = dayPart.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        if (dayMatch) {
+                            const folderDateStr = `${dayMatch[1]}${dayMatch[2]}${dayMatch[3]}`;
+                            isValidFolder = folderDateStr === dateStr;
+                        }
+                    }
+                } else {
+                    // 旧格式检查
+                    isValidFolder = folder.startsWith(dateStr + '_');
+                }
+                
+                if (!dateStr || !isValidFolder) {
                     showStatus('autoFixStatus', '仅允许修正当日文件夹', 'error');
                     return;
                 }
-                const newFolder = `${dateStr}_${contract}`;
+                
+                // 创建新格式文件夹路径
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const yearMonth = `${year}-${month}`;
+                const yearMonthDay = `${year}-${month}-${day}`;
+                const newFolder = `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${contract}`;
                 let changed = false;
                 for (const [key, file] of Array.from(uploadedFiles.entries())) {
                     if (file && String(file.folder) === folder) {
@@ -2426,7 +2372,14 @@
                 // 顺序执行，遇到个别失败不影响其他
                 const before = total;
                 (function(folder, contract, lp){
-                    const newFolder = `${dateStr}_${contract}`;
+                    // 创建新格式文件夹路径
+                    const today = new Date();
+                    const year = today.getFullYear();
+                    const month = String(today.getMonth() + 1).padStart(2, '0');
+                    const day = String(today.getDate()).padStart(2, '0');
+                    const yearMonth = `${year}-${month}`;
+                    const yearMonthDay = `${year}-${month}-${day}`;
+                    const newFolder = `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${contract}`;
                     let changed = false;
                     for (const [key, file] of Array.from(uploadedFiles.entries())) {
                         if (file && String(file.folder) === folder) {
@@ -2605,7 +2558,15 @@
                     if (statusEl) showStatus('fixStatus', '未在数据库中找到该LP号，请确认后再试', 'error');
                     return;
                 }
-                const newFolder = `${dateStr}_${contract}`;
+                
+                // 创建新格式文件夹路径
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const yearMonth = `${year}-${month}`;
+                const yearMonthDay = `${year}-${month}-${day}`;
+                const newFolder = `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${contract}`;
 
                 // 执行修正：更新 uploadedFiles 中该文件夹的所有记录的 folder、lpNumber、contractNumber
                 let changed = false;
