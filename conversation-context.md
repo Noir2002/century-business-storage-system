@@ -29,7 +29,7 @@
 ### 目标仓库结构 (century-business-storage-system)
 ```
 ├── index.html (统一入口页面)
-├── video-storage.html (视频存储模块)
+├── package-system.html (统一打包管理系统)
 ├── dashboard.html (库存管理仪表板)
 ├── shared-assets/
 │   ├── cloudflare-config.js
