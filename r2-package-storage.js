@@ -6,25 +6,22 @@ class R2PackageStorage {
   }
   
   getBaseUrl() {
-    // 方法1: 使用window.apiConfig
-    if (window.apiConfig && window.apiConfig.baseURL) {
-      return window.apiConfig.baseURL;
-    }
-    
-    // 方法2: 使用APIConfig类
-    if (window.APIConfig) {
-      const apiConfig = new window.APIConfig();
-      return apiConfig.baseURL;
-    }
-    
-    // 方法3: 直接检查当前域名
+    // 检查当前域名，优先使用本地服务器
     const hostname = window.location.hostname;
+    
+    // 本地开发环境
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:3000';
     }
     
-    // 方法4: 回退到默认Worker URL
-    return 'https://century-business-system.anthonin815.workers.dev';
+    // 如果有本地server.js运行，使用相对路径
+    // 这样可以避免跨域问题
+    if (window.location.protocol === 'file:' || window.location.port === '3000') {
+      return '';  // 使用相对路径
+    }
+    
+    // 其他情况使用当前域名的相对路径
+    return '';
   }
 
   getApiUrl(endpoint) {
@@ -280,3 +277,35 @@ window.r2PackageStorage = new R2PackageStorage();
 
 console.log('📦 R2 打包系统存储适配器已加载');
 console.log('🔧 API基础URL:', window.r2PackageStorage.baseUrl);
+
+// 添加系统状态指示
+function showSystemStatus() {
+  const statusMsg = document.createElement('div');
+  statusMsg.style.cssText = `
+    position: fixed; top: 10px; right: 10px; z-index: 10000;
+    background: #52c41a; color: white; padding: 8px 16px;
+    border-radius: 4px; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  `;
+  statusMsg.innerHTML = '✅ 打包系统已就绪 (本地模式)';
+  document.body.appendChild(statusMsg);
+  
+  setTimeout(() => {
+    if (statusMsg.parentNode) {
+      statusMsg.style.opacity = '0';
+      statusMsg.style.transition = 'opacity 0.3s';
+      setTimeout(() => {
+        if (statusMsg.parentNode) {
+          statusMsg.remove();
+        }
+      }, 300);
+    }
+  }, 3000);
+}
+
+// 页面加载完成后显示状态
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', showSystemStatus);
+} else {
+  showSystemStatus();
+}
+

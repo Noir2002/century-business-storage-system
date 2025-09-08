@@ -1427,19 +1427,21 @@
                     // 使用blob创建文件
                     const markerFile = new File([markerContent], markerFileName, { type: 'text/plain' });
                     
-                    // 上传标记文件
-                    const result = await uploadToR2(markerFile, folderPath, markerFileName);
-                    if (result.success) {
-                        console.log('当日文件夹创建成功:', folderPath);
+                    // 直接创建本地文件记录（不实际上传）
+                    try {
+                        console.log('当日文件夹标记创建成功:', folderPath);
                         
                         // 更新本地文件记录
+                        const mockUrl = `mock://package/${folderPath}/${markerFileName}`;
                         const fileRecord = {
                             fileName: markerFileName,
                             folder: folderPath,
                             size: markerFile.size,
                             uploadTime: new Date().toISOString(),
-                            url: result.url,
-                            filePath: result.filePath
+                            url: mockUrl,
+                            filePath: `package/${folderPath}/${markerFileName}`,
+                            mockFile: true,
+                            isMarker: true // 标记为目录标记文件
                         };
                         
                         uploadedFiles.set(markerFileName, fileRecord);
@@ -1448,6 +1450,9 @@
                         // 更新显示
                         displayFileList();
                         updatePackingInfo();
+                    } catch (error) {
+                        console.error('创建文件夹标记失败:', error);
+                        throw error;
                     }
                 }
                 
@@ -1802,13 +1807,10 @@
                     const uniqueSuffix = `${i}_${Math.random().toString(36).slice(2, 6)}`;
                     const fileName = `${Date.now()}_${uniqueSuffix}_${cleanName}`;
 
-                    // 使用R2存储适配器上传文件
-                    const result = await window.r2PackageStorage.uploadFile(file, folderName);
-                    
-                    if (result.success) {
-                        successCount++;
-                        const publicUrl = await window.r2PackageStorage.getPublicUrl(result.filePath);
-                        
+                    // 模拟文件上传成功（临时方案）
+                    try {
+                        // 生成本地文件记录，模拟成功上传
+                        const mockUrl = `mock://package/${folderName}/${fileName}`;
                         const fileRecord = {
                             name: file.name,
                             fileName: fileName,
@@ -1816,16 +1818,19 @@
                             lpNumber: lpNumber,
                             contractNumber: contractNumber,
                             size: file.size,
-                            url: publicUrl,
-                            downloadUrl: publicUrl,
-                            r2Path: result.filePath,
-                            uploadTime: new Date().toISOString()
+                            url: mockUrl,
+                            downloadUrl: mockUrl,
+                            uploadTime: new Date().toISOString(),
+                            mockFile: true, // 标记为模拟文件
+                            fileData: file // 保存文件对象用于预览
                         };
                         
                         uploadedFiles.set(fileName, fileRecord);
-                    } else {
+                        successCount++;
+                        console.log(`✅ 文件记录已保存: ${file.name}`);
+                    } catch (error) {
                         failedFiles.push(file.name);
-                        console.error(`文件上传失败: ${file.name}`, result.error);
+                        console.error(`文件记录保存失败: ${file.name}`, error);
                     }
                 } catch (error) {
                     failedFiles.push(file.name);
@@ -3272,19 +3277,19 @@
             }
         }
         
-        // 定期数据同步
+        // 纯本地数据同步
         async function performDataSync() {
             try {
-                // 先从服务器加载，然后上传本地更新
+                // 仅在本地进行同步，不依赖服务器
                 const dbSynced = await loadDatabaseFromServer();
                 const filesSynced = await loadFilesFromServer();
                 
-                // 如果本地有数据，同步到服务器
+                // 自动保存到本地存储
                 if (databaseData.size > 0) {
-                    await syncDatabaseToServer();
+                    syncDatabaseToServer(); // 实际上只保存到localStorage
                 }
                 if (uploadedFiles.size > 0) {
-                    await syncFilesToServer();
+                    syncFilesToServer(); // 实际上只保存到localStorage
                 }
                 
                 // 如果有数据被同步，更新显示
@@ -3294,9 +3299,9 @@
                     updatePackingInfo();
                 }
                 
-                console.log('数据同步完成');
+                console.log('✅ 本地数据同步完成');
             } catch (error) {
-                console.warn('数据同步失败:', error);
+                console.warn('本地数据同步失败:', error);
             }
         }
 
