@@ -3226,14 +3226,14 @@
                 return window.location.origin;
             }
             
-            // 如果是file://协议，优先尝试 Worker 域名（API 可用）
+            // 如果是file://协议，优先尝试自定义域名
+            // 用户的自定义域名
+            const customDomain = 'https://centurybusiness.org';
+            
             // 备用 Worker 域名
             const cloudflareWorkerUrl = 'https://century-business-system.anthonin815.workers.dev';
             
-            // 用户的自定义域名（当前 API 不可用）
-            const customDomain = 'https://centurybusiness.org';
-            
-            return cloudflareWorkerUrl;
+            return customDomain;
         }
 
         // 数据同步功能（临时使用LocalStorage跨域同步）
