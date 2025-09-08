@@ -1,7 +1,30 @@
 // 打包系统的R2存储适配器
 class R2PackageStorage {
   constructor() {
-    this.baseUrl = (window.apiConfig && window.apiConfig.baseURL) ? window.apiConfig.baseURL : '';
+    // 尝试多种方式获取API基础URL
+    this.baseUrl = this.getBaseUrl();
+  }
+  
+  getBaseUrl() {
+    // 方法1: 使用window.apiConfig
+    if (window.apiConfig && window.apiConfig.baseURL) {
+      return window.apiConfig.baseURL;
+    }
+    
+    // 方法2: 使用APIConfig类
+    if (window.APIConfig) {
+      const apiConfig = new window.APIConfig();
+      return apiConfig.baseURL;
+    }
+    
+    // 方法3: 直接检查当前域名
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3000';
+    }
+    
+    // 方法4: 回退到默认Worker URL
+    return 'https://century-business-system.anthonin815.workers.dev';
   }
 
   getApiUrl(endpoint) {
@@ -256,3 +279,4 @@ window.R2PackageStorage = R2PackageStorage;
 window.r2PackageStorage = new R2PackageStorage();
 
 console.log('📦 R2 打包系统存储适配器已加载');
+console.log('🔧 API基础URL:', window.r2PackageStorage.baseUrl);

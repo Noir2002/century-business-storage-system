@@ -3142,7 +3142,7 @@
             }
         }
 
-        // 数据同步功能（基于服务器API）
+        // 数据同步功能（临时使用LocalStorage跨域同步）
         async function syncDatabaseToServer() {
             try {
                 const dataObject = {};
@@ -3157,17 +3157,15 @@
                     timestamp: Date.now()
                 };
                 
-                const response = await fetch('/api/package-sync/database', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dataToSync)
-                });
+                // 临时方案：使用localStorage + 跨窗口通信
+                localStorage.setItem('SYNC_DATABASE_GLOBAL', JSON.stringify(dataToSync));
+                localStorage.setItem('SYNC_DATABASE_TIMESTAMP', Date.now().toString());
                 
-                const result = await response.json();
-                if (!result.success) {
-                    console.warn('数据库同步失败:', result.error);
-                }
-                return result.success;
+                // 触发其他窗口同步
+                window.dispatchEvent(new CustomEvent('database-sync', { detail: dataToSync }));
+                
+                console.log('✅ 数据库已同步到本地存储');
+                return true;
             } catch (error) {
                 console.warn('数据库同步异常:', error);
                 return false;
@@ -3176,17 +3174,18 @@
         
         async function loadDatabaseFromServer() {
             try {
-                const response = await fetch('/api/package-sync/database');
-                const result = await response.json();
+                // 临时方案：从全局localStorage加载
+                const globalData = localStorage.getItem('SYNC_DATABASE_GLOBAL');
+                const globalTimestamp = parseInt(localStorage.getItem('SYNC_DATABASE_TIMESTAMP') || '0');
                 
-                if (result.success && result.data && result.data.data) {
-                    const serverData = result.data;
+                if (globalData) {
+                    const serverData = JSON.parse(globalData);
                     const serverTimestamp = serverData.timestamp || 0;
                     
                     // 检查本地时间戳
                     const localTimestamp = localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || 0;
                     
-                    // 如果服务器数据更新，则同步到本地
+                    // 如果全局数据更新，则同步到本地
                     if (serverTimestamp > localTimestamp) {
                         databaseData.clear();
                         Object.entries(serverData.data).forEach(([key, value]) => {
@@ -3201,13 +3200,13 @@
                         saveDatabaseToLocal();
                         localStorage.setItem(STORAGE_KEYS.DATABASE + '_timestamp', serverTimestamp);
                         
-                        console.log('数据库已从服务器同步');
+                        console.log('✅ 数据库已从全局同步加载');
                         return true;
                     }
                 }
                 return false;
             } catch (error) {
-                console.warn('从服务器加载数据库失败:', error);
+                console.warn('从全局存储加载数据库失败:', error);
                 return false;
             }
         }
@@ -3225,17 +3224,15 @@
                     timestamp: Date.now()
                 };
                 
-                const response = await fetch('/api/package-sync/files', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dataToSync)
-                });
+                // 临时方案：使用localStorage + 跨窗口通信
+                localStorage.setItem('SYNC_FILES_GLOBAL', JSON.stringify(dataToSync));
+                localStorage.setItem('SYNC_FILES_TIMESTAMP', Date.now().toString());
                 
-                const result = await response.json();
-                if (!result.success) {
-                    console.warn('文件注册表同步失败:', result.error);
-                }
-                return result.success;
+                // 触发其他窗口同步
+                window.dispatchEvent(new CustomEvent('files-sync', { detail: dataToSync }));
+                
+                console.log('✅ 文件注册表已同步到本地存储');
+                return true;
             } catch (error) {
                 console.warn('文件注册表同步异常:', error);
                 return false;
@@ -3244,17 +3241,17 @@
         
         async function loadFilesFromServer() {
             try {
-                const response = await fetch('/api/package-sync/files');
-                const result = await response.json();
+                // 临时方案：从全局localStorage加载
+                const globalData = localStorage.getItem('SYNC_FILES_GLOBAL');
                 
-                if (result.success && result.data && result.data.data) {
-                    const serverData = result.data;
+                if (globalData) {
+                    const serverData = JSON.parse(globalData);
                     const serverTimestamp = serverData.timestamp || 0;
                     
                     // 检查本地时间戳
                     const localTimestamp = localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || 0;
                     
-                    // 如果服务器数据更新，则同步到本地
+                    // 如果全局数据更新，则同步到本地
                     if (serverTimestamp > localTimestamp) {
                         uploadedFiles.clear();
                         Object.entries(serverData.data).forEach(([key, value]) => {
@@ -3264,13 +3261,13 @@
                         saveFilesToLocal();
                         localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', serverTimestamp);
                         
-                        console.log('文件注册表已从服务器同步');
+                        console.log('✅ 文件注册表已从全局同步加载');
                         return true;
                     }
                 }
                 return false;
             } catch (error) {
-                console.warn('从服务器加载文件注册表失败:', error);
+                console.warn('从全局存储加载文件注册表失败:', error);
                 return false;
             }
         }
@@ -3361,6 +3358,48 @@
             
             // 设置定期数据同步（每60秒）
             setInterval(performDataSync, AUTO_SYNC_INTERVAL);
+            
+            // 监听跨窗口同步事件
+            window.addEventListener('database-sync', (event) => {
+                console.log('🔄 收到数据库同步事件');
+                loadDatabaseFromServer().then((synced) => {
+                    if (synced) {
+                        updateDatabaseDisplay();
+                        updatePackingInfo();
+                    }
+                });
+            });
+            
+            window.addEventListener('files-sync', (event) => {
+                console.log('🔄 收到文件同步事件');
+                loadFilesFromServer().then((synced) => {
+                    if (synced) {
+                        displayFileList();
+                        updatePackingInfo();
+                    }
+                });
+            });
+            
+            // 监听localStorage变化（跨标签页同步）
+            window.addEventListener('storage', (event) => {
+                if (event.key === 'SYNC_DATABASE_GLOBAL') {
+                    console.log('🔄 检测到数据库跨标签页更新');
+                    loadDatabaseFromServer().then((synced) => {
+                        if (synced) {
+                            updateDatabaseDisplay();
+                            updatePackingInfo();
+                        }
+                    });
+                } else if (event.key === 'SYNC_FILES_GLOBAL') {
+                    console.log('🔄 检测到文件跨标签页更新');
+                    loadFilesFromServer().then((synced) => {
+                        if (synced) {
+                            displayFileList();
+                            updatePackingInfo();
+                        }
+                    });
+                }
+            });
         });
 
         // 点击模态框外部关闭

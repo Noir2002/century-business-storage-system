@@ -111,6 +111,9 @@ class APIConfig {
   }
 }
 
+// 导出类到全局
+window.APIConfig = APIConfig;
+
 // 全局API实例
 window.apiConfig = new APIConfig();
 
