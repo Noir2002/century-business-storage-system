@@ -793,11 +793,46 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
       console.log('💾 保存宽表数据:', requestData);
       if (requestData && Array.isArray(requestData.data)) {
         wideTableCache = requestData.data;
+        
+        // 计算销量
+        wideTableCache = computeSalesForWideTableRows(wideTableCache);
+        
+        // 执行自动归档：将超过5天的数据移动到历史记录
+        await archiveOldDatesToRecords(env, 5);
+        
+        // 如果历史记录为空且是新导入的数据，生成一些测试历史记录
+        if ((!Array.isArray(recordsCache) || recordsCache.length === 0) && wideTableCache.length > 0) {
+          recordsCache = generateTestHistoricalRecords(wideTableCache.slice(0, 5)); // 为前5个SKU生成历史数据
+          console.log('🔄 为新导入数据生成了', recordsCache.length, '条测试历史记录');
+        }
+        
+        // 持久化到R2
+        if (env.R2_BUCKET) {
+          try {
+            await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), {
+              httpMetadata: { contentType: 'application/json' },
+              customMetadata: { updatedAt: new Date().toISOString() }
+            });
+            
+            // 同时保存历史记录到R2
+            if (Array.isArray(recordsCache) && recordsCache.length > 0) {
+              await env.R2_BUCKET.put(RECORDS_R2_KEY, JSON.stringify(recordsCache), {
+                httpMetadata: { contentType: 'application/json' },
+                customMetadata: { updatedAt: new Date().toISOString() }
+              });
+            }
+            
+            console.log('✅ 数据已持久化到R2，宽表:', wideTableCache.length, '行，历史记录:', recordsCache.length, '条');
+          } catch (e) { 
+            console.warn('写入R2失败:', e); 
+          }
+        }
       }
       return Response.json({
         success: true,
         message: '宽表数据保存成功',
-        data: requestData
+        wideTableCount: wideTableCache.length,
+        recordsCount: recordsCache.length
       }, { headers: corsHeaders });
     }
     
@@ -1563,6 +1598,41 @@ async function generateRealInventorySummary(env) {
   });
   
   return Object.values(skuSummary);
+}
+
+// 生成测试历史记录（为新导入的数据创建一些历史数据）
+function generateTestHistoricalRecords(sampleRows) {
+  const testRecords = [];
+  const today = new Date();
+  
+  // 为每个SKU生成过去30天的历史数据
+  sampleRows.forEach(row => {
+    if (!row.SKU) return;
+    
+    for (let dayOffset = 30; dayOffset > 5; dayOffset--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - dayOffset);
+      const dateStr = date.toISOString().split('T')[0] + ' 12:00';
+      
+      const stock = Math.floor(Math.random() * 80) + 20; // 20-100库存
+      const sales = Math.floor(Math.random() * 5); // 0-4销量
+      
+      testRecords.push({
+        id: Date.now() + Math.floor(Math.random() * 1000000),
+        SKU: row.SKU,
+        '产品中文名': row['产品中文名'] || '测试产品',
+        '网页链接': row['网页链接'] || '',
+        '初始库存': row['初始库存'] || 100,
+        '日期': dateStr,
+        '库存': stock,
+        '销量': sales,
+        createTime: new Date().toISOString(),
+        createBy: 'auto-generated'
+      });
+    }
+  });
+  
+  return testRecords;
 }
 
 // 处理上下架管理API

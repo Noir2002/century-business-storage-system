@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>测试Excel上传和数据分析</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        .result { margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 3px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Excel导入和数据分析测试</h1>
+        
+        <div class="test-section">
+            <h3>1. 创建测试Excel文件</h3>
+            <button class="button" onclick="createTestExcel()">生成测试Excel文件</button>
+            <div id="excel-result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. 模拟前端Excel解析</h3>
+            <input type="file" id="fileInput" accept=".xlsx,.xls" style="margin: 10px 0;">
+            <button class="button" onclick="parseAndUpload()">解析并上传到Worker</button>
+            <div id="upload-result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>3. 测试数据分析API</h3>
+            <button class="button" onclick="testAnalytics()">测试销售分析</button>
+            <button class="button" onclick="testInventory()">测试库存数据</button>
+            <button class="button" onclick="testRecords()">测试历史记录</button>
+            <div id="api-result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // 配置Worker URL（请替换为您的实际URL）
+        const WORKER_URL = 'https://your-worker.your-subdomain.workers.dev';
+        
+        // 创建测试Excel文件
+        function createTestExcel() {
+            const testData = [
+                ['SKU', '产品中文名', '网页链接', '初始库存', '2025-09-05', '2025-09-06', '2025-09-07', '2025-09-08', '2025-09-09'],
+                ['X000001', 'Arc\'teryx Beta AR夹克 黑色 M', 'https://arcteryx.com/test1', 100, 95, 90, 85, 80, 75],
+                ['X000002', 'Arc\'teryx Atom LT马甲 蓝色 L', 'https://arcteryx.com/test2', 80, 78, 75, 70, 65, 60],
+                ['X000003', 'Arc\'teryx Gamma SL短裤 绿色 S', 'https://arcteryx.com/test3', 60, 58, 55, 50, 45, 40],
+                ['X000004', 'Arc\'teryx Beta AR夹克 红色 XL', 'https://arcteryx.com/test4', 120, 115, 110, 105, 100, 95],
+                ['X000005', 'Arc\'teryx Atom LT马甲 黑色 M', 'https://arcteryx.com/test5', 90, 88, 85, 80, 75, 70]
+            ];
+            
+            const ws = XLSX.utils.aoa_to_sheet(testData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '库存数据');
+            XLSX.writeFile(wb, 'test-inventory.xlsx');
+            
+            document.getElementById('excel-result').innerHTML = 
+                '<span class="success">✅ 测试Excel文件已生成：test-inventory.xlsx</span>';
+        }
+        
+        // 解析Excel并上传
+        async function parseAndUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                document.getElementById('upload-result').innerHTML = 
+                    '<span class="error">❌ 请先选择Excel文件</span>';
+                return;
+            }
+            
+            try {
+                // 解析Excel
+                const arrayBuffer = await file.arrayBuffer();
+                const wb = XLSX.read(arrayBuffer, { type: 'array' });
+                const sheet = wb.Sheets[wb.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+                
+                document.getElementById('upload-result').innerHTML = 
+                    `<div>📊 解析成功：${rows.length} 行数据</div>`;
+                
+                // 上传到Worker
+                const response = await fetch(`${WORKER_URL}/api/localdb/wide`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ data: rows })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('upload-result').innerHTML += 
+                        `<div class="success">✅ 上传成功！宽表：${result.wideTableCount} 行，历史记录：${result.recordsCount} 条</div>`;
+                } else {
+                    document.getElementById('upload-result').innerHTML += 
+                        `<div class="error">❌ 上传失败：${result.error}</div>`;
+                }
+                
+            } catch (error) {
+                document.getElementById('upload-result').innerHTML += 
+                    `<div class="error">❌ 处理失败：${error.message}</div>`;
+            }
+        }
+        
+        // 测试销售分析API
+        async function testAnalytics() {
+            try {
+                const response = await fetch(`${WORKER_URL}/api/analytics/sales`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('api-result').innerHTML = 
+                        `<div class="success">✅ 销售分析API测试成功</div>
+                         <pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                } else {
+                    document.getElementById('api-result').innerHTML = 
+                        `<div class="error">❌ 销售分析API失败：${result.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('api-result').innerHTML = 
+                    `<div class="error">❌ API调用失败：${error.message}</div>`;
+            }
+        }
+        
+        // 测试库存数据API
+        async function testInventory() {
+            try {
+                const response = await fetch(`${WORKER_URL}/api/inventory/summary`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('api-result').innerHTML = 
+                        `<div class="success">✅ 库存汇总API测试成功，数据条数：${result.data.length}</div>
+                         <pre>${JSON.stringify(result.data.slice(0, 3), null, 2)}</pre>`;
+                } else {
+                    document.getElementById('api-result').innerHTML = 
+                        `<div class="error">❌ 库存汇总API失败：${result.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('api-result').innerHTML = 
+                    `<div class="error">❌ API调用失败：${error.message}</div>`;
+            }
+        }
+        
+        // 测试历史记录API
+        async function testRecords() {
+            try {
+                const response = await fetch(`${WORKER_URL}/api/localdb/records`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('api-result').innerHTML = 
+                        `<div class="success">✅ 历史记录API测试成功，记录条数：${result.data.length}</div>
+                         <pre>${JSON.stringify(result.data.slice(0, 3), null, 2)}</pre>`;
+                } else {
+                    document.getElementById('api-result').innerHTML = 
+                        `<div class="error">❌ 历史记录API失败：${result.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('api-result').innerHTML = 
+                    `<div class="error">❌ API调用失败：${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

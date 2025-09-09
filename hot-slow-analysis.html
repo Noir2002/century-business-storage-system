@@ -110,8 +110,12 @@
             <div class="layui-input-inline">
               <select name="timeRange" lay-filter="timeRange">
                 <option value="7">最近7天</option>
+                <option value="15">最近15天</option>
                 <option value="30" selected>最近30天</option>
-                <option value="90">最近90天</option>
+                <option value="90">最近3个月</option>
+                <option value="180">最近半年</option>
+                <option value="365">最近1年</option>
+                <option value="0">全部数据</option>
               </select>
             </div>
           </div>
@@ -251,7 +255,12 @@
         // 1. 过滤时间范围
         var now = new Date();
         var startDate = new Date(now);
-        startDate.setDate(now.getDate() - currentTimeRange + 1);
+        if (currentTimeRange > 0) {
+          startDate.setDate(now.getDate() - currentTimeRange + 1);
+        } else {
+          // 全部数据：设置为很早的日期
+          startDate = new Date('2020-01-01');
+        }
         // 2. 聚合宽表每日销量
         var dateMap = {};
         var skuMap = {};
@@ -377,7 +386,7 @@
           series: topProducts.map((item, index) => ({
             name: item.name,
             type: 'bar',
-            data: [item.totalSales, Math.round(item.totalSales / timeRange * 10) / 10],
+            data: [item.totalSales, timeRange > 0 ? Math.round(item.totalSales / timeRange * 10) / 10 : Math.round(item.totalSales / 30 * 10) / 10],
             itemStyle: {
               color: index < 3 ? '#FF5722' : '#1E9FFF'
             }

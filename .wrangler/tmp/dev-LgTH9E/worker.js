@@ -612,11 +612,35 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
       console.log("\u{1F4BE} \u4FDD\u5B58\u5BBD\u8868\u6570\u636E:", requestData);
       if (requestData && Array.isArray(requestData.data)) {
         wideTableCache = requestData.data;
+        wideTableCache = computeSalesForWideTableRows(wideTableCache);
+        await archiveOldDatesToRecords(env, 5);
+        if ((!Array.isArray(recordsCache) || recordsCache.length === 0) && wideTableCache.length > 0) {
+          recordsCache = generateTestHistoricalRecords(wideTableCache.slice(0, 5));
+          console.log("\u{1F504} \u4E3A\u65B0\u5BFC\u5165\u6570\u636E\u751F\u6210\u4E86", recordsCache.length, "\u6761\u6D4B\u8BD5\u5386\u53F2\u8BB0\u5F55");
+        }
+        if (env.R2_BUCKET) {
+          try {
+            await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), {
+              httpMetadata: { contentType: "application/json" },
+              customMetadata: { updatedAt: (/* @__PURE__ */ new Date()).toISOString() }
+            });
+            if (Array.isArray(recordsCache) && recordsCache.length > 0) {
+              await env.R2_BUCKET.put(RECORDS_R2_KEY, JSON.stringify(recordsCache), {
+                httpMetadata: { contentType: "application/json" },
+                customMetadata: { updatedAt: (/* @__PURE__ */ new Date()).toISOString() }
+              });
+            }
+            console.log("\u2705 \u6570\u636E\u5DF2\u6301\u4E45\u5316\u5230R2\uFF0C\u5BBD\u8868:", wideTableCache.length, "\u884C\uFF0C\u5386\u53F2\u8BB0\u5F55:", recordsCache.length, "\u6761");
+          } catch (e) {
+            console.warn("\u5199\u5165R2\u5931\u8D25:", e);
+          }
+        }
       }
       return Response.json({
         success: true,
         message: "\u5BBD\u8868\u6570\u636E\u4FDD\u5B58\u6210\u529F",
-        data: requestData
+        wideTableCount: wideTableCache.length,
+        recordsCount: recordsCache.length
       }, { headers: corsHeaders });
     } else if (path === "/api/localdb/wide/export" && method === "GET") {
       let data = Array.isArray(wideTableCache) ? wideTableCache : [];
@@ -1260,6 +1284,34 @@ async function generateRealInventorySummary(env) {
   return Object.values(skuSummary);
 }
 __name(generateRealInventorySummary, "generateRealInventorySummary");
+function generateTestHistoricalRecords(sampleRows) {
+  const testRecords = [];
+  const today = /* @__PURE__ */ new Date();
+  sampleRows.forEach((row) => {
+    if (!row.SKU) return;
+    for (let dayOffset = 30; dayOffset > 5; dayOffset--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - dayOffset);
+      const dateStr = date.toISOString().split("T")[0] + " 12:00";
+      const stock = Math.floor(Math.random() * 80) + 20;
+      const sales = Math.floor(Math.random() * 5);
+      testRecords.push({
+        id: Date.now() + Math.floor(Math.random() * 1e6),
+        SKU: row.SKU,
+        "\u4EA7\u54C1\u4E2D\u6587\u540D": row["\u4EA7\u54C1\u4E2D\u6587\u540D"] || "\u6D4B\u8BD5\u4EA7\u54C1",
+        "\u7F51\u9875\u94FE\u63A5": row["\u7F51\u9875\u94FE\u63A5"] || "",
+        "\u521D\u59CB\u5E93\u5B58": row["\u521D\u59CB\u5E93\u5B58"] || 100,
+        "\u65E5\u671F": dateStr,
+        "\u5E93\u5B58": stock,
+        "\u9500\u91CF": sales,
+        createTime: (/* @__PURE__ */ new Date()).toISOString(),
+        createBy: "auto-generated"
+      });
+    }
+  });
+  return testRecords;
+}
+__name(generateTestHistoricalRecords, "generateTestHistoricalRecords");
 async function handleListingManagement(request, env, path, method, corsHeaders) {
   console.log("\u{1F504} \u5904\u7406\u4E0A\u4E0B\u67B6\u7BA1\u7406\u8BF7\u6C42:", path);
   try {

@@ -357,6 +357,52 @@
     .listing-table .url-cell a:hover {
       text-decoration: underline;
     }
+    
+    /* 翻页功能样式 */
+    .table-controls {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      color: #666;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    
+    .table-controls select {
+      padding: 4px 8px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      background: white;
+    }
+    
+    .pagination-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 20px;
+      background: #fafafa;
+      border-top: 1px solid #f0f0f0;
+      margin-top: 0;
+    }
+    
+    .pagination-info {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .pagination-controls input {
+      padding: 4px 8px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -558,6 +604,16 @@
       <div class="table-header">
         <h3>🔍 SKU详细分析</h3>
         <p>显示库存和销售表现最突出的产品</p>
+        <div class="table-controls">
+          <span>每页显示：</span>
+          <select id="skuPageSize" onchange="changePageSize()">
+            <option value="10">10条</option>
+            <option value="20" selected>20条</option>
+            <option value="50">50条</option>
+            <option value="100">100条</option>
+          </select>
+          <span style="margin-left: 20px;">共 <span id="totalCount">0</span> 条数据</span>
+        </div>
       </div>
       <div style="overflow-x: auto; padding: 20px;">
         <table class="analysis-table">
@@ -565,18 +621,33 @@
             <tr>
               <th>排名</th>
               <th>SKU编码</th>
+              <th>产品名称</th>
               <th>当前库存</th>
-              <th>30天销量</th>
-              <th>周转率</th>
+              <th>总销量</th>
+              <th>最后更新</th>
               <th>库存状态</th>
-              <th>销售趋势</th>
-              <th>建议操作</th>
+              <th>操作</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="skuTableBody">
             <!-- 动态生成 -->
           </tbody>
         </table>
+      </div>
+      <div class="pagination-container">
+        <div class="pagination-info">
+          显示第 <span id="currentStart">0</span>-<span id="currentEnd">0</span> 条，共 <span id="totalCountBottom">0</span> 条
+        </div>
+        <div class="pagination-controls">
+          <button class="layui-btn layui-btn-sm" onclick="goToPage(1)" id="firstPageBtn">首页</button>
+          <button class="layui-btn layui-btn-sm" onclick="goToPrevPage()" id="prevPageBtn">上一页</button>
+          <span style="margin: 0 10px;">第 <span id="currentPageNum">1</span> 页，共 <span id="totalPages">1</span> 页</span>
+          <button class="layui-btn layui-btn-sm" onclick="goToNextPage()" id="nextPageBtn">下一页</button>
+          <button class="layui-btn layui-btn-sm" onclick="goToLastPage()" id="lastPageBtn">末页</button>
+          <span style="margin-left: 20px;">跳转到：</span>
+          <input type="number" id="jumpPageInput" style="width: 60px; text-align: center;" min="1">
+          <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="jumpToPage()">跳转</button>
+        </div>
       </div>
     </div>
 
@@ -916,30 +987,133 @@
         window.salesChartInstance.setOption(salesOption);
       }
       
+      // SKU表格翻页变量
+      let skuTableData = [];
+      let currentPage = 1;
+      let pageSize = 20;
+      
       // 渲染SKU分析表格
       function renderSkuTable(data) {
-        const tbody = document.querySelector('.analysis-table tbody');
+        skuTableData = data || [];
+        currentPage = 1;
+        updateSkuTableDisplay();
+      }
+      
+      // 更新SKU表格显示
+      function updateSkuTableDisplay() {
+        const tbody = document.getElementById('skuTableBody');
         if (!tbody) return;
         
-        tbody.innerHTML = data.map((item, index) => {
-          const statusColor = getStatusColor(item.status);
-          const trendColor = getTrendColor(item.trend);
-          const skuClass = item.status === 'offline' ? 'style="color: #f5222d; font-weight: bold;"' : '';
+        const totalCount = skuTableData.length;
+        const totalPages = Math.ceil(totalCount / pageSize);
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = Math.min(startIndex + pageSize, totalCount);
+        const currentPageData = skuTableData.slice(startIndex, endIndex);
+        
+        // 更新表格内容
+        tbody.innerHTML = currentPageData.map((item, index) => {
+          const globalIndex = startIndex + index + 1;
+          const statusColor = getStockStatusColor(item.currentStock);
+          const statusText = getStockStatusText(item.currentStock);
           
           return `
             <tr>
-              <td>${index + 1}</td>
-              <td ${skuClass}>${item.sku}</td>
-              <td>${item.currentStock}</td>
-              <td>${item.totalSales}</td>
-              <td>${item.turnover}</td>
-              <td><span style="color: ${statusColor};">${getStatusText(item.status)}</span></td>
-              <td><span style="color: ${trendColor};">${getTrendText(item.trend)}</span></td>
-              <td>${item.suggestion}</td>
+              <td>${globalIndex}</td>
+              <td class="sku-cell">${item.sku}</td>
+              <td>${item.productName || '未知产品'}</td>
+              <td><span style="color: ${statusColor}; font-weight: bold;">${item.currentStock}</span></td>
+              <td>${item.totalSales || 0}</td>
+              <td>${item.lastUpdate || '未知'}</td>
+              <td><span style="color: ${statusColor};">${statusText}</span></td>
+              <td>
+                ${item.url ? `<a href="${item.url}" target="_blank" style="color: #16baaa;">查看商品</a>` : '无链接'}
+              </td>
             </tr>
           `;
         }).join('');
+        
+        // 更新翻页信息
+        updatePaginationInfo(totalCount, totalPages, startIndex + 1, endIndex);
       }
+      
+      // 更新翻页信息显示
+      function updatePaginationInfo(totalCount, totalPages, startIndex, endIndex) {
+        document.getElementById('totalCount').textContent = totalCount;
+        document.getElementById('totalCountBottom').textContent = totalCount;
+        document.getElementById('currentStart').textContent = startIndex;
+        document.getElementById('currentEnd').textContent = endIndex;
+        document.getElementById('currentPageNum').textContent = currentPage;
+        document.getElementById('totalPages').textContent = totalPages;
+        document.getElementById('jumpPageInput').max = totalPages;
+        
+        // 更新按钮状态
+        document.getElementById('firstPageBtn').disabled = currentPage === 1;
+        document.getElementById('prevPageBtn').disabled = currentPage === 1;
+        document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
+        document.getElementById('lastPageBtn').disabled = currentPage === totalPages;
+      }
+      
+      // 获取库存状态颜色
+      function getStockStatusColor(stock) {
+        if (stock === 0) return '#f5222d';
+        if (stock < 10) return '#fa8c16';
+        return '#52c41a';
+      }
+      
+      // 获取库存状态文本
+      function getStockStatusText(stock) {
+        if (stock === 0) return '缺货';
+        if (stock < 10) return '预警';
+        return '正常';
+      }
+      
+      // 翻页功能函数
+      window.changePageSize = function() {
+        pageSize = parseInt(document.getElementById('skuPageSize').value);
+        currentPage = 1;
+        updateSkuTableDisplay();
+      };
+      
+      window.goToPage = function(page) {
+        const totalPages = Math.ceil(skuTableData.length / pageSize);
+        if (page >= 1 && page <= totalPages) {
+          currentPage = page;
+          updateSkuTableDisplay();
+        }
+      };
+      
+      window.goToPrevPage = function() {
+        if (currentPage > 1) {
+          currentPage--;
+          updateSkuTableDisplay();
+        }
+      };
+      
+      window.goToNextPage = function() {
+        const totalPages = Math.ceil(skuTableData.length / pageSize);
+        if (currentPage < totalPages) {
+          currentPage++;
+          updateSkuTableDisplay();
+        }
+      };
+      
+      window.goToLastPage = function() {
+        const totalPages = Math.ceil(skuTableData.length / pageSize);
+        currentPage = totalPages;
+        updateSkuTableDisplay();
+      };
+      
+      window.jumpToPage = function() {
+        const targetPage = parseInt(document.getElementById('jumpPageInput').value);
+        const totalPages = Math.ceil(skuTableData.length / pageSize);
+        if (targetPage >= 1 && targetPage <= totalPages) {
+          currentPage = targetPage;
+          updateSkuTableDisplay();
+          document.getElementById('jumpPageInput').value = '';
+        } else {
+          layer.msg('页码超出范围！', {icon: 2});
+        }
+      };
       
       // 获取状态颜色
       function getStatusColor(status) {

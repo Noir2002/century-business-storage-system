@@ -1,0 +1,1756 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>始祖鸟外网数据分析 - 数据管理系统</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="./src/css/layui.css" rel="stylesheet">
+  <link href="./src/css/app-header.css" rel="stylesheet">
+  <script src="./api-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <style>
+    body {
+      background: #f8f9fa;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header .layui-nav {
+      background: transparent;
+    }
+    .header .layui-nav .layui-nav-item a {
+      color: rgba(255,255,255,0.9);
+    }
+    .header .layui-nav .layui-nav-item a:hover {
+      color: white;
+    }
+    .header .logo {
+      font-size: 18px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    
+    /* 主导航样式 */
+    .main-nav {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      margin: 0 20px;
+    }
+    .main-nav .layui-nav-item {
+      margin: 0 5px;
+    }
+    .main-nav .layui-nav-item a {
+      padding: 0 20px;
+      border-radius: 20px;
+      transition: all 0.3s ease;
+    }
+    .main-nav .layui-nav-item a:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .main-nav .layui-this a {
+      background: rgba(255,255,255,0.3) !important;
+    }
+
+    /* 页面顶部按钮区域 */
+    .top-actions {
+      margin: 20px 0;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    /* 页面容器 */
+    .page-container {
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    /* 分析范围控制面板 */
+    .analysis-controls {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* 基础统计卡片 */
+    .stats-container {
+      margin-bottom: 30px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+    .stats-card {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      text-align: center;
+      transition: transform 0.3s ease;
+    }
+    .stats-card:hover {
+      transform: translateY(-5px);
+    }
+    .stats-value {
+      font-size: 2.5em;
+      font-weight: bold;
+      color: #16baaa;
+      margin-bottom: 8px;
+    }
+    .stats-label {
+      color: #666;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .stats-trend {
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    .trend-up { color: #52c41a; }
+    .trend-down { color: #f5222d; }
+    .trend-stable { color: #fa8c16; }
+    
+    /* 图表容器 */
+    .chart-container {
+      background: white;
+      margin-bottom: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .chart-header {
+      padding: 20px 25px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .chart-title {
+      margin: 0;
+      color: #333;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .chart-controls {
+      display: flex;
+      gap: 8px;
+    }
+    .chart-content {
+      padding: 20px 25px;
+    }
+    .chart {
+      height: 350px;
+      width: 100%;
+    }
+    
+    /* 表格容器 */
+    .table-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      overflow: hidden;
+      margin-bottom: 25px;
+    }
+    .table-header {
+      padding: 20px 25px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .table-header h3 {
+      margin: 0;
+      color: #333;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .table-header p {
+      margin: 5px 0 0 0;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    /* SKU分析表格样式 */
+    .analysis-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .analysis-table th,
+    .analysis-table td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .analysis-table th {
+      background: #f8f9fa;
+      font-weight: bold;
+      color: #333;
+    }
+    .analysis-table tbody tr:hover {
+      background: #f5f5f5;
+    }
+    .analysis-table .sku-cell {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      color: #1890ff;
+    }
+    
+    /* 上下架管理（隐藏状态，保留代码） */
+    .listing-management-container {
+      display: none; /* 暂时隐藏，为虚拟库存功能保留 */
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      overflow: hidden;
+      margin-bottom: 25px;
+    }
+    .listing-section {
+      padding: 20px;
+    }
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .section-controls {
+      display: flex;
+      gap: 8px;
+    }
+    .listing-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      background: white;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .listing-table th,
+    .listing-table td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .listing-table th {
+      background: #f8f9fa;
+      font-weight: bold;
+      color: #333;
+    }
+    .listing-table tbody tr:hover {
+      background: #f5f5f5;
+    }
+    .listing-table .sku-cell {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+    }
+    .listing-table .url-cell {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .listing-table .url-cell a {
+      color: #16baaa;
+      text-decoration: none;
+    }
+    .listing-table .url-cell a:hover {
+      text-decoration: underline;
+    }
+    
+    /* 翻页功能样式 */
+    .table-controls {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      color: #666;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .table-controls select {
+      padding: 4px 8px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      background: white;
+    }
+    .pagination-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 20px;
+      background: #fafafa;
+      border-top: 1px solid #f0f0f0;
+      margin-top: 0;
+    }
+    .pagination-info {
+      color: #666;
+      font-size: 14px;
+    }
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pagination-controls input {
+      padding: 4px 8px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    /* 爆款滞销分析专用样式 */
+    .hot-slow-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .hot-slow-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .hot-slow-number {
+      font-size: 2em;
+      font-weight: bold;
+      color: #1E9FFF;
+    }
+    .hot-slow-label {
+      color: #666;
+      margin-top: 5px;
+    }
+    
+    /* 产品详细列表 */
+    .product-list {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .product-list h3 {
+      margin-bottom: 15px;
+      color: #333;
+    }
+    .layui-table {
+      margin-top: 0;
+    }
+    .layui-table th, .layui-table td {
+      text-align: center;
+    }
+    .product-name {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .hot-product { color: #FF5722; font-weight: bold; }
+    .slow-product { color: #757575; }
+    .normal-product { color: #333; }
+  </style>
+</head>
+<body>
+  <div class="layui-header header">
+    <div class="logo">
+      📊 数据管理系统
+    </div>
+    <div class="main-nav">
+      <ul class="layui-nav">
+        <li class="layui-nav-item"><a href="unified-index.html">首页总览</a></li>
+        <li class="layui-nav-item"><a href="local-database.html">本地数据库</a></li>
+        <li class="layui-nav-item layui-this"><a href="arcteryx-data-analysis.html">始祖鸟外网数据分析</a></li>
+        <li class="layui-nav-item"><a href="tmall-database.html">天猫数据库</a></li>
+        <li class="layui-nav-item"><a href="package-system.html">发包系统</a></li>
+        <li class="layui-nav-item"><a href="user-management.html">用户管理</a></li>
+      </ul>
+    </div>
+    <div class="layui-nav">
+      <li class="layui-nav-item">
+        <a href="javascript:;" id="userInfo">
+          <img src="//unpkg.com/outicons@1.0.0/icons/user-circle.svg" style="width: 20px; margin-right: 5px;">
+          <span id="username">用户</span>
+        </a>
+        <dl class="layui-nav-child">
+          <dd><a href="profile.html">个人设置</a></dd>
+          <dd><a href="javascript:;" onclick="logout()">退出登录</a></dd>
+        </dl>
+      </li>
+    </div>
+  </div>
+
+  <div class="page-container">
+    <!-- 顶部操作按钮 -->
+    <div class="top-actions">
+      <button class="layui-btn layui-btn-normal" onclick="window.location.href='tmall-hot-slow-analysis.html'">
+        <i class="layui-icon layui-icon-chart"></i> 天猫数据分析
+      </button>
+      <button class="layui-btn layui-btn-primary" onclick="refreshAllData()">
+        <i class="layui-icon layui-icon-refresh"></i> 刷新数据
+      </button>
+      <button class="layui-btn layui-btn-primary" onclick="exportAnalysisReport()">
+        <i class="layui-icon layui-icon-download-circle"></i> 导出报告
+      </button>
+    </div>
+
+    <!-- 分析控制面板 -->
+    <div class="analysis-controls">
+      <form class="layui-form" lay-filter="analysisFilter">
+        <div class="layui-form-item">
+          <div class="layui-inline">
+            <label class="layui-form-label">分析范围</label>
+            <div class="layui-input-inline">
+              <select name="timeRange" lay-filter="timeRange">
+                <option value="7">最近7天</option>
+                <option value="15">最近15天</option>
+                <option value="30" selected>最近30天</option>
+                <option value="90">最近3个月</option>
+                <option value="180">最近半年</option>
+                <option value="365">最近1年</option>
+                <option value="0">全部数据</option>
+              </select>
+            </div>
+          </div>
+          <div class="layui-inline">
+            <label class="layui-form-label">显示数量</label>
+            <div class="layui-input-inline">
+              <select name="limit">
+                <option value="10">前10名</option>
+                <option value="20" selected>前20名</option>
+                <option value="50">前50名</option>
+              </select>
+            </div>
+          </div>
+          <div class="layui-inline">
+            <button type="submit" class="layui-btn" lay-submit lay-filter="updateAnalysis">
+              <i class="layui-icon layui-icon-search"></i> 更新分析
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- 基础数据统计卡片 -->
+    <div class="stats-container">
+      <h2 style="margin-bottom: 20px; color: #333;">📊 基础数据概览</h2>
+      <div class="stats-grid">
+        <div class="stats-card">
+          <div class="stats-value">0</div>
+          <div class="stats-label">总SKU数</div>
+          <div class="stats-trend trend-up">↗ 较昨日 +0</div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-value">0%</div>
+          <div class="stats-label">库存健康率</div>
+          <div class="stats-trend trend-stable">→ 较昨日 +0%</div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-value">0</div>
+          <div class="stats-label">平均周转率</div>
+          <div class="stats-trend trend-up">↗ 较昨日 +0</div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-value">0</div>
+          <div class="stats-label">库存预警</div>
+          <div class="stats-trend trend-down">↘ 较昨日 -0</div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-value">0</div>
+          <div class="stats-label">历史记录</div>
+          <div class="stats-trend trend-up">↗ 较昨日 +0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 库存趋势图表 -->
+    <div class="chart-container">
+      <div class="chart-header">
+        <h3 class="chart-title">📈 库存趋势分析</h3>
+        <div class="chart-controls">
+          <button class="layui-btn layui-btn-xs" onclick="exportChart('stock')">
+            <i class="layui-icon layui-icon-download-circle"></i> 导出
+          </button>
+          <button class="layui-btn layui-btn-xs layui-btn-primary" onclick="refreshChart('stock')">
+            <i class="layui-icon layui-icon-refresh"></i> 刷新
+          </button>
+        </div>
+      </div>
+      <div class="chart-content">
+        <div id="stockChart" class="chart"></div>
+      </div>
+    </div>
+
+    <!-- 销售趋势图表 -->
+    <div class="chart-container">
+      <div class="chart-header">
+        <h3 class="chart-title">📈 销售趋势分析</h3>
+        <div class="chart-controls">
+          <button class="layui-btn layui-btn-xs" onclick="exportChart('sales')">
+            <i class="layui-icon layui-icon-download-circle"></i> 导出
+          </button>
+          <button class="layui-btn layui-btn-xs layui-btn-primary" onclick="refreshChart('sales')">
+            <i class="layui-icon layui-icon-refresh"></i> 刷新
+          </button>
+        </div>
+      </div>
+      <div class="chart-content">
+        <div id="salesChart" class="chart"></div>
+      </div>
+    </div>
+
+    <!-- 爆款滞销分析部分 -->
+    <div style="margin: 40px 0;">
+      <h2 style="margin-bottom: 20px; color: #333;">🔥 爆款滞销分析</h2>
+      
+      <!-- 爆款滞销统计卡片 -->
+      <div class="hot-slow-stats">
+        <div class="hot-slow-card">
+          <div class="hot-slow-number" id="totalProducts">0</div>
+          <div class="hot-slow-label">总产品数</div>
+        </div>
+        <div class="hot-slow-card">
+          <div class="hot-slow-number" id="hotProducts">0</div>
+          <div class="hot-slow-label">爆品数量</div>
+        </div>
+        <div class="hot-slow-card">
+          <div class="hot-slow-number" id="slowProducts">0</div>
+          <div class="hot-slow-label">滞销品数量</div>
+        </div>
+        <div class="hot-slow-card">
+          <div class="hot-slow-number" id="totalSales">0</div>
+          <div class="hot-slow-label">总销量</div>
+        </div>
+      </div>
+
+      <!-- 每日总销量趋势 -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h3 class="chart-title">📊 每日总销量趋势</h3>
+        </div>
+        <div class="chart-content">
+          <div id="dailyTotalSalesChart" class="chart"></div>
+        </div>
+      </div>
+
+      <!-- 销量趋势分析 -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h3 class="chart-title">📈 销量趋势分析</h3>
+        </div>
+        <div class="chart-content">
+          <div id="salesTrendChart" class="chart"></div>
+        </div>
+      </div>
+
+      <!-- 爆品销量排行 -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h3 class="chart-title">🔥 爆品销量排行</h3>
+        </div>
+        <div class="chart-content">
+          <div id="hotProductsChart" class="chart"></div>
+        </div>
+      </div>
+
+      <!-- 爆品分级分析 -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h3 class="chart-title">🔥 爆品分级分析</h3>
+        </div>
+        <div class="chart-content">
+          <div id="hotLevelChartsContainer"></div>
+        </div>
+      </div>
+
+      <!-- 滞销品分析 -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h3 class="chart-title">📉 滞销品分析</h3>
+        </div>
+        <div class="chart-content">
+          <div id="slowProductsChart" class="chart"></div>
+        </div>
+      </div>
+
+      <!-- 产品详细分析 -->
+      <div class="product-list">
+        <h3>📋 产品详细分析</h3>
+        <table class="layui-table" id="productTable">
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>产品名称</th>
+              <th>SKU</th>
+              <th>总销量</th>
+              <th>当前库存</th>
+              <th>平均日销量</th>
+              <th>网址</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- 动态生成 -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SKU详细分析表格 -->
+    <div class="table-container">
+      <div class="table-header">
+        <h3>🔍 SKU详细分析</h3>
+        <p>显示库存和销售表现最突出的产品</p>
+        <div class="table-controls">
+          <span>每页显示：</span>
+          <select id="skuPageSize" onchange="changePageSize()">
+            <option value="10">10条</option>
+            <option value="20" selected>20条</option>
+            <option value="50">50条</option>
+            <option value="100">100条</option>
+          </select>
+          <span style="margin-left: 20px;">共 <span id="totalCount">0</span> 条数据</span>
+        </div>
+      </div>
+      <div style="overflow-x: auto; padding: 20px;">
+        <table class="analysis-table">
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>SKU编码</th>
+              <th>产品名称</th>
+              <th>当前库存</th>
+              <th>总销量</th>
+              <th>最后更新</th>
+              <th>库存状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="skuTableBody">
+            <!-- 动态生成 -->
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination-container">
+        <div class="pagination-info">
+          显示第 <span id="currentStart">0</span>-<span id="currentEnd">0</span> 条，共 <span id="totalCountBottom">0</span> 条
+        </div>
+        <div class="pagination-controls">
+          <button class="layui-btn layui-btn-sm" onclick="goToPage(1)" id="firstPageBtn">首页</button>
+          <button class="layui-btn layui-btn-sm" onclick="goToPrevPage()" id="prevPageBtn">上一页</button>
+          <span style="margin: 0 10px;">第 <span id="currentPageNum">1</span> 页，共 <span id="totalPages">1</span> 页</span>
+          <button class="layui-btn layui-btn-sm" onclick="goToNextPage()" id="nextPageBtn">下一页</button>
+          <button class="layui-btn layui-btn-sm" onclick="goToLastPage()" id="lastPageBtn">末页</button>
+          <span style="margin-left: 20px;">跳转到：</span>
+          <input type="number" id="jumpPageInput" style="width: 60px; text-align: center;" min="1">
+          <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="jumpToPage()">跳转</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 上下架管理区域（隐藏，保留代码） -->
+    <div class="listing-management-container">
+      <div class="table-header">
+        <h3>📋 商品上下架管理</h3>
+        <p>基于库存状态的智能上下架建议</p>
+        <div class="section-controls">
+          <button class="layui-btn layui-btn-sm layui-btn-normal" onclick="loadListingCandidates()">
+            <i class="layui-icon layui-icon-upload"></i> 查看待上架
+          </button>
+          <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="loadDelistingCandidates()">
+            <i class="layui-icon layui-icon-download"></i> 查看待下架
+          </button>
+        </div>
+      </div>
+      
+      <!-- 待上架商品列表 -->
+      <div id="listingSection" class="listing-section" style="display: none;">
+        <div class="section-header">
+          <h4 style="color: #52c41a;">📈 建议上架商品（库存 > 10）</h4>
+          <div class="section-controls">
+            <button class="layui-btn layui-btn-sm layui-btn-normal" onclick="selectAllListing()">全选</button>
+            <button class="layui-btn layui-btn-sm" onclick="clearListingSelection()">取消全选</button>
+            <button class="layui-btn layui-btn-sm layui-btn-normal" onclick="confirmListing()">确认上架</button>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="listing-table">
+            <thead>
+              <tr>
+                <th width="60"><input type="checkbox" id="listingSelectAll" onchange="toggleAllListing(this)"></th>
+                <th>SKU编码</th>
+                <th>产品名称</th>
+                <th>当前库存</th>
+                <th>最近销量</th>
+                <th>下架时间</th>
+                <th>网页链接</th>
+              </tr>
+            </thead>
+            <tbody id="listingTableBody">
+              <!-- 动态生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- 待下架商品列表 -->
+      <div id="delistingSection" class="listing-section" style="display: none;">
+        <div class="section-header">
+          <h4 style="color: #f5222d;">📉 建议下架商品（库存 = 0）</h4>
+          <div class="section-controls">
+            <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="selectAllDelisting()">全选</button>
+            <button class="layui-btn layui-btn-sm" onclick="clearDelistingSelection()">取消全选</button>
+            <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="confirmDelisting()">确认下架</button>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="listing-table">
+            <thead>
+              <tr>
+                <th width="60"><input type="checkbox" id="delistingSelectAll" onchange="toggleAllDelisting(this)"></th>
+                <th>SKU编码</th>
+                <th>产品名称</th>
+                <th>当前库存</th>
+                <th>最近销量</th>
+                <th>缺货天数</th>
+                <th>网页链接</th>
+              </tr>
+            </thead>
+            <tbody id="delistingTableBody">
+              <!-- 动态生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/layui.js"></script>
+  <script>
+    layui.use(['form', 'layer'], function(){
+      var form = layui.form;
+      var layer = layui.layer;
+      
+      // 检查登录状态
+      checkLoginStatus();
+      
+      // 初始化页面
+      initCharts();
+      loadAnalysisData();
+      
+      // 爆款滞销分析变量
+      var allWideData = [];
+      var allRecordData = [];
+      var currentTimeRange = 30;
+      var currentLimit = 20;
+      
+      // 图表实例
+      var stockChartInstance = null;
+      var salesChartInstance = null;
+      var dailyTotalSalesChart = null;
+      var salesTrendChart = null;
+      var hotProductsChart = null;
+      var slowProductsChart = null;
+      
+      // SKU表格翻页变量
+      let skuTableData = [];
+      let currentPage = 1;
+      let pageSize = 20;
+      
+      // 表单提交事件
+      form.on('submit(updateAnalysis)', function(data){
+        currentTimeRange = parseInt(data.field.timeRange || 30);
+        currentLimit = parseInt(data.field.limit || 20);
+        loadHotSlowAnalysisData();
+        return false;
+      });
+      
+      // 初始化图表
+      function initCharts() {
+        window.stockChartInstance = echarts.init(document.getElementById('stockChart'));
+        window.salesChartInstance = echarts.init(document.getElementById('salesChart'));
+      }
+      
+      // 检查登录状态
+      function checkLoginStatus() {
+        const token = localStorage.getItem('token');
+        const userInfo = localStorage.getItem('userInfo');
+        
+        if (!token) {
+          layer.confirm('您还未登录，是否跳转到登录页面？', {
+            btn: ['登录', '取消']
+          }, function(){
+            window.location.href = 'login.html';
+          });
+          return;
+        }
+        
+        if (userInfo) {
+          try {
+            const user = JSON.parse(userInfo);
+            document.getElementById('username').textContent = user.username || '用户';
+          } catch (e) {
+            console.warn('用户信息解析失败:', e);
+          }
+        }
+      }
+      
+      // 退出登录
+      window.logout = function() {
+        layer.confirm('确定要退出登录吗？', function(index){
+          localStorage.removeItem('token');
+          localStorage.removeItem('userInfo');
+          layer.close(index);
+          window.location.href = 'login.html';
+        });
+      };
+      
+      // 加载基础分析数据
+      function loadAnalysisData() {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        // 加载销售分析
+        fetch(window.apiConfig.baseURL + '/api/analytics/sales', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            updateStatsCards(data.data);
+          }
+        })
+        .catch(error => {
+          console.error('加载销售分析失败:', error);
+        });
+        
+        // 加载库存趋势
+        fetch(window.apiConfig.baseURL + '/api/analytics/trends', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            renderStockChart(data.data);
+          }
+        })
+        .catch(error => {
+          console.error('加载库存趋势失败:', error);
+        });
+        
+        // 加载销售趋势
+        fetch(window.apiConfig.baseURL + '/api/inventory/data', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            renderSalesChart(data.data);
+          }
+        })
+        .catch(error => {
+          console.error('加载销售趋势失败:', error);
+        });
+        
+        // 加载SKU详细分析
+        fetch(window.apiConfig.baseURL + '/api/inventory/summary', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            renderSkuTable(data.data);
+          }
+        })
+        .catch(error => {
+          console.error('加载SKU分析失败:', error);
+        });
+        
+        // 加载爆款滞销分析数据
+        loadHotSlowAnalysisData();
+      }
+      
+      // 更新统计卡片
+      function updateStatsCards(data) {
+        const cards = document.querySelectorAll('.stats-card');
+        if (cards.length >= 5) {
+          // 总SKU数
+          cards[0].querySelector('.stats-value').textContent = data.totalSku || 0;
+          // 库存健康率
+          cards[1].querySelector('.stats-value').textContent = (data.healthRate || 0) + '%';
+          // 平均周转率
+          cards[2].querySelector('.stats-value').textContent = data.avgTurnover || 0;
+          // 库存预警
+          cards[3].querySelector('.stats-value').textContent = data.warningCount || 0;
+          // 库存价值（移除金额显示，改为记录总数）
+          cards[4].querySelector('.stats-value').textContent = data.totalRecords || 0;
+          cards[4].querySelector('.stats-label').textContent = '历史记录';
+        }
+      }
+      
+      // 渲染库存趋势图表
+      function renderStockChart(data) {
+        const stockOption = {
+          title: {
+            text: '库存趋势变化',
+            left: 'center',
+            textStyle: { fontSize: 16, color: '#333' }
+          },
+          tooltip: {
+            trigger: 'axis',
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            borderColor: '#ddd',
+            textStyle: { color: '#333' }
+          },
+          legend: {
+            data: ['总库存', '正常库存', '预警库存', '缺货SKU'],
+            bottom: 10
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '15%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: data.dates || []
+          },
+          yAxis: {
+            type: 'value',
+            name: '数量'
+          },
+          series: [
+            {
+              name: '总库存',
+              type: 'line',
+              data: data.series.total || [],
+              itemStyle: { color: '#16baaa' },
+              smooth: true
+            },
+            {
+              name: '正常库存',
+              type: 'line',
+              data: data.series.healthy || [],
+              itemStyle: { color: '#52c41a' },
+              smooth: true
+            },
+            {
+              name: '预警库存',
+              type: 'line',
+              data: data.series.warning || [],
+              itemStyle: { color: '#fa8c16' },
+              smooth: true
+            },
+            {
+              name: '缺货SKU',
+              type: 'line',
+              data: data.series.outOfStock || [],
+              itemStyle: { color: '#f5222d' },
+              smooth: true
+            }
+          ]
+        };
+        window.stockChartInstance.setOption(stockOption);
+      }
+      
+      // 渲染销售趋势图表
+      function renderSalesChart(data) {
+        const salesOption = {
+          title: {
+            text: '销售趋势分析',
+            left: 'center',
+            textStyle: { fontSize: 16, color: '#333' }
+          },
+          tooltip: {
+            trigger: 'axis',
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            borderColor: '#ddd',
+            textStyle: { color: '#333' }
+          },
+          legend: {
+            data: ['日销量', '周平均', '月累计'],
+            bottom: 10
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '15%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: data.dates || []
+          },
+          yAxis: {
+            type: 'value',
+            name: '销量'
+          },
+          series: [
+            {
+              name: '日销量',
+              type: 'bar',
+              data: data.series.daily || [],
+              itemStyle: { color: '#1890ff' }
+            },
+            {
+              name: '周平均',
+              type: 'line',
+              data: data.series.weekly || [],
+              itemStyle: { color: '#52c41a' },
+              smooth: true
+            },
+            {
+              name: '月累计',
+              type: 'line',
+              data: data.series.monthly || [],
+              itemStyle: { color: '#fa8c16' },
+              smooth: true
+            }
+          ]
+        };
+        window.salesChartInstance.setOption(salesOption);
+      }
+      
+      // 渲染SKU分析表格
+      function renderSkuTable(data) {
+        skuTableData = data || [];
+        currentPage = 1;
+        updateSkuTableDisplay();
+      }
+      
+      // 更新SKU表格显示
+      function updateSkuTableDisplay() {
+        const tbody = document.getElementById('skuTableBody');
+        if (!tbody) return;
+        
+        const totalCount = skuTableData.length;
+        const totalPages = Math.ceil(totalCount / pageSize);
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = Math.min(startIndex + pageSize, totalCount);
+        const currentPageData = skuTableData.slice(startIndex, endIndex);
+        
+        // 更新表格内容
+        tbody.innerHTML = currentPageData.map((item, index) => {
+          const globalIndex = startIndex + index + 1;
+          const statusColor = getStockStatusColor(item.currentStock);
+          const statusText = getStockStatusText(item.currentStock);
+          
+          return `
+            <tr>
+              <td>${globalIndex}</td>
+              <td class="sku-cell">${item.sku}</td>
+              <td>${item.productName || '未知产品'}</td>
+              <td><span style="color: ${statusColor}; font-weight: bold;">${item.currentStock}</span></td>
+              <td>${item.totalSales || 0}</td>
+              <td>${item.lastUpdate || '未知'}</td>
+              <td><span style="color: ${statusColor};">${statusText}</span></td>
+              <td>
+                ${item.url ? `<a href="${item.url}" target="_blank" style="color: #16baaa;">查看商品</a>` : '无链接'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+        
+        // 更新翻页信息
+        updatePaginationInfo(totalCount, totalPages, startIndex + 1, endIndex);
+      }
+      
+      // 更新翻页信息显示
+      function updatePaginationInfo(totalCount, totalPages, startIndex, endIndex) {
+        document.getElementById('totalCount').textContent = totalCount;
+        document.getElementById('totalCountBottom').textContent = totalCount;
+        document.getElementById('currentStart').textContent = startIndex;
+        document.getElementById('currentEnd').textContent = endIndex;
+        document.getElementById('currentPageNum').textContent = currentPage;
+        document.getElementById('totalPages').textContent = totalPages;
+        document.getElementById('jumpPageInput').max = totalPages;
+        
+        // 更新按钮状态
+        document.getElementById('firstPageBtn').disabled = currentPage === 1;
+        document.getElementById('prevPageBtn').disabled = currentPage === 1;
+        document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
+        document.getElementById('lastPageBtn').disabled = currentPage === totalPages;
+      }
+      
+      // 获取库存状态颜色
+      function getStockStatusColor(stock) {
+        if (stock === 0) return '#f5222d';
+        if (stock < 10) return '#fa8c16';
+        return '#52c41a';
+      }
+      
+      // 获取库存状态文本
+      function getStockStatusText(stock) {
+        if (stock === 0) return '缺货';
+        if (stock < 10) return '预警';
+        return '正常';
+      }
+      
+      // 翻页功能函数
+      window.changePageSize = function() {
+        pageSize = parseInt(document.getElementById('skuPageSize').value);
+        currentPage = 1;
+        updateSkuTableDisplay();
+      };
+      
+      window.goToPage = function(page) {
+        const totalPages = Math.ceil(skuTableData.length / pageSize);
+        if (page >= 1 && page <= totalPages) {
+          currentPage = page;
+          updateSkuTableDisplay();
+        }
+      };
+      
+      window.goToPrevPage = function() {
+        if (currentPage > 1) {
+          currentPage--;
+          updateSkuTableDisplay();
+        }
+      };
+      
+      window.goToNextPage = function() {
+        const totalPages = Math.ceil(skuTableData.length / pageSize);
+        if (currentPage < totalPages) {
+          currentPage++;
+          updateSkuTableDisplay();
+        }
+      };
+      
+      window.goToLastPage = function() {
+        const totalPages = Math.ceil(skuTableData.length / pageSize);
+        currentPage = totalPages;
+        updateSkuTableDisplay();
+      };
+      
+      window.jumpToPage = function() {
+        const targetPage = parseInt(document.getElementById('jumpPageInput').value);
+        const totalPages = Math.ceil(skuTableData.length / pageSize);
+        if (targetPage >= 1 && targetPage <= totalPages) {
+          currentPage = targetPage;
+          updateSkuTableDisplay();
+          document.getElementById('jumpPageInput').value = '';
+        } else {
+          layer.msg('页码超出范围！', {icon: 2});
+        }
+      };
+      
+      // 爆款滞销分析数据加载
+      function loadHotSlowAnalysisData() {
+        layer.msg('正在加载本地宽表和明细数据...', {icon: 16, time: 1000});
+        var token = localStorage.getItem('token');
+        var headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        
+        $.when(
+          $.ajax({url: window.apiConfig.baseURL + '/api/localdb/wide', headers: headers}),
+          $.ajax({url: window.apiConfig.baseURL + '/api/localdb/records', headers: headers})
+        ).done(function(wideRes, recordRes) {
+          allWideData = wideRes[0].data || [];
+          allRecordData = recordRes[0].data || [];
+          processHotSlowData();
+        }).fail(function() {
+          layer.msg('数据加载失败', {icon:2});
+        });
+      }
+      
+      function processHotSlowData() {
+        // 1. 过滤时间范围
+        var now = new Date();
+        var startDate = new Date(now);
+        if (currentTimeRange > 0) {
+          startDate.setDate(now.getDate() - currentTimeRange + 1);
+        } else {
+          // 全部数据：设置为很早的日期
+          startDate = new Date('2020-01-01');
+        }
+        // 2. 聚合宽表每日销量
+        var dateMap = {};
+        var skuMap = {};
+        allWideData.forEach(row => {
+          var sku = row['SKU'];
+          var name = row['产品中文名'] || row['产品名称'] || '';
+          if (!sku) return;
+          
+          // 提取所有日期列的销量数据
+          for (var key in row) {
+            if (key.includes('销量') || key.includes('2024') || key.includes('2023')) {
+              var sales = parseInt(row[key]) || 0;
+              if (sales > 0) {
+                var dateStr = extractDateFromKey(key);
+                if (dateStr && new Date(dateStr) >= startDate) {
+                  if (!dateMap[dateStr]) dateMap[dateStr] = 0;
+                  dateMap[dateStr] += sales;
+                  
+                  if (!skuMap[sku]) {
+                    skuMap[sku] = {
+                      sku: sku,
+                      name: name,
+                      url: row['网页链接'] || '',
+                      totalSales: 0,
+                      currentStock: parseInt(row['库存']) || 0
+                    };
+                  }
+                  skuMap[sku].totalSales += sales;
+                }
+              }
+            }
+          }
+        });
+        
+        // 3. 处理历史记录
+        allRecordData.forEach(record => {
+          var sku = record['SKU'];
+          var sales = parseInt(record['销量']) || 0;
+          var dateStr = record['日期'];
+          
+          if (sales > 0 && dateStr && new Date(dateStr) >= startDate) {
+            if (!dateMap[dateStr]) dateMap[dateStr] = 0;
+            dateMap[dateStr] += sales;
+            
+            if (!skuMap[sku]) {
+              skuMap[sku] = {
+                sku: sku,
+                name: record['产品中文名'] || '',
+                url: record['网页链接'] || '',
+                totalSales: 0,
+                currentStock: parseInt(record['库存']) || 0
+              };
+            }
+            skuMap[sku].totalSales += sales;
+          }
+        });
+        
+        // 4. 转换为数组并排序
+        var skuArr = Object.values(skuMap).sort((a, b) => b.totalSales - a.totalSales);
+        var dateArr = Object.keys(dateMap).sort().map(date => ({
+          date: date,
+          sales: dateMap[date]
+        }));
+        
+        // 5. 分类爆品和滞销品
+        var hotArr = skuArr.filter(item => item.totalSales >= 5);
+        var slowArr = skuArr.filter(item => item.totalSales === 0 && item.currentStock > 0);
+        
+        // 6. 更新统计
+        $('#totalProducts').text(skuArr.length);
+        $('#hotProducts').text(hotArr.length);
+        $('#slowProducts').text(slowArr.length);
+        $('#totalSales').text(skuArr.reduce((sum, item) => sum + item.totalSales, 0));
+        
+        // 7. 生成图表
+        generateDailyTotalSalesChart(dateArr);
+        generateSalesTrendChart(skuArr, currentTimeRange);
+        generateHotProductsChart(skuArr);
+        generateHotLevelCharts(skuArr);
+        generateSlowProductsChart(slowArr);
+        generateProductTableWithPagination(skuArr);
+        
+        layer.msg('爆品滞销品分析完成！', {icon: 1});
+      }
+      
+      // 提取日期字符串
+      function extractDateFromKey(key) {
+        var match = key.match(/(\d{4}-\d{2}-\d{2})/);
+        return match ? match[1] : null;
+      }
+      
+      // 生成每日总销量趋势图
+      function generateDailyTotalSalesChart(data) {
+        const chartDom = document.getElementById('dailyTotalSalesChart');
+        if (dailyTotalSalesChart) {
+          dailyTotalSalesChart.dispose();
+        }
+        dailyTotalSalesChart = echarts.init(chartDom);
+        
+        const option = {
+          title: {
+            text: '每日总销量趋势',
+            left: 'center'
+          },
+          tooltip: {
+            trigger: 'axis'
+          },
+          xAxis: {
+            type: 'category',
+            data: data.map(item => item.date)
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: [{
+            data: data.map(item => item.sales),
+            type: 'line',
+            smooth: true,
+            itemStyle: {
+              color: '#1E9FFF'
+            }
+          }]
+        };
+        dailyTotalSalesChart.setOption(option);
+      }
+      
+      // 生成销量趋势图
+      function generateSalesTrendChart(data, timeRange) {
+        const chartDom = document.getElementById('salesTrendChart');
+        if (salesTrendChart) {
+          salesTrendChart.dispose();
+        }
+        salesTrendChart = echarts.init(chartDom);
+        
+        // 按销量排序，取前10名
+        const topProducts = data.slice(0, 10);
+        
+        const option = {
+          title: {
+            text: '销量趋势分析',
+            left: 'center'
+          },
+          tooltip: {
+            trigger: 'axis'
+          },
+          legend: {
+            data: ['总销量', '日均销量'],
+            bottom: 10
+          },
+          xAxis: {
+            type: 'category',
+            data: topProducts.map(item => item.name || item.sku)
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: topProducts.map((item, index) => ({
+            name: item.name,
+            type: 'bar',
+            data: [item.totalSales, timeRange > 0 ? Math.round(item.totalSales / timeRange * 10) / 10 : Math.round(item.totalSales / 30 * 10) / 10],
+            itemStyle: {
+              color: index < 3 ? '#FF5722' : '#1E9FFF'
+            }
+          }))
+        };
+        
+        salesTrendChart.setOption(option);
+      }
+      
+      // 生成爆品图表
+      function generateHotProductsChart(data) {
+        const chartDom = document.getElementById('hotProductsChart');
+        if (hotProductsChart) {
+          hotProductsChart.dispose();
+        }
+        hotProductsChart = echarts.init(chartDom);
+        
+        const hotProducts = data.filter(item => item.totalSales >= 5).slice(0, currentLimit);
+        
+        const option = {
+          title: {
+            text: '爆品销量排行',
+            left: 'center'
+          },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            }
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'value',
+            boundaryGap: [0, 0.01]
+          },
+          yAxis: {
+            type: 'category',
+            data: hotProducts.map(item => item.name || item.sku)
+          },
+          series: [{
+            name: '销量',
+            type: 'bar',
+            data: hotProducts.map(item => item.totalSales),
+            itemStyle: {
+              color: '#FF5722'
+            }
+          }]
+        };
+        
+        hotProductsChart.setOption(option);
+      }
+      
+      // 生成爆品分级图表
+      function generateHotLevelCharts(data) {
+        const container = document.getElementById('hotLevelChartsContainer');
+        container.innerHTML = '';
+        
+        const levels = [
+          { name: '超级爆品', min: 20, color: '#FF1744' },
+          { name: '热销爆品', min: 10, max: 19, color: '#FF5722' },
+          { name: '一般爆品', min: 5, max: 9, color: '#FF9800' }
+        ];
+        
+        levels.forEach((level, index) => {
+          const chartDiv = document.createElement('div');
+          chartDiv.style.height = '300px';
+          chartDiv.style.marginBottom = '20px';
+          container.appendChild(chartDiv);
+          
+          const chart = echarts.init(chartDiv);
+          const levelData = data.filter(item => {
+            return item.totalSales >= level.min && (!level.max || item.totalSales <= level.max);
+          }).slice(0, 10);
+          
+          const option = {
+            title: {
+              text: level.name + '（' + levelData.length + '个）',
+              left: 'center'
+            },
+            tooltip: {
+              trigger: 'item'
+            },
+            series: [{
+              name: level.name,
+              type: 'pie',
+              radius: '50%',
+              data: levelData.map(item => ({
+                value: item.totalSales,
+                name: item.name || item.sku
+              })),
+              itemStyle: {
+                color: level.color
+              },
+              emphasis: {
+                itemStyle: {
+                  shadowBlur: 10,
+                  shadowOffsetX: 0,
+                  shadowColor: 'rgba(0, 0, 0, 0.5)'
+                }
+              }
+            }]
+          };
+          
+          chart.setOption(option);
+        });
+      }
+      
+      // 生成滞销品图表
+      function generateSlowProductsChart(data) {
+        const chartDom = document.getElementById('slowProductsChart');
+        if (slowProductsChart) {
+          slowProductsChart.dispose();
+        }
+        slowProductsChart = echarts.init(chartDom);
+        
+        const slowProducts = data.slice(0, currentLimit);
+        
+        const option = {
+          title: {
+            text: '滞销品库存分布',
+            left: 'center'
+          },
+          tooltip: {
+            trigger: 'item'
+          },
+          series: [{
+            name: '库存',
+            type: 'pie',
+            radius: '50%',
+            data: slowProducts.map(item => ({
+              value: item.currentStock,
+              name: item.name || item.sku
+            })),
+            itemStyle: {
+              color: '#757575'
+            },
+            emphasis: {
+              itemStyle: {
+                shadowBlur: 10,
+                shadowOffsetX: 0,
+                shadowColor: 'rgba(0, 0, 0, 0.5)'
+              }
+            }
+          }]
+        };
+        
+        slowProductsChart.setOption(option);
+      }
+      
+      // 生成产品详细表格
+      function generateProductTableWithPagination(data) {
+        const tbody = document.querySelector('#productTable tbody');
+        if (!tbody) return;
+        
+        const displayData = data.slice(0, currentLimit);
+        tbody.innerHTML = displayData.map((item, index) => {
+          const rowClass = item.totalSales >= 5 ? 'hot-product' : 
+                          item.totalSales === 0 ? 'slow-product' : 'normal-product';
+          
+          return `
+            <tr class="${rowClass}">
+              <td>${index + 1}</td>
+              <td class="product-name" title="${item.name || item.sku}">${item.name || item.sku}</td>
+              <td>${item.sku}</td>
+              <td>${item.totalSales}</td>
+              <td>${item.currentStock}</td>
+              <td>${(item.totalSales / currentTimeRange).toFixed(2)}</td>
+              <td>
+                ${item.url ? `<a href="${item.url}" target="_blank">查看</a>` : '无链接'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+      
+      // 工具函数
+      window.refreshAllData = function() {
+        loadAnalysisData();
+      };
+      
+      window.exportAnalysisReport = function() {
+        layer.msg('导出功能开发中...', {icon: 16});
+      };
+      
+      window.exportChart = function(type) {
+        layer.msg(`导出${type}图表功能开发中...`, {icon: 16});
+      };
+      
+      window.refreshChart = function(type) {
+        if (type === 'stock') {
+          // 重新加载库存趋势
+          const token = localStorage.getItem('token');
+          fetch(window.apiConfig.baseURL + '/api/analytics/trends', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              renderStockChart(data.data);
+              layer.msg('库存趋势图已刷新', {icon: 1});
+            }
+          });
+        } else if (type === 'sales') {
+          // 重新加载销售趋势
+          const token = localStorage.getItem('token');
+          fetch(window.apiConfig.baseURL + '/api/inventory/data', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              renderSalesChart(data.data);
+              layer.msg('销售趋势图已刷新', {icon: 1});
+            }
+          });
+        }
+      };
+      
+      // 上下架管理功能（保留代码）
+      window.loadListingCandidates = function() {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        fetch(window.apiConfig.baseURL + '/api/listing/candidates', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            renderListingTable(data.data);
+            document.getElementById('listingSection').style.display = 'block';
+            document.getElementById('delistingSection').style.display = 'none';
+          }
+        })
+        .catch(error => {
+          console.error('加载上架候选失败:', error);
+          layer.msg('加载上架候选失败', {icon: 2});
+        });
+      };
+      
+      window.loadDelistingCandidates = function() {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        fetch(window.apiConfig.baseURL + '/api/delisting/candidates', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            renderDelistingTable(data.data);
+            document.getElementById('delistingSection').style.display = 'block';
+            document.getElementById('listingSection').style.display = 'none';
+          }
+        })
+        .catch(error => {
+          console.error('加载下架候选失败:', error);
+          layer.msg('加载下架候选失败', {icon: 2});
+        });
+      };
+      
+      // 渲染上架表格
+      function renderListingTable(data) {
+        const tbody = document.getElementById('listingTableBody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = data.map(item => `
+          <tr>
+            <td><input type="checkbox" name="listingSku" value="${item.sku}"></td>
+            <td class="sku-cell">${item.sku}</td>
+            <td>${item.name || '未知商品'}</td>
+            <td><span style="color: #52c41a; font-weight: bold;">${item.currentStock}</span></td>
+            <td>${item.totalSales || 0}</td>
+            <td>${item.delistedDate || '未知'}</td>
+            <td class="url-cell">
+              ${item.url ? `<a href="${item.url}" target="_blank">查看商品</a>` : '无链接'}
+            </td>
+          </tr>
+        `).join('');
+      }
+      
+      // 渲染下架表格
+      function renderDelistingTable(data) {
+        const tbody = document.getElementById('delistingTableBody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = data.map(item => `
+          <tr>
+            <td><input type="checkbox" name="delistingSku" value="${item.sku}"></td>
+            <td class="sku-cell">${item.sku}</td>
+            <td>${item.name || '未知商品'}</td>
+            <td><span style="color: #f5222d; font-weight: bold;">${item.currentStock}</span></td>
+            <td>${item.totalSales || 0}</td>
+            <td>${item.outOfStockDays || 0} 天</td>
+            <td class="url-cell">
+              ${item.url ? `<a href="${item.url}" target="_blank">查看商品</a>` : '无链接'}
+            </td>
+          </tr>
+        `).join('');
+      }
+      
+      // 上下架管理其他功能（保留代码）
+      window.toggleAllListing = function(checkbox) {
+        const checkboxes = document.querySelectorAll('input[name="listingSku"]');
+        checkboxes.forEach(cb => cb.checked = checkbox.checked);
+      };
+      
+      window.selectAllListing = function() {
+        document.getElementById('listingSelectAll').checked = true;
+        toggleAllListing(document.getElementById('listingSelectAll'));
+      };
+      
+      window.clearListingSelection = function() {
+        document.getElementById('listingSelectAll').checked = false;
+        toggleAllListing(document.getElementById('listingSelectAll'));
+      };
+      
+      window.confirmListing = function() {
+        const selectedSkus = Array.from(document.querySelectorAll('input[name="listingSku"]:checked'))
+          .map(cb => cb.value);
+        
+        if (selectedSkus.length === 0) {
+          layer.msg('请选择要上架的商品', {icon: 2});
+          return;
+        }
+        
+        layer.confirm(`确定要上架选中的 ${selectedSkus.length} 个商品吗？`, function(index){
+          const token = localStorage.getItem('token');
+          fetch(window.apiConfig.baseURL + '/api/listing/confirm', {
+            method: 'POST',
+            headers: { 
+              'Authorization': 'Bearer ' + token,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ skus: selectedSkus })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              layer.msg('上架操作完成', {icon: 1});
+              loadListingCandidates(); // 刷新列表
+              loadAnalysisData(); // 刷新分析数据
+            } else {
+              layer.msg('上架操作失败', {icon: 2});
+            }
+          })
+          .catch(error => {
+            console.error('上架操作失败:', error);
+            layer.msg('上架操作失败', {icon: 2});
+          });
+          
+          layer.close(index);
+        });
+      };
+      
+      // 类似的下架功能...
+      window.toggleAllDelisting = function(checkbox) {
+        const checkboxes = document.querySelectorAll('input[name="delistingSku"]');
+        checkboxes.forEach(cb => cb.checked = checkbox.checked);
+      };
+      
+      window.selectAllDelisting = function() {
+        document.getElementById('delistingSelectAll').checked = true;
+        toggleAllDelisting(document.getElementById('delistingSelectAll'));
+      };
+      
+      window.clearDelistingSelection = function() {
+        document.getElementById('delistingSelectAll').checked = false;
+        toggleAllDelisting(document.getElementById('delistingSelectAll'));
+      };
+      
+      window.confirmDelisting = function() {
+        const selectedSkus = Array.from(document.querySelectorAll('input[name="delistingSku"]:checked'))
+          .map(cb => cb.value);
+        
+        if (selectedSkus.length === 0) {
+          layer.msg('请选择要下架的商品', {icon: 2});
+          return;
+        }
+        
+        layer.confirm(`确定要下架选中的 ${selectedSkus.length} 个商品吗？`, function(index){
+          const token = localStorage.getItem('token');
+          fetch(window.apiConfig.baseURL + '/api/delisting/confirm', {
+            method: 'POST',
+            headers: { 
+              'Authorization': 'Bearer ' + token,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ skus: selectedSkus })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              layer.msg('下架操作完成', {icon: 1});
+              loadDelistingCandidates(); // 刷新列表
+              loadAnalysisData(); // 刷新分析数据
+            } else {
+              layer.msg('下架操作失败', {icon: 2});
+            }
+          })
+          .catch(error => {
+            console.error('下架操作失败:', error);
+            layer.msg('下架操作失败', {icon: 2});
+          });
+          
+          layer.close(index);
+        });
+      };
+    });
+  </script>
+</body>
+</html>
