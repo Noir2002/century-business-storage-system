@@ -137,6 +137,8 @@ var worker_default = {
           return await handleR2Routes(request, env, path, method, corsHeaders);
         } else if (path.startsWith("/api/package-sync/")) {
           return await handlePackageSync(request, env, path, method, corsHeaders);
+        } else if (path.startsWith("/api/listing/") || path.startsWith("/api/delisting/")) {
+          return await handleListingManagement(request, env, path, method, corsHeaders);
         } else {
           return new Response("Not Found", { status: 404, headers: corsHeaders });
         }
@@ -489,20 +491,19 @@ __name(handleExcelParse, "handleExcelParse");
 async function handleInventoryData(request, env, path, method, corsHeaders) {
   console.log("\u{1F504} \u5904\u7406\u5E93\u5B58\u6570\u636E\u8BF7\u6C42:", path);
   if (path === "/api/inventory/data" && method === "GET") {
-    const mockData = generateMockInventoryData();
+    const salesData = await generateRealSalesData(env);
     return Response.json({
       success: true,
-      data: mockData,
-      total: mockData.length,
+      data: salesData,
+      total: salesData.length,
       message: "\u5E93\u5B58\u6570\u636E\u83B7\u53D6\u6210\u529F"
     }, { headers: corsHeaders });
   } else if (path === "/api/inventory/summary" && method === "GET") {
-    const mockData = generateMockInventoryData();
-    const summary = calculateInventorySummary(mockData);
+    const summary = await generateRealInventorySummary(env);
     return Response.json({
       success: true,
-      summary,
-      message: "\u5E93\u5B58\u6C47\u603B\u8BA1\u7B97\u6210\u529F"
+      data: summary,
+      message: "\u5E93\u5B58\u6C47\u603B\u83B7\u53D6\u6210\u529F"
     }, { headers: corsHeaders });
   }
   return Response.json({
@@ -514,17 +515,17 @@ __name(handleInventoryData, "handleInventoryData");
 async function handleAnalyticsData(request, env, path, method, corsHeaders) {
   console.log("\u{1F504} \u5904\u7406\u6570\u636E\u5206\u6790\u8BF7\u6C42:", path);
   if (path === "/api/analytics/sales" && method === "GET") {
-    const salesAnalysis = generateSalesAnalysis();
+    const salesAnalysis = await generateRealSalesAnalysis(env);
     return Response.json({
       success: true,
-      analysis: salesAnalysis,
+      data: salesAnalysis,
       message: "\u9500\u552E\u5206\u6790\u5B8C\u6210"
     }, { headers: corsHeaders });
   } else if (path === "/api/analytics/trends" && method === "GET") {
-    const trendsAnalysis = generateTrendsAnalysis();
+    const trendsAnalysis = await generateRealTrendsAnalysis(env);
     return Response.json({
       success: true,
-      trends: trendsAnalysis,
+      data: trendsAnalysis,
       message: "\u8D8B\u52BF\u5206\u6790\u5B8C\u6210"
     }, { headers: corsHeaders });
   }
@@ -556,53 +557,6 @@ function generateMockInventoryData() {
   return data;
 }
 __name(generateMockInventoryData, "generateMockInventoryData");
-function calculateInventorySummary(data) {
-  const totalProducts = data.length;
-  const totalStock = data.reduce((sum, item) => sum + item.stock, 0);
-  const totalValue = data.reduce((sum, item) => sum + item.stock * parseFloat(item.price), 0);
-  const lowStockItems = data.filter((item) => item.stock < 50).length;
-  const outOfStockItems = data.filter((item) => item.status === "\u7F3A\u8D27").length;
-  return {
-    totalProducts,
-    totalStock,
-    totalValue: totalValue.toFixed(2),
-    lowStockItems,
-    outOfStockItems,
-    categories: [...new Set(data.map((item) => item.category))].length
-  };
-}
-__name(calculateInventorySummary, "calculateInventorySummary");
-function generateSalesAnalysis() {
-  const months = ["1\u6708", "2\u6708", "3\u6708", "4\u6708", "5\u6708", "6\u6708"];
-  const salesData = months.map((month) => ({
-    month,
-    sales: Math.floor(Math.random() * 1e6) + 5e5,
-    orders: Math.floor(Math.random() * 5e3) + 1e3,
-    avgOrderValue: (Math.random() * 500 + 200).toFixed(2)
-  }));
-  return {
-    monthlySales: salesData,
-    totalSales: salesData.reduce((sum, item) => sum + item.sales, 0),
-    totalOrders: salesData.reduce((sum, item) => sum + item.orders, 0),
-    growthRate: (Math.random() * 40 - 10).toFixed(1) + "%"
-  };
-}
-__name(generateSalesAnalysis, "generateSalesAnalysis");
-function generateTrendsAnalysis() {
-  const categories = ["\u624B\u673A", "\u5E73\u677F", "\u7B14\u8BB0\u672C", "\u914D\u4EF6"];
-  const trends = categories.map((category) => ({
-    category,
-    trend: Math.random() > 0.5 ? "\u4E0A\u5347" : "\u4E0B\u964D",
-    percentage: (Math.random() * 30).toFixed(1),
-    recommendation: Math.random() > 0.5 ? "\u589E\u52A0\u5E93\u5B58" : "\u51CF\u5C11\u8BA2\u8D2D"
-  }));
-  return {
-    categoryTrends: trends,
-    hotProducts: ["iPhone 15", "MacBook Air", "AirPods Pro"],
-    seasonalForecast: "\u9884\u8BA1\u4E0B\u5B63\u5EA6\u9500\u91CF\u589E\u957F15%"
-  };
-}
-__name(generateTrendsAnalysis, "generateTrendsAnalysis");
 function parseExcelData(arrayBuffer) {
   const mockData = [];
   for (let i = 1; i <= 100; i++) {
@@ -1108,6 +1062,322 @@ async function handlePackageSync(request, env, path, method, corsHeaders) {
   }
 }
 __name(handlePackageSync, "handlePackageSync");
+async function getRealDataFromR2(env) {
+  let wideData = [];
+  let recordsData = [];
+  if (env.R2_BUCKET) {
+    try {
+      const wideObj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY);
+      if (wideObj) {
+        const wideText = await wideObj.text();
+        wideData = JSON.parse(wideText) || [];
+      }
+    } catch (e) {
+      console.warn("\u8BFB\u53D6R2\u5BBD\u8868\u6570\u636E\u5931\u8D25:", e);
+    }
+    try {
+      const recordsObj = await env.R2_BUCKET.get(RECORDS_R2_KEY);
+      if (recordsObj) {
+        const recordsText = await recordsObj.text();
+        recordsData = JSON.parse(recordsText) || [];
+      }
+    } catch (e) {
+      console.warn("\u8BFB\u53D6R2\u5386\u53F2\u8BB0\u5F55\u5931\u8D25:", e);
+    }
+  }
+  if (wideData.length === 0 && Array.isArray(wideTableCache)) {
+    wideData = wideTableCache;
+  }
+  if (recordsData.length === 0 && Array.isArray(recordsCache)) {
+    recordsData = recordsCache;
+  }
+  return { wideData, recordsData };
+}
+__name(getRealDataFromR2, "getRealDataFromR2");
+async function generateRealSalesAnalysis(env) {
+  const { wideData, recordsData } = await getRealDataFromR2(env);
+  const totalSku = (/* @__PURE__ */ new Set([...wideData.map((r) => r.SKU), ...recordsData.map((r) => r.SKU)])).size;
+  const healthySku = wideData.filter((row) => {
+    const dates = Object.keys(row).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k));
+    return dates.some((date) => (parseInt(row[date]) || 0) > 0);
+  }).length;
+  const healthRate = totalSku > 0 ? Math.round(healthySku / totalSku * 100) : 0;
+  let totalSales = 0;
+  wideData.forEach((row) => {
+    Object.keys(row).forEach((key) => {
+      if (key.includes("_\u9500\u91CF")) {
+        totalSales += parseInt(row[key]) || 0;
+      }
+    });
+  });
+  recordsData.forEach((record) => {
+    totalSales += parseInt(record["\u9500\u91CF"]) || 0;
+  });
+  const avgTurnover = totalSku > 0 ? Math.round(totalSales / totalSku * 10) / 10 : 0;
+  const warningCount = wideData.filter((row) => {
+    const dates = Object.keys(row).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k));
+    return dates.every((date) => (parseInt(row[date]) || 0) === 0);
+  }).length;
+  return {
+    totalSku,
+    healthRate,
+    avgTurnover,
+    warningCount,
+    totalRecords: recordsData.length,
+    totalSales
+  };
+}
+__name(generateRealSalesAnalysis, "generateRealSalesAnalysis");
+async function generateRealTrendsAnalysis(env) {
+  const { wideData, recordsData } = await getRealDataFromR2(env);
+  const allDates = /* @__PURE__ */ new Set();
+  wideData.forEach((row) => {
+    Object.keys(row).forEach((key) => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+        allDates.add(key);
+      }
+    });
+  });
+  recordsData.forEach((record) => {
+    if (record["\u65E5\u671F"]) {
+      const dateMatch = record["\u65E5\u671F"].match(/(\d{4}-\d{2}-\d{2})/);
+      if (dateMatch) {
+        allDates.add(dateMatch[1]);
+      }
+    }
+  });
+  const sortedDates = Array.from(allDates).sort();
+  const trends = sortedDates.map((date) => {
+    let totalStock = 0;
+    let totalSales = 0;
+    wideData.forEach((row) => {
+      if (row[date] !== void 0) {
+        totalStock += parseInt(row[date]) || 0;
+      }
+      if (row[date + "_\u9500\u91CF"] !== void 0) {
+        totalSales += parseInt(row[date + "_\u9500\u91CF"]) || 0;
+      }
+    });
+    recordsData.forEach((record) => {
+      if (record["\u65E5\u671F"] && record["\u65E5\u671F"].includes(date)) {
+        totalStock += parseInt(record["\u5E93\u5B58"]) || 0;
+        totalSales += parseInt(record["\u9500\u91CF"]) || 0;
+      }
+    });
+    return {
+      date,
+      stock: totalStock,
+      sales: totalSales
+    };
+  });
+  return trends;
+}
+__name(generateRealTrendsAnalysis, "generateRealTrendsAnalysis");
+async function generateRealSalesData(env) {
+  const { wideData, recordsData } = await getRealDataFromR2(env);
+  const salesData = [];
+  wideData.forEach((row) => {
+    Object.keys(row).forEach((key) => {
+      if (key.includes("_\u9500\u91CF")) {
+        const date = key.replace("_\u9500\u91CF", "");
+        const sales = parseInt(row[key]) || 0;
+        if (sales > 0) {
+          salesData.push({
+            date,
+            sku: row.SKU,
+            sales,
+            productName: row["\u4EA7\u54C1\u4E2D\u6587\u540D"]
+          });
+        }
+      }
+    });
+  });
+  recordsData.forEach((record) => {
+    const sales = parseInt(record["\u9500\u91CF"]) || 0;
+    if (sales > 0 && record["\u65E5\u671F"]) {
+      const dateMatch = record["\u65E5\u671F"].match(/(\d{4}-\d{2}-\d{2})/);
+      if (dateMatch) {
+        salesData.push({
+          date: dateMatch[1],
+          sku: record.SKU,
+          sales,
+          productName: record["\u4EA7\u54C1\u4E2D\u6587\u540D"]
+        });
+      }
+    }
+  });
+  return salesData;
+}
+__name(generateRealSalesData, "generateRealSalesData");
+async function generateRealInventorySummary(env) {
+  const { wideData, recordsData } = await getRealDataFromR2(env);
+  const skuSummary = {};
+  wideData.forEach((row) => {
+    if (!row.SKU) return;
+    if (!skuSummary[row.SKU]) {
+      skuSummary[row.SKU] = {
+        sku: row.SKU,
+        productName: row["\u4EA7\u54C1\u4E2D\u6587\u540D"] || "",
+        url: row["\u7F51\u9875\u94FE\u63A5"] || "",
+        initialStock: parseInt(row["\u521D\u59CB\u5E93\u5B58"]) || 0,
+        currentStock: 0,
+        totalSales: 0,
+        lastUpdate: ""
+      };
+    }
+    const dates = Object.keys(row).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+    if (dates.length > 0) {
+      const latestDate = dates[dates.length - 1];
+      skuSummary[row.SKU].currentStock = parseInt(row[latestDate]) || 0;
+      skuSummary[row.SKU].lastUpdate = latestDate;
+    }
+    Object.keys(row).forEach((key) => {
+      if (key.includes("_\u9500\u91CF")) {
+        skuSummary[row.SKU].totalSales += parseInt(row[key]) || 0;
+      }
+    });
+  });
+  recordsData.forEach((record) => {
+    if (!record.SKU) return;
+    if (!skuSummary[record.SKU]) {
+      skuSummary[record.SKU] = {
+        sku: record.SKU,
+        productName: record["\u4EA7\u54C1\u4E2D\u6587\u540D"] || "",
+        url: record["\u7F51\u9875\u94FE\u63A5"] || "",
+        initialStock: parseInt(record["\u521D\u59CB\u5E93\u5B58"]) || 0,
+        currentStock: parseInt(record["\u5E93\u5B58"]) || 0,
+        totalSales: parseInt(record["\u9500\u91CF"]) || 0,
+        lastUpdate: record["\u65E5\u671F"] || ""
+      };
+    } else {
+      if (record["\u65E5\u671F"] > skuSummary[record.SKU].lastUpdate) {
+        skuSummary[record.SKU].currentStock = parseInt(record["\u5E93\u5B58"]) || 0;
+        skuSummary[record.SKU].lastUpdate = record["\u65E5\u671F"] || "";
+      }
+      skuSummary[record.SKU].totalSales += parseInt(record["\u9500\u91CF"]) || 0;
+    }
+  });
+  return Object.values(skuSummary);
+}
+__name(generateRealInventorySummary, "generateRealInventorySummary");
+async function handleListingManagement(request, env, path, method, corsHeaders) {
+  console.log("\u{1F504} \u5904\u7406\u4E0A\u4E0B\u67B6\u7BA1\u7406\u8BF7\u6C42:", path);
+  try {
+    if (path === "/api/listing/candidates" && method === "GET") {
+      const { wideData } = await getRealDataFromR2(env);
+      const candidates = wideData.filter((row) => {
+        const dates = Object.keys(row).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+        const latestDate = dates[dates.length - 1];
+        const currentStock = latestDate ? parseInt(row[latestDate]) || 0 : 0;
+        return currentStock > 10 && (!row.status || row.status === "offline");
+      }).map((row) => {
+        const dates = Object.keys(row).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+        const latestDate = dates[dates.length - 1];
+        const currentStock = latestDate ? parseInt(row[latestDate]) || 0 : 0;
+        return {
+          sku: row.SKU,
+          productName: row["\u4EA7\u54C1\u4E2D\u6587\u540D"],
+          currentStock,
+          status: row.status || "offline"
+        };
+      });
+      return Response.json({
+        success: true,
+        data: candidates,
+        message: "\u83B7\u53D6\u5F85\u4E0A\u67B6\u5546\u54C1\u6210\u529F"
+      }, { headers: corsHeaders });
+    } else if (path === "/api/delisting/candidates" && method === "GET") {
+      const { wideData } = await getRealDataFromR2(env);
+      const candidates = wideData.filter((row) => {
+        const dates = Object.keys(row).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+        const latestDate = dates[dates.length - 1];
+        const currentStock = latestDate ? parseInt(row[latestDate]) || 0 : 0;
+        return currentStock === 0 && row.status === "online";
+      }).map((row) => {
+        return {
+          sku: row.SKU,
+          productName: row["\u4EA7\u54C1\u4E2D\u6587\u540D"],
+          currentStock: 0,
+          status: row.status
+        };
+      });
+      return Response.json({
+        success: true,
+        data: candidates,
+        message: "\u83B7\u53D6\u5F85\u4E0B\u67B6\u5546\u54C1\u6210\u529F"
+      }, { headers: corsHeaders });
+    } else if (path === "/api/listing/confirm" && method === "POST") {
+      const { skus } = await request.json();
+      if (!Array.isArray(skus)) {
+        return Response.json({
+          success: false,
+          error: "SKU\u5217\u8868\u683C\u5F0F\u9519\u8BEF"
+        }, { status: 400, headers: corsHeaders });
+      }
+      let updatedCount = 0;
+      wideTableCache.forEach((row) => {
+        if (skus.includes(row.SKU)) {
+          row.status = "online";
+          updatedCount++;
+        }
+      });
+      if (env.R2_BUCKET && wideTableCache.length > 0) {
+        try {
+          await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), {
+            httpMetadata: { contentType: "application/json" }
+          });
+        } catch (e) {
+          console.warn("\u4FDD\u5B58\u4E0A\u67B6\u72B6\u6001\u5230R2\u5931\u8D25:", e);
+        }
+      }
+      return Response.json({
+        success: true,
+        message: `\u6210\u529F\u4E0A\u67B6 ${updatedCount} \u4E2A\u5546\u54C1`,
+        updatedCount
+      }, { headers: corsHeaders });
+    } else if (path === "/api/delisting/confirm" && method === "POST") {
+      const { skus } = await request.json();
+      if (!Array.isArray(skus)) {
+        return Response.json({
+          success: false,
+          error: "SKU\u5217\u8868\u683C\u5F0F\u9519\u8BEF"
+        }, { status: 400, headers: corsHeaders });
+      }
+      let updatedCount = 0;
+      wideTableCache.forEach((row) => {
+        if (skus.includes(row.SKU)) {
+          row.status = "offline";
+          updatedCount++;
+        }
+      });
+      if (env.R2_BUCKET && wideTableCache.length > 0) {
+        try {
+          await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), {
+            httpMetadata: { contentType: "application/json" }
+          });
+        } catch (e) {
+          console.warn("\u4FDD\u5B58\u4E0B\u67B6\u72B6\u6001\u5230R2\u5931\u8D25:", e);
+        }
+      }
+      return Response.json({
+        success: true,
+        message: `\u6210\u529F\u4E0B\u67B6 ${updatedCount} \u4E2A\u5546\u54C1`,
+        updatedCount
+      }, { headers: corsHeaders });
+    }
+    return Response.json({
+      success: false,
+      error: "\u4E0D\u652F\u6301\u7684\u4E0A\u4E0B\u67B6\u7BA1\u7406\u64CD\u4F5C"
+    }, { status: 404, headers: corsHeaders });
+  } catch (error) {
+    console.error("\u4E0A\u4E0B\u67B6\u7BA1\u7406\u5931\u8D25:", error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { status: 500, headers: corsHeaders });
+  }
+}
+__name(handleListingManagement, "handleListingManagement");
 
 // ../../AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
 var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
