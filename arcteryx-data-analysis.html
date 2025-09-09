@@ -787,22 +787,17 @@
         const token = localStorage.getItem('token');
         const userInfo = localStorage.getItem('userInfo');
         
-        if (!token) {
-          layer.confirm('您还未登录，是否跳转到登录页面？', {
-            btn: ['登录', '取消']
-          }, function(){
-            window.location.href = 'login.html';
-          });
-          return;
-        }
-        
+        // 不强制要求登录，但如果有用户信息就显示
         if (userInfo) {
           try {
             const user = JSON.parse(userInfo);
             document.getElementById('username').textContent = user.username || '用户';
           } catch (e) {
             console.warn('用户信息解析失败:', e);
+            document.getElementById('username').textContent = '用户';
           }
+        } else {
+          document.getElementById('username').textContent = '用户';
         }
       }
       
