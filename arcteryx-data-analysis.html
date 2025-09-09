@@ -78,29 +78,53 @@
       margin-bottom: 20px;
     }
     
+    .data-source-tabs .layui-tab {
+      margin: 0;
+    }
+    
     .data-source-tabs .layui-tab-title {
-      border-bottom: 2px solid #f0f0f0;
+      border-bottom: 1px solid #e6e6e6;
       background: white;
-      padding: 0 20px;
+      padding: 0;
       border-radius: 8px 8px 0 0;
+      display: flex;
+      margin: 0;
     }
     
     .data-source-tabs .layui-tab-title li {
-      padding: 15px 25px;
+      padding: 18px 30px;
       font-size: 16px;
       font-weight: 500;
       position: relative;
+      margin: 0;
+      flex: 1;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border-right: 1px solid #e6e6e6;
+    }
+    
+    .data-source-tabs .layui-tab-title li:last-child {
+      border-right: none;
+    }
+    
+    .data-source-tabs .layui-tab-title li:hover {
+      background: #f8f9fa;
     }
     
     .data-source-tabs .layui-tab-title .layui-this {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      border-radius: 6px;
+    }
+    
+    .data-source-tabs .layui-tab-title .layui-this:hover {
+      background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
     }
     
     .data-source-tabs .layui-tab-content {
       background: transparent;
       padding: 0;
+      border: none;
     }
     
     /* 分析范围控制面板 */
@@ -472,11 +496,11 @@
               </select>
             </div>
           </div>
-          <div class="layui-inline">
-            <button type="submit" class="layui-btn" lay-submit lay-filter="updateAnalysis">
-              <i class="layui-icon layui-icon-search"></i> 更新分析
-            </button>
-          </div>
+                  <div class="layui-inline">
+                    <button type="button" class="layui-btn" lay-submit lay-filter="updateAnalysis">
+                      <i class="layui-icon layui-icon-search"></i> 更新分析
+                    </button>
+                  </div>
         </div>
       </form>
     </div>
@@ -731,7 +755,7 @@
                     </div>
                   </div>
                   <div class="layui-inline">
-                    <button type="submit" class="layui-btn" lay-submit lay-filter="updateTmallAnalysis">
+                    <button type="button" class="layui-btn" lay-submit lay-filter="updateTmallAnalysis">
                       <i class="layui-icon layui-icon-search"></i> 更新分析
                     </button>
                   </div>
@@ -1026,18 +1050,20 @@
       
       // 表单提交事件
       form.on('submit(updateAnalysis)', function(data){
+        console.log('本地数据分析表单提交', data.field);
         currentTimeRange = parseInt(data.field.timeRange || 30);
         currentLimit = parseInt(data.field.limit || 20);
         loadHotSlowAnalysisData();
-        return false;
+        return false; // 阻止表单默认提交
       });
       
       // 天猫分析表单提交事件
       form.on('submit(updateTmallAnalysis)', function(data){
+        console.log('天猫数据分析表单提交', data.field);
         tmallTimeRange = parseInt(data.field.timeRange || 30);
         tmallLimit = parseInt(data.field.limit || 20);
         loadTmallAnalysisData();
-        return false;
+        return false; // 阻止表单默认提交
       });
       
       // 标签页切换事件
@@ -1045,14 +1071,31 @@
         var layId = this.getAttribute('lay-id');
         if (layId === 'tmall') {
           // 切换到天猫数据分析，加载天猫数据
-          if (tmallData.length === 0) {
-            loadTmallAnalysisData();
-          }
+          setTimeout(function() {
+            if (tmallData.length === 0) {
+              loadTmallAnalysisData();
+            } else {
+              // 如果数据已存在，重新渲染图表
+              processTmallData();
+            }
+          }, 100);
         } else if (layId === 'local') {
           // 切换到本地数据分析，确保本地数据已加载
-          if (allWideData.length === 0 && allRecordData.length === 0) {
-            loadHotSlowAnalysisData();
-          }
+          setTimeout(function() {
+            if (allWideData.length === 0 && allRecordData.length === 0) {
+              loadHotSlowAnalysisData();
+            } else {
+              // 如果数据已存在，重新渲染图表
+              processHotSlowData();
+            }
+            // 重新渲染基础图表
+            if (window.stockChartInstance) {
+              window.stockChartInstance.resize();
+            }
+            if (window.salesChartInstance) {
+              window.salesChartInstance.resize();
+            }
+          }, 100);
         }
       });
       
@@ -2129,6 +2172,10 @@
       // 天猫图表生成函数
       function generateTmallDailyTotalSalesChart(skuArr) {
         var chartDom = document.getElementById('tmallDailyTotalSalesChart');
+        if (!chartDom) {
+          console.error('Chart container not found: tmallDailyTotalSalesChart');
+          return;
+        }
         if (tmallDailyTotalSalesChart) tmallDailyTotalSalesChart.dispose();
         tmallDailyTotalSalesChart = echarts.init(chartDom);
         
@@ -2154,6 +2201,10 @@
       
       function generateTmallSalesTrendChart(skuArr) {
         var chartDom = document.getElementById('tmallSalesTrendChart');
+        if (!chartDom) {
+          console.error('Chart container not found: tmallSalesTrendChart');
+          return;
+        }
         if (tmallSalesTrendChart) tmallSalesTrendChart.dispose();
         tmallSalesTrendChart = echarts.init(chartDom);
         
@@ -2177,6 +2228,10 @@
       
       function generateTmallHotProductsChart(hotArr) {
         var chartDom = document.getElementById('tmallHotProductsChart');
+        if (!chartDom) {
+          console.error('Chart container not found: tmallHotProductsChart');
+          return;
+        }
         if (tmallHotProductsChart) tmallHotProductsChart.dispose();
         tmallHotProductsChart = echarts.init(chartDom);
         
@@ -2234,6 +2289,10 @@
       
       function generateTmallSlowProductsChart(slowArr) {
         var chartDom = document.getElementById('tmallSlowProductsChart');
+        if (!chartDom) {
+          console.error('Chart container not found: tmallSlowProductsChart');
+          return;
+        }
         if (tmallSlowProductsChart) tmallSlowProductsChart.dispose();
         tmallSlowProductsChart = echarts.init(chartDom);
         
