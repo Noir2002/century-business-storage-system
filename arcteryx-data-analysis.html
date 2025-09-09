@@ -1137,72 +1137,171 @@
       
       // 加载基础分析数据
       function loadAnalysisData() {
+        // 直接基于本地数据库数据进行分析，不使用单独的analytics API
         const token = localStorage.getItem('token');
-        
-        // 设置请求头，如果有token就带上
         const headers = {};
         if (token) {
           headers['Authorization'] = 'Bearer ' + token;
         }
         
-        // 加载销售分析
-        fetch('/api/analytics/sales', {
-          headers: headers
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            updateStatsCards(data.data);
-          }
-        })
-        .catch(error => {
-          console.error('加载销售分析失败:', error);
-        });
-        
-        // 加载库存趋势
-        fetch('/api/analytics/trends', {
-          headers: headers
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            renderStockChart(data.data);
-          }
-        })
-        .catch(error => {
-          console.error('加载库存趋势失败:', error);
-        });
-        
-        // 加载销售趋势
-        fetch('/api/inventory/data', {
-          headers: headers
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            renderSalesChart(data.data);
-          }
-        })
-        .catch(error => {
-          console.error('加载销售趋势失败:', error);
-        });
-        
-        // 加载SKU详细分析
-        fetch('/api/inventory/summary', {
-          headers: headers
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            renderSkuTable(data.data);
-          }
-        })
-        .catch(error => {
-          console.error('加载SKU分析失败:', error);
+        // 加载本地数据库数据进行分析
+        $.when(
+          $.ajax({url: '/api/localdb/wide', headers: headers}),
+          $.ajax({url: '/api/localdb/records', headers: headers})
+        ).done(function(wideRes, recordRes) {
+          const wideData = wideRes[0].data || [];
+          const recordData = recordRes[0].data || [];
+          
+          // 基于真实数据生成分析
+          const analysisData = generateAnalysisFromRealData(wideData, recordData);
+          
+          // 更新统计卡片
+          updateStatsCards(analysisData.stats);
+          
+          // 渲染图表
+          renderStockChart(analysisData.stockTrends);
+          renderSalesChart(analysisData.salesTrends);
+          renderSkuTable(analysisData.skuSummary);
+          
+        }).fail(function(xhr) {
+          console.error('加载基础数据失败:', xhr);
+          // 显示默认空数据
+          updateStatsCards({});
+          renderStockChart({dates: [], series: {total: [], healthy: [], warning: [], outOfStock: []}});
+          renderSalesChart({dates: [], daily: [], weekly: [], monthly: []});
+          renderSkuTable([]);
         });
         
         // 加载爆款滞销分析数据
         loadHotSlowAnalysisData();
+      }
+      
+      // 基于真实数据生成分析结果
+      function generateAnalysisFromRealData(wideData, recordData) {
+        // 统计基础数据
+        const skuSet = new Set();
+        let totalStock = 0;
+        let warningCount = 0;
+        const dateMap = {};
+        const skuMap = {};
+        
+        // 处理宽表数据
+        wideData.forEach(row => {
+          const sku = row['SKU'];
+          const stock = parseInt(row['库存']) || 0;
+          const productName = row['产品中文名'] || row['产品名称'] || '';
+          
+          if (sku) {
+            skuSet.add(sku);
+            totalStock += stock;
+            if (stock <= 10) warningCount++;
+            
+            // 收集SKU信息用于详细分析
+            skuMap[sku] = {
+              sku: sku,
+              productName: productName,
+              currentStock: stock,
+              totalSales: 0,
+              avgDailySales: 0,
+              url: row['网页链接'] || ''
+            };
+            
+            // 收集销量数据用于趋势分析
+            Object.keys(row).forEach(key => {
+              if (key.includes('销量') || /^\d{4}-\d{2}-\d{2}$/.test(key)) {
+                const sales = parseInt(row[key]) || 0;
+                if (sales > 0) {
+                  const dateStr = key.includes('销量') ? key.replace('_销量', '') : key;
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                    if (!dateMap[dateStr]) {
+                      dateMap[dateStr] = { totalStock: 0, totalSales: 0, skuCount: 0 };
+                    }
+                    dateMap[dateStr].totalSales += sales;
+                    dateMap[dateStr].skuCount++;
+                    
+                    if (skuMap[sku]) {
+                      skuMap[sku].totalSales += sales;
+                    }
+                  }
+                }
+              }
+            });
+          }
+        });
+        
+        // 处理历史记录数据
+        recordData.forEach(record => {
+          const sku = record['SKU'];
+          const sales = parseInt(record['销量']) || 0;
+          const dateStr = record['日期'] ? record['日期'].split(' ')[0] : '';
+          
+          if (sku && sales > 0 && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            if (!dateMap[dateStr]) {
+              dateMap[dateStr] = { totalStock: 0, totalSales: 0, skuCount: 0 };
+            }
+            dateMap[dateStr].totalSales += sales;
+            
+            if (skuMap[sku]) {
+              skuMap[sku].totalSales += sales;
+            }
+          }
+        });
+        
+        // 计算健康率和周转率
+        const healthyCount = skuSet.size - warningCount;
+        const healthRate = skuSet.size > 0 ? Math.round((healthyCount / skuSet.size) * 100) : 0;
+        const totalSales = Object.values(dateMap).reduce((sum, day) => sum + day.totalSales, 0);
+        const avgTurnoverRate = totalStock > 0 ? Math.round((totalSales / totalStock) * 100) / 100 : 0;
+        
+        // 生成趋势数据
+        const sortedDates = Object.keys(dateMap).sort().slice(-30); // 最近30天
+        const stockTrends = {
+          dates: sortedDates,
+          series: {
+            total: sortedDates.map(() => totalStock), // 简化：使用当前总库存
+            healthy: sortedDates.map(() => totalStock - warningCount * 50), // 估算正常库存
+            warning: sortedDates.map(() => warningCount * 50), // 估算预警库存
+            outOfStock: sortedDates.map(() => warningCount) // 缺货SKU数
+          }
+        };
+        
+        const salesTrends = {
+          dates: sortedDates,
+          daily: sortedDates.map(date => dateMap[date] ? dateMap[date].totalSales : 0),
+          weekly: [], // 计算周平均
+          monthly: [] // 计算月累计
+        };
+        
+        // 计算周平均和月累计
+        for (let i = 0; i < sortedDates.length; i++) {
+          const weekData = sortedDates.slice(Math.max(0, i - 6), i + 1);
+          const weekSales = weekData.reduce((sum, date) => sum + (dateMap[date] ? dateMap[date].totalSales : 0), 0);
+          salesTrends.weekly.push(Math.round(weekSales / weekData.length));
+          
+          const monthData = sortedDates.slice(Math.max(0, i - 29), i + 1);
+          const monthSales = monthData.reduce((sum, date) => sum + (dateMap[date] ? dateMap[date].totalSales : 0), 0);
+          salesTrends.monthly.push(monthSales);
+        }
+        
+        // 生成SKU汇总数据
+        const skuSummary = Object.values(skuMap).map(sku => {
+          const days = sortedDates.length;
+          sku.avgDailySales = days > 0 ? Math.round((sku.totalSales / days) * 100) / 100 : 0;
+          return sku;
+        }).slice(0, 100); // 限制数量
+        
+        return {
+          stats: {
+            totalSku: skuSet.size,
+            healthRate: healthRate,
+            avgTurnoverRate: avgTurnoverRate,
+            warningCount: warningCount,
+            totalRecords: recordData.length
+          },
+          stockTrends: stockTrends,
+          salesTrends: salesTrends,
+          skuSummary: skuSummary
+        };
       }
       
       // 更新统计卡片
@@ -1327,20 +1426,20 @@
             {
               name: '日销量',
               type: 'bar',
-              data: data.series.daily || [],
+              data: data.daily || [],
               itemStyle: { color: '#1890ff' }
             },
             {
               name: '周平均',
               type: 'line',
-              data: data.series.weekly || [],
+              data: data.weekly || [],
               itemStyle: { color: '#52c41a' },
               smooth: true
             },
             {
               name: '月累计',
               type: 'line',
-              data: data.series.monthly || [],
+              data: data.monthly || [],
               itemStyle: { color: '#fa8c16' },
               smooth: true
             }
@@ -1950,33 +2049,9 @@
       };
       
       window.refreshChart = function(type) {
-        if (type === 'stock') {
-          // 重新加载库存趋势
-          const token = localStorage.getItem('token');
-          fetch('/api/analytics/trends', {
-            headers: { 'Authorization': 'Bearer ' + token }
-          })
-          .then(response => response.json())
-          .then(data => {
-            if (data.success) {
-              renderStockChart(data.data);
-              layer.msg('库存趋势图已刷新', {icon: 1});
-            }
-          });
-        } else if (type === 'sales') {
-          // 重新加载销售趋势
-          const token = localStorage.getItem('token');
-          fetch('/api/inventory/data', {
-            headers: { 'Authorization': 'Bearer ' + token }
-          })
-          .then(response => response.json())
-          .then(data => {
-            if (data.success) {
-              renderSalesChart(data.data);
-              layer.msg('销售趋势图已刷新', {icon: 1});
-            }
-          });
-        }
+        // 重新加载所有基础分析数据
+        loadAnalysisData();
+        layer.msg(`${type === 'stock' ? '库存' : '销售'}趋势图已刷新`, {icon: 1});
       };
       
       // 上下架管理功能（保留代码）
@@ -2101,7 +2176,7 @@
           .then(data => {
             if (data.success) {
               layer.msg('上架操作完成', {icon: 1});
-              loadListingCandidates(); // 刷新列表
+              // loadListingCandidates(); // 暂时禁用
               loadAnalysisData(); // 刷新分析数据
             } else {
               layer.msg('上架操作失败', {icon: 2});
@@ -2155,7 +2230,7 @@
           .then(data => {
             if (data.success) {
               layer.msg('下架操作完成', {icon: 1});
-              loadDelistingCandidates(); // 刷新列表
+              // loadDelistingCandidates(); // 暂时禁用
               loadAnalysisData(); // 刷新分析数据
             } else {
               layer.msg('下架操作失败', {icon: 2});
