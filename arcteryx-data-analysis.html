@@ -1001,10 +1001,11 @@
 
   <script src="./src/layui.js"></script>
   <script>
-    layui.use(['form', 'layer', 'element'], function(){
+    layui.use(['form', 'layer', 'element', 'jquery'], function(){
       var form = layui.form;
       var layer = layui.layer;
       var element = layui.element;
+      var $ = layui.$; // 获取jQuery对象
       
       // 检查登录状态
       checkLoginStatus();
@@ -1145,7 +1146,7 @@
         }
         
         // 加载销售分析
-        fetch(window.apiConfig.baseURL + '/api/analytics/sales', {
+        fetch('/api/analytics/sales', {
           headers: headers
         })
         .then(response => response.json())
@@ -1159,7 +1160,7 @@
         });
         
         // 加载库存趋势
-        fetch(window.apiConfig.baseURL + '/api/analytics/trends', {
+        fetch('/api/analytics/trends', {
           headers: headers
         })
         .then(response => response.json())
@@ -1173,7 +1174,7 @@
         });
         
         // 加载销售趋势
-        fetch(window.apiConfig.baseURL + '/api/inventory/data', {
+        fetch('/api/inventory/data', {
           headers: headers
         })
         .then(response => response.json())
@@ -1187,7 +1188,7 @@
         });
         
         // 加载SKU详细分析
-        fetch(window.apiConfig.baseURL + '/api/inventory/summary', {
+        fetch('/api/inventory/summary', {
           headers: headers
         })
         .then(response => response.json())
@@ -1479,8 +1480,8 @@
         if (token) headers['Authorization'] = 'Bearer ' + token;
         
         $.when(
-          $.ajax({url: window.apiConfig.baseURL + '/api/localdb/wide', headers: headers}),
-          $.ajax({url: window.apiConfig.baseURL + '/api/localdb/records', headers: headers})
+          $.ajax({url: '/api/localdb/wide', headers: headers}),
+          $.ajax({url: '/api/localdb/records', headers: headers})
         ).done(function(wideRes, recordRes) {
           allWideData = wideRes[0].data || [];
           allRecordData = recordRes[0].data || [];
@@ -1593,7 +1594,7 @@
         if (token) headers['Authorization'] = 'Bearer ' + token;
         
         $.ajax({
-          url: window.apiConfig.baseURL + '/api/tmall-orders/wide',
+          url: '/api/tmall-orders/wide',
           type: 'GET',
           headers: headers,
           success: function(res) {
@@ -1952,7 +1953,7 @@
         if (type === 'stock') {
           // 重新加载库存趋势
           const token = localStorage.getItem('token');
-          fetch(window.apiConfig.baseURL + '/api/analytics/trends', {
+          fetch('/api/analytics/trends', {
             headers: { 'Authorization': 'Bearer ' + token }
           })
           .then(response => response.json())
@@ -1965,7 +1966,7 @@
         } else if (type === 'sales') {
           // 重新加载销售趋势
           const token = localStorage.getItem('token');
-          fetch(window.apiConfig.baseURL + '/api/inventory/data', {
+          fetch('/api/inventory/data', {
             headers: { 'Authorization': 'Bearer ' + token }
           })
           .then(response => response.json())
@@ -1983,7 +1984,7 @@
         const token = localStorage.getItem('token');
         if (!token) return;
         
-        fetch(window.apiConfig.baseURL + '/api/listing/candidates', {
+        fetch('/api/listing/candidates', {
           headers: { 'Authorization': 'Bearer ' + token }
         })
         .then(response => response.json())
@@ -2004,7 +2005,7 @@
         const token = localStorage.getItem('token');
         if (!token) return;
         
-        fetch(window.apiConfig.baseURL + '/api/delisting/candidates', {
+        fetch('/api/delisting/candidates', {
           headers: { 'Authorization': 'Bearer ' + token }
         })
         .then(response => response.json())
@@ -2088,7 +2089,7 @@
         
         layer.confirm(`确定要上架选中的 ${selectedSkus.length} 个商品吗？`, function(index){
           const token = localStorage.getItem('token');
-          fetch(window.apiConfig.baseURL + '/api/listing/confirm', {
+          fetch('/api/listing/confirm', {
             method: 'POST',
             headers: { 
               'Authorization': 'Bearer ' + token,
@@ -2142,7 +2143,7 @@
         
         layer.confirm(`确定要下架选中的 ${selectedSkus.length} 个商品吗？`, function(index){
           const token = localStorage.getItem('token');
-          fetch(window.apiConfig.baseURL + '/api/delisting/confirm', {
+          fetch('/api/delisting/confirm', {
             method: 'POST',
             headers: { 
               'Authorization': 'Bearer ' + token,
