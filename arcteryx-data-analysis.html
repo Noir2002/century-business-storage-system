@@ -1149,11 +1149,19 @@
           $.ajax({url: '/api/localdb/wide', headers: headers}),
           $.ajax({url: '/api/localdb/records', headers: headers})
         ).done(function(wideRes, recordRes) {
+          console.log('原始宽表数据:', wideRes[0]);
+          console.log('原始记录数据:', recordRes[0]);
+          
           const wideData = wideRes[0].data || [];
           const recordData = recordRes[0].data || [];
           
+          console.log('处理后的宽表数据长度:', wideData.length);
+          console.log('处理后的记录数据长度:', recordData.length);
+          
           // 基于真实数据生成分析
           const analysisData = generateAnalysisFromRealData(wideData, recordData);
+          
+          console.log('生成的分析数据:', analysisData);
           
           // 更新统计卡片
           updateStatsCards(analysisData.stats);
@@ -1178,6 +1186,10 @@
       
       // 基于真实数据生成分析结果
       function generateAnalysisFromRealData(wideData, recordData) {
+        console.log('generateAnalysisFromRealData 开始处理数据');
+        console.log('输入宽表数据:', wideData);
+        console.log('输入记录数据:', recordData);
+        
         // 统计基础数据
         const skuSet = new Set();
         let totalStock = 0;
@@ -1272,6 +1284,10 @@
           monthly: [] // 计算月累计
         };
         
+        console.log('生成的销售趋势数据 - sortedDates:', sortedDates);
+        console.log('生成的销售趋势数据 - dateMap:', dateMap);
+        console.log('生成的销售趋势数据 - salesTrends:', salesTrends);
+        
         // 计算周平均和月累计
         for (let i = 0; i < sortedDates.length; i++) {
           const weekData = sortedDates.slice(Math.max(0, i - 6), i + 1);
@@ -1324,6 +1340,22 @@
       
       // 渲染库存趋势图表
       function renderStockChart(data) {
+        console.log('renderStockChart 接收到的数据:', data);
+        
+        // 确保数据存在，如果不存在则使用默认值
+        if (!data || !data.series) {
+          console.warn('renderStockChart: data 为空或缺少 series，使用默认值');
+          data = {
+            dates: [],
+            series: {
+              total: [],
+              healthy: [],
+              warning: [],
+              outOfStock: []
+            }
+          };
+        }
+        
         const stockOption = {
           title: {
             text: '库存趋势变化',
@@ -1391,6 +1423,19 @@
       
       // 渲染销售趋势图表
       function renderSalesChart(data) {
+        console.log('renderSalesChart 接收到的数据:', data);
+        
+        // 确保数据存在，如果不存在则使用默认值
+        if (!data) {
+          console.warn('renderSalesChart: data 为空，使用默认值');
+          data = {
+            dates: [],
+            daily: [],
+            weekly: [],
+            monthly: []
+          };
+        }
+        
         const salesOption = {
           title: {
             text: '销售趋势分析',
