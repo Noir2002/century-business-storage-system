@@ -1514,12 +1514,12 @@
                     const header = String(headers[i] || '').trim();
                     console.log(`列${i}: "${header}"`);
                     
-                    // 精确匹配列标题
-                    if (header === '指定运单号') {
+                    // 根据实际Excel格式识别列标题
+                    if (header === '指定运单号' || header === '快递运单号') {
                         lpColumnIndex = i;
                         console.log(`✅ 找到LP号列: 第${i+1}列 "${header}"`);
                     } 
-                    else if (header === '系统履约单号') {
+                    else if (header === '系统履约单号' || header === 'VO预约到仓单号') {
                         contractColumnIndex = i;
                         console.log(`✅ 找到履约单号列: 第${i+1}列 "${header}"`);
                     }
@@ -1530,10 +1530,10 @@
                     console.log('⚠️ 未找到精确匹配的列标题，尝试通过内容特征识别...');
                     for (let i = 0; i < headers.length; i++) {
                         const header = String(headers[i] || '').toLowerCase().trim();
-                        if (lpColumnIndex === -1 && (header.includes('指定运单号') || header.includes('运单号') || header.includes('lp'))) {
+                        if (lpColumnIndex === -1 && (header.includes('快递运单号') || header.includes('运单号') || header.includes('lp'))) {
                             lpColumnIndex = i;
                             console.log(`🔍 通过内容特征找到LP号列: 第${i+1}列 "${header}"`);
-                        } else if (contractColumnIndex === -1 && (header.includes('系统履约单号') || header.includes('履约单号') || header.includes('履约'))) {
+                        } else if (contractColumnIndex === -1 && (header.includes('vo预约到仓单号') || header.includes('预约到仓单号') || header.includes('履约单号'))) {
                             contractColumnIndex = i;
                             console.log(`🔍 通过内容特征找到履约单号列: 第${i+1}列 "${header}"`);
                         }
@@ -1548,6 +1548,8 @@
                 if (lpColumnIndex === contractColumnIndex) {
                     contractColumnIndex = lpColumnIndex === 0 ? 1 : 0;
                 }
+                
+                console.log(`最终列识别结果: LP号列=${lpColumnIndex}, 履约单号列=${contractColumnIndex}`);
                 
                 showStatus('databaseStatus', `识别列：第${lpColumnIndex + 1}列为LP号，第${contractColumnIndex + 1}列为履约单号`, 'info');
 
