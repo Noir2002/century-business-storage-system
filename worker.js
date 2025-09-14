@@ -1807,6 +1807,8 @@ async function handleReorganization(request, env, path, method, corsHeaders) {
       return await resetReorganization(env, corsHeaders);
     } else if (path === '/api/reorganize/debug' && method === 'GET') {
       return await debugReorganization(env, corsHeaders);
+    } else if (path === '/api/reorganize/test' && method === 'GET') {
+      return await testReorganization(env, corsHeaders);
     }
     
     return Response.json({
@@ -1858,40 +1860,46 @@ async function startReorganization(env, corsHeaders) {
     const allObjects = await env.R2_BUCKET.list({ limit: 1000 });
     const filesToMove = [];
     
-    // 识别需要移动的文件（只处理打包系统的文件）
+    // 识别需要移动的文件（使用与analyzeFiles相同的逻辑）
     for (const obj of allObjects.objects) {
-      // 跳过库存系统文件
-      if (obj.key.startsWith('arc/') || 
-          obj.key.startsWith('package-sync/') ||
-          obj.key.startsWith('wide/') ||
-          obj.key.startsWith('records/') ||
-          obj.key.startsWith('tmall/') ||
-          obj.key.startsWith('reorganization/')) {
+      const key = obj.key;
+      
+      // 跳过库存系统文件和重组相关文件
+      if (key.startsWith('arc/') || 
+          key.startsWith('package-sync/') ||
+          key.startsWith('wide/') ||
+          key.startsWith('records/') ||
+          key.startsWith('tmall/') ||
+          key.startsWith('reorganization/')) {
         continue;
       }
       
-      // 检查是否为图片或视频文件
-      const isImageOrVideo = obj.httpMetadata?.contentType?.startsWith('image/') || 
-                            obj.httpMetadata?.contentType?.startsWith('video/') ||
-                            obj.key.match(/\.(jpg|jpeg|png|gif|mp4|avi|mov|webp)$/i);
+      // 识别需要重新组织的文件
+      let needsReorganization = false;
       
-      // 检查是否为需要重新组织的文件：
-      // 1. 直接存储在根目录的图片和视频文件
-      // 2. 在package/文件夹中但路径不正确的文件（需要重新组织到正确的日期文件夹）
-      // 3. 以时间戳命名的文件（如 1757513851798-887008722.jpg）
-      const isRootFile = !obj.key.includes('/');
-      const isInPackageButWrongPath = obj.key.startsWith('package/') && 
-                                     !obj.key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\//);
-      const isTimestampFile = obj.key.match(/^\d{13,}-\d+\.(jpg|jpeg|png|gif|mp4|avi|mov|webp)$/i);
+      // 1. 根目录的图片和视频文件
+      if (key.match(/\.(jpg|jpeg|png|gif|mp4|avi|mov)$/i) && !key.includes('/')) {
+        needsReorganization = true;
+        console.log(`📁 根目录文件需要重新组织: ${key}`);
+      }
+      // 2. 日期格式文件夹中的文件
+      else if (key.match(/^\d{8}_[^/]+\//)) {
+        needsReorganization = true;
+        console.log(`📁 日期文件夹文件需要重新组织: ${key}`);
+      }
+      // 3. package/文件夹中但路径不正确的文件
+      else if (key.startsWith('package/') && !key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\//)) {
+        needsReorganization = true;
+        console.log(`📁 package文件夹中路径不正确的文件需要重新组织: ${key}`);
+      }
       
-      if (isImageOrVideo && (isRootFile || isInPackageButWrongPath || isTimestampFile)) {
+      if (needsReorganization) {
         filesToMove.push({
           key: obj.key,
           size: obj.size,
           uploaded: obj.uploaded,
           contentType: obj.httpMetadata?.contentType || 'application/octet-stream'
         });
-        console.log(`📁 找到需要重新组织的文件: ${obj.key}`);
       }
     }
 
@@ -2412,6 +2420,103 @@ async function debugReorganization(env, corsHeaders) {
 
   } catch (error) {
     console.error('❌ 调试失败:', error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { status: 500, headers: corsHeaders });
+  }
+}
+
+// 测试重新组织逻辑
+async function testReorganization(env, corsHeaders) {
+  try {
+    console.log('🧪 测试重新组织逻辑...');
+    
+    if (!env.R2_BUCKET) {
+      throw new Error('R2存储桶不可用');
+    }
+
+    // 获取所有文件
+    const allObjects = await env.R2_BUCKET.list({ limit: 1000 });
+    const testResults = {
+      totalFiles: allObjects.objects.length,
+      filesToMove: [],
+      skippedFiles: [],
+      errors: []
+    };
+
+    for (const obj of allObjects.objects) {
+      const key = obj.key;
+      
+      // 跳过库存系统文件和重组相关文件
+      if (key.startsWith('arc/') || 
+          key.startsWith('package-sync/') ||
+          key.startsWith('wide/') ||
+          key.startsWith('records/') ||
+          key.startsWith('tmall/') ||
+          key.startsWith('reorganization/')) {
+        testResults.skippedFiles.push({
+          key: key,
+          reason: '库存系统或重组相关文件'
+        });
+        continue;
+      }
+      
+      // 识别需要重新组织的文件
+      let needsReorganization = false;
+      let reason = '';
+      
+      // 1. 根目录的图片和视频文件
+      if (key.match(/\.(jpg|jpeg|png|gif|mp4|avi|mov)$/i) && !key.includes('/')) {
+        needsReorganization = true;
+        reason = '根目录图片/视频文件';
+      }
+      // 2. 日期格式文件夹中的文件
+      else if (key.match(/^\d{8}_[^/]+\//)) {
+        needsReorganization = true;
+        reason = '日期格式文件夹中的文件';
+      }
+      // 3. package/文件夹中但路径不正确的文件
+      else if (key.startsWith('package/') && !key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\//)) {
+        needsReorganization = true;
+        reason = 'package文件夹中路径不正确的文件';
+      }
+      
+      if (needsReorganization) {
+        // 测试路径生成
+        try {
+          const folderPath = generateNewPath(key, obj.uploaded);
+          const fileName = key.split('/').pop();
+          const newFilePath = `${folderPath}/${fileName}`;
+          
+          testResults.filesToMove.push({
+            key: key,
+            newPath: newFilePath,
+            reason: reason,
+            size: obj.size,
+            contentType: obj.httpMetadata?.contentType || 'application/octet-stream'
+          });
+        } catch (error) {
+          testResults.errors.push({
+            key: key,
+            error: error.message
+          });
+        }
+      } else {
+        testResults.skippedFiles.push({
+          key: key,
+          reason: '不需要重新组织'
+        });
+      }
+    }
+
+    return Response.json({
+      success: true,
+      test: testResults
+    }, { headers: corsHeaders });
+
+  } catch (error) {
+    console.error('❌ 测试失败:', error);
     return Response.json({
       success: false,
       error: error.message

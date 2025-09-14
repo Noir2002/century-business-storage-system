@@ -274,6 +274,9 @@
                 <button id="resetBtn" class="btn" onclick="resetReorganization()" style="background: #f44336;">
                     🔄 重置状态
                 </button>
+                <button id="testBtn" class="btn" onclick="testReorganization()" style="background: #9c27b0;">
+                    🧪 测试逻辑
+                </button>
                 <button id="viewFilesBtn" class="btn" onclick="viewFiles()" style="display: none;">
                     📋 查看文件列表
                 </button>
@@ -696,6 +699,67 @@
             } finally {
                 resetBtn.disabled = false;
                 resetBtn.textContent = '🔄 重置状态';
+            }
+        }
+
+        // 测试重新组织逻辑
+        async function testReorganization() {
+            const testBtn = document.getElementById('testBtn');
+            testBtn.disabled = true;
+            testBtn.textContent = '🧪 测试中...';
+            
+            addLog('开始测试重新组织逻辑...', 'info');
+            
+            try {
+                const response = await fetch(`${getBaseURL()}/api/reorganize/test`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    const test = result.test;
+                    addLog(`测试完成 - 总文件: ${test.totalFiles}, 需要移动: ${test.filesToMove.length}, 跳过: ${test.skippedFiles.length}, 错误: ${test.errors.length}`, 'success');
+                    
+                    // 显示详细测试结果
+                    const testInfo = document.createElement('div');
+                    testInfo.style.marginTop = '20px';
+                    testInfo.style.padding = '15px';
+                    testInfo.style.backgroundColor = '#f8f9fa';
+                    testInfo.style.borderRadius = '8px';
+                    testInfo.style.fontFamily = 'monospace';
+                    testInfo.style.fontSize = '12px';
+                    testInfo.innerHTML = `
+                        <h4>🧪 测试结果详情</h4>
+                        <div><strong>需要移动的文件 (${test.filesToMove.length}):</strong></div>
+                        ${test.filesToMove.slice(0, 10).map(file => 
+                            `<div style="margin: 5px 0; padding: 5px; background: #e3f2fd; border-radius: 4px;">
+                                <div><strong>${file.key}</strong></div>
+                                <div>→ ${file.newPath}</div>
+                                <div style="color: #666;">原因: ${file.reason}</div>
+                            </div>`
+                        ).join('')}
+                        ${test.filesToMove.length > 10 ? `<div>... 还有 ${test.filesToMove.length - 10} 个文件</div>` : ''}
+                        
+                        ${test.errors.length > 0 ? `
+                            <div style="margin-top: 10px;"><strong>错误 (${test.errors.length}):</strong></div>
+                            ${test.errors.map(error => 
+                                `<div style="margin: 5px 0; padding: 5px; background: #ffebee; border-radius: 4px; color: #c62828;">
+                                    ${error.key}: ${error.error}
+                                </div>`
+                            ).join('')}
+                        ` : ''}
+                    `;
+                    
+                    const logContainer = document.getElementById('logContainer');
+                    logContainer.appendChild(testInfo);
+                    logContainer.style.display = 'block';
+                    
+                } else {
+                    addLog(`测试失败: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                addLog(`测试网络错误: ${error.message}`, 'error');
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = '🧪 测试逻辑';
             }
         }
 
