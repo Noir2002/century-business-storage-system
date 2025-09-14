@@ -885,7 +885,10 @@
             <div class="page-content">
                 <div class="form-group">
                     <label for="databaseFile">选择 Excel 数据库文件：</label>
-                    <input type="file" id="databaseFile" accept=".xlsx,.xls" onchange="importDatabase()">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="file" id="databaseFile" accept=".xlsx,.xls" onchange="importDatabase()">
+                        <button onclick="importDatabase()" class="btn btn-primary">📥 导入数据库</button>
+                    </div>
                 </div>
 
                 <div id="databaseInfo" class="database-info" style="display: none;">
@@ -905,6 +908,7 @@
                         <button onclick="deleteDatabase()" class="btn btn-danger">🗑️ 删除数据库</button>
                         <button onclick="downloadDatabase()" class="btn btn-secondary">📥 导出数据库</button>
                         <button onclick="toggleDatabasePreview()" id="databasePreviewBtn" class="btn btn-secondary">👁️ 预览数据库</button>
+                        <button onclick="debugDatabase()" class="btn btn-info">🔍 调试数据库</button>
                     </div>
 
                     <div id="databasePreview" style="display: none; margin-top: 15px;">
@@ -1473,10 +1477,16 @@
 
         // 导入数据库
         async function importDatabase() {
+            console.log('🔄 开始导入数据库...');
             const fileInput = document.getElementById('databaseFile');
             const file = fileInput.files[0];
             
-            if (!file) return;
+            if (!file) {
+                console.log('❌ 没有选择文件');
+                return;
+            }
+            
+            console.log('📁 选择的文件:', file.name, '大小:', file.size);
 
             try {
                 showStatus('databaseStatus', '正在导入数据库...', 'info');
@@ -1543,7 +1553,10 @@
                 
                 showStatus('databaseStatus', `识别列：第${lpColumnIndex + 1}列为LP号，第${contractColumnIndex + 1}列为履约单号`, 'info');
 
+                // 清除旧数据
                 databaseData.clear();
+                console.log('🗑️ 已清除旧数据库数据');
+                
                 let validRecords = 0;
 
                 for (let i = 1; i < data.length; i++) {
@@ -1586,7 +1599,10 @@
                     console.warn('同步到服务器失败:', error);
                 });
 
+                // 强制更新显示
                 updateDatabaseDisplay();
+                console.log(`📊 数据库导入完成，共 ${validRecords} 条记录`);
+                console.log('📋 数据库内容:', Array.from(databaseData.entries()));
                 
                 // 自动创建当日文件夹和设置待完成打包数量
                 await createTodayFolderAndSetPackingTargets();
@@ -1713,6 +1729,27 @@
             } catch (e) {
                 console.warn('渲染数据库预览失败:', e);
             }
+        }
+
+        // 调试数据库
+        function debugDatabase() {
+            console.log('🔍 数据库调试信息:');
+            console.log('📊 数据库大小:', databaseData.size);
+            console.log('📅 导入日期:', databaseImportDate);
+            console.log('📋 数据库内容:', Array.from(databaseData.entries()));
+            
+            // 显示前5条记录
+            const entries = Array.from(databaseData.entries());
+            console.log('📝 前5条记录:');
+            entries.slice(0, 5).forEach(([lp, contract], index) => {
+                console.log(`  ${index + 1}. LP号: "${lp}" -> 履约单号: "${contract}"`);
+            });
+            
+            // 检查本地存储
+            const localData = localStorage.getItem(STORAGE_KEYS.DATABASE);
+            console.log('💾 本地存储数据:', localData);
+            
+            alert(`数据库调试信息已输出到控制台\n\n记录数: ${databaseData.size}\n导入日期: ${databaseImportDate || '未知'}\n\n请按F12查看详细日志`);
         }
 
         // 文件上传相关函数
