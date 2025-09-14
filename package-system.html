@@ -1983,6 +1983,9 @@
 
         // 上传文件到R2存储
         async function uploadFilesToR2(files, folderName, lpNumber, contractNumber) {
+            console.log('📤 开始上传文件到R2存储...');
+            console.log('📋 上传参数:', { files: files.length, folderName, lpNumber, contractNumber });
+            
             let successCount = 0;
             let failedFiles = [];
             const totalFiles = files.length;
@@ -2038,8 +2041,8 @@
                             name: file.name,
                             fileName: uploadResult.file.fileName,
                             folder: fullFolderPath, // 使用完整的文件夹路径
-                            lpNumber: lpNumber,
-                            contractNumber: contractNumber,
+                            lpNumber: lpNumber || '',
+                            contractNumber: contractNumber || '',
                             size: file.size,
                             url: uploadResult.file.publicUrl || '',
                             downloadUrl: `${baseURL}/api/package/${uploadResult.file.id}/download`,
@@ -2047,6 +2050,8 @@
                             r2Path: uploadResult.file.r2Path,
                             id: uploadResult.file.id
                         };
+                        
+                        console.log('📝 生成文件记录:', fileRecord);
                         
                         uploadedFiles.set(uploadResult.file.fileName, fileRecord);
                         successCount++;
@@ -3406,11 +3411,16 @@
                 uploadedFiles.forEach((value, key) => {
                     filesObject[key] = value;
                 });
-                localStorage.setItem(STORAGE_KEYS.FILES, JSON.stringify({
+                
+                const dataToSave = {
                     version: DATA_VERSION,
                     data: filesObject,
                     timestamp: Date.now()
-                }));
+                };
+                
+                console.log('💾 保存文件记录到本地存储:', dataToSave);
+                localStorage.setItem(STORAGE_KEYS.FILES, JSON.stringify(dataToSave));
+                console.log('✅ 文件记录已保存到本地存储');
             } catch (error) {
                 console.error('保存文件列表到本地失败:', error);
             }
@@ -3442,13 +3452,18 @@
         function loadFilesFromLocal() {
             try {
                 const saved = localStorage.getItem(STORAGE_KEYS.FILES);
+                console.log('📂 从本地存储加载文件记录:', saved);
+                
                 if (saved) {
                     const parsed = JSON.parse(saved);
+                    console.log('📋 解析后的文件数据:', parsed);
+                    
                     if (parsed.data) {
                         uploadedFiles.clear();
                         Object.entries(parsed.data).forEach(([key, value]) => {
                             uploadedFiles.set(key, value);
                         });
+                        console.log('✅ 已加载文件记录数量:', uploadedFiles.size);
                     }
                 }
             } catch (error) {
