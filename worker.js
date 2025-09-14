@@ -1031,20 +1031,22 @@ function generateMockWideData() {
 
 // 生成模拟记录数据
 function generateMockRecords() {
-  const records = [];
-  
-  for (let i = 1; i <= 20; i++) {
-    records.push({
-      id: i,
-      fileName: `Excel数据表${i}.xlsx`,
-      uploadTime: new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString(),
-      recordCount: Math.floor(Math.random() * 500) + 100,
-      status: Math.random() > 0.1 ? '已处理' : '处理中',
-      description: `批次${i}的库存数据导入`
-    });
-  }
-  
-  return records.sort((a, b) => new Date(b.uploadTime) - new Date(a.uploadTime));
+    const records = [];
+    const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000;
+    const statuses = ['已处理', '处理中', '失败'];
+
+    for (let i = 1; i <= 20; i++) {
+        records.push({
+            id: i,
+            fileName: `Excel数据表${i}.xlsx`,
+            uploadTime: new Date(Date.now() - Math.random() * TEN_DAYS_MS).toISOString(),
+            recordCount: Math.floor(Math.random() * 500) + 100,
+            status: statuses[Math.floor(Math.random() * statuses.length)],
+            description: `批次${i}的库存数据导入`
+        });
+    }
+
+    return records.sort((a, b) => Date.parse(b.uploadTime) - Date.parse(a.uploadTime));
 }
 
 // 从文件名中提取ID
@@ -1801,6 +1803,10 @@ async function handleReorganization(request, env, path, method, corsHeaders) {
       return await moveFile(fileKey, env, corsHeaders);
     } else if (path === '/api/reorganize/analyze' && method === 'GET') {
       return await analyzeFiles(env, corsHeaders);
+    } else if (path === '/api/reorganize/reset' && method === 'POST') {
+      return await resetReorganization(env, corsHeaders);
+    } else if (path === '/api/reorganize/debug' && method === 'GET') {
+      return await debugReorganization(env, corsHeaders);
     }
     
     return Response.json({
@@ -2187,4 +2193,108 @@ function generateNewPath(fileName, uploadTime, databaseData = null) {
   const defaultContract = `DEFAULT_${fileName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20)}`;
   
   return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${defaultContract}`;
+}
+
+// 重置重新组织状态
+async function resetReorganization(env, corsHeaders) {
+  try {
+    console.log('🔄 重置重新组织状态...');
+    
+    if (!env.R2_BUCKET) {
+      throw new Error('R2存储桶不可用');
+    }
+
+    // 删除现有的计划文件
+    await env.R2_BUCKET.delete('reorganization/plan.json');
+    
+    console.log('✅ 重新组织状态已重置');
+    
+    return Response.json({
+      success: true,
+      message: '重新组织状态已重置，可以重新开始'
+    }, { headers: corsHeaders });
+
+  } catch (error) {
+    console.error('❌ 重置失败:', error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { status: 500, headers: corsHeaders });
+  }
+}
+
+// 调试重新组织状态
+async function debugReorganization(env, corsHeaders) {
+  try {
+    console.log('🔍 调试重新组织状态...');
+    
+    if (!env.R2_BUCKET) {
+      throw new Error('R2存储桶不可用');
+    }
+
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      planExists: false,
+      planData: null,
+      actualFiles: [],
+      movedFiles: [],
+      errors: []
+    };
+
+    // 检查计划文件
+    try {
+      const planObj = await env.R2_BUCKET.get('reorganization/plan.json');
+      if (planObj) {
+        debugInfo.planExists = true;
+        debugInfo.planData = await planObj.json();
+      }
+    } catch (error) {
+      debugInfo.errors.push(`计划文件读取错误: ${error.message}`);
+    }
+
+    // 检查实际文件状态
+    try {
+      const allObjects = await env.R2_BUCKET.list({ limit: 1000 });
+      debugInfo.actualFiles = allObjects.objects.map(obj => ({
+        key: obj.key,
+        size: obj.size,
+        uploaded: obj.uploaded,
+        contentType: obj.httpMetadata?.contentType
+      }));
+    } catch (error) {
+      debugInfo.errors.push(`文件列表读取错误: ${error.message}`);
+    }
+
+    // 如果有计划，检查移动状态
+    if (debugInfo.planData && debugInfo.planData.plan) {
+      for (const item of debugInfo.planData.plan) {
+        try {
+          const destObj = await env.R2_BUCKET.get(item.destination);
+          const sourceObj = await env.R2_BUCKET.get(item.source);
+          
+          debugInfo.movedFiles.push({
+            source: item.source,
+            destination: item.destination,
+            sourceExists: !!sourceObj,
+            destinationExists: !!destObj,
+            status: destObj ? 'moved' : (sourceObj ? 'not_moved' : 'missing')
+          });
+        } catch (error) {
+          debugInfo.errors.push(`检查文件 ${item.source} 错误: ${error.message}`);
+        }
+      }
+    }
+
+    return Response.json({
+      success: true,
+      debug: debugInfo
+    }, { headers: corsHeaders });
+
+  } catch (error) {
+    console.error('❌ 调试失败:', error);
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { status: 500, headers: corsHeaders });
+  }
 }
