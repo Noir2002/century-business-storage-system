@@ -971,6 +971,7 @@
             <div class="page-content">
                 <div style="margin-bottom: 20px;">
                     <button onclick="refreshFileList()" class="btn">🔄 刷新列表</button>
+                    <button onclick="debugFileRecords()" class="btn btn-info">🔍 调试文件记录</button>
                     <button onclick="exportAllFiles()" class="btn btn-success">📦 导出所有文件</button>
                     <button onclick="openDeleteByFolderModal()" class="btn btn-danger">🗑️ 删除文件</button>
                     <!-- GitHub重建功能已移除 -->
@@ -1802,6 +1803,35 @@
             alert(`数据库调试信息已输出到控制台\n\n记录数: ${databaseData.size}\n导入日期: ${databaseImportDate || '未知'}\n\n请按F12查看详细日志`);
         }
 
+        // 调试文件记录
+        function debugFileRecords() {
+            console.log('🔍 文件记录调试信息:');
+            console.log('📊 文件记录数量:', uploadedFiles.size);
+            console.log('📋 文件记录内容:', Array.from(uploadedFiles.entries()));
+            
+            // 显示前5条记录
+            const entries = Array.from(uploadedFiles.entries());
+            console.log('📝 前5条文件记录:');
+            entries.slice(0, 5).forEach(([fileName, fileRecord], index) => {
+                console.log(`  ${index + 1}. 文件名: "${fileName}"`);
+                console.log(`     原始名: "${fileRecord.name}"`);
+                console.log(`     文件夹: "${fileRecord.folder}"`);
+                console.log(`     LP号: "${fileRecord.lpNumber}"`);
+                console.log(`     履约单号: "${fileRecord.contractNumber}"`);
+                console.log(`     R2路径: "${fileRecord.r2Path}"`);
+            });
+            
+            // 检查本地存储
+            const localData = localStorage.getItem(STORAGE_KEYS.FILES);
+            console.log('💾 本地存储文件数据:', localData);
+            
+            // 检查同步数据
+            const syncData = localStorage.getItem('SYNC_FILES_GLOBAL');
+            console.log('🔄 同步文件数据:', syncData);
+            
+            alert(`文件记录调试信息已输出到控制台\n\n文件记录数: ${uploadedFiles.size}\n\n请按F12查看详细日志`);
+        }
+
         // 测试Excel解析
         async function testExcelParsing() {
             const fileInput = document.getElementById('databaseFile');
@@ -2021,6 +2051,7 @@
                         uploadedFiles.set(uploadResult.file.fileName, fileRecord);
                         successCount++;
                         console.log(`✅ 文件上传成功: ${file.name} -> ${uploadResult.file.fileName}`);
+                        console.log(`📝 文件记录已保存:`, fileRecord);
                     } catch (error) {
                         console.error(`❌ 上传失败 ${file.name}:`, error);
                         failedFiles.push({
@@ -2043,11 +2074,17 @@
             showUploadProgress(100);
 
             if (successCount > 0) {
+                console.log(`💾 保存 ${successCount} 个文件记录到本地存储...`);
                 saveFilesToLocal();
+                console.log('📊 保存后文件记录数量:', uploadedFiles.size);
+                
                 // 同步文件注册表到服务器
                 syncFilesToServer().catch(error => {
                     console.warn('文件注册表同步失败:', error);
                 });
+                
+                // 刷新文件列表显示
+                displayFileList();
             }
 
             if (failedFiles.length === 0) {
@@ -2364,6 +2401,10 @@
         }
 
         function displayFileList() {
+            console.log('📂 开始显示文件列表...');
+            console.log('📊 当前文件记录数量:', uploadedFiles.size);
+            console.log('📋 文件记录内容:', Array.from(uploadedFiles.entries()));
+            
             normalizeAndCleanupFiles();
             renderManageView();
             updatePackingInfo();
