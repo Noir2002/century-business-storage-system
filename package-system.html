@@ -1515,17 +1515,20 @@
                     const headerLower = header.toLowerCase();
                     console.log(`列${i}: 原始="${header}", 小写="${headerLower}"`);
                     
-                    // 识别LP号列：指定运单号、运单号、LP号等
-                    if (headerLower.includes('指定运单号') || headerLower.includes('运单号') || 
-                        headerLower.includes('lp') || headerLower.includes('lp号') || 
-                        headerLower.includes('运单') || headerLower.includes('waybill')) {
+                    // 识别LP号列：快递运单号、指定运单号、运单号、LP号等
+                    if (headerLower.includes('快递运单号') || headerLower.includes('指定运单号') || 
+                        headerLower.includes('运单号') || headerLower.includes('lp') || 
+                        headerLower.includes('lp号') || headerLower.includes('运单') || 
+                        headerLower.includes('waybill') || headerLower.includes('快递单号')) {
                         lpColumnIndex = i;
                         console.log(`✅ 找到LP号列: 第${i+1}列 "${header}"`);
                     } 
-                    // 识别履约单号列：系统履约单号、履约单号、合同号等
-                    else if (headerLower.includes('系统履约单号') || headerLower.includes('履约单号') || 
+                    // 识别履约单号列：VO预约到仓单号、系统履约单号、履约单号、合同号等
+                    else if (headerLower.includes('vo预约到仓单号') || headerLower.includes('预约到仓单号') ||
+                             headerLower.includes('系统履约单号') || headerLower.includes('履约单号') || 
                              headerLower.includes('履约') || headerLower.includes('合同') || 
-                             headerLower.includes('contract') || headerLower.includes('fulfillment')) {
+                             headerLower.includes('contract') || headerLower.includes('fulfillment') ||
+                             headerLower.includes('到仓单号')) {
                         contractColumnIndex = i;
                         console.log(`✅ 找到履约单号列: 第${i+1}列 "${header}"`);
                     }
@@ -1566,14 +1569,26 @@
                 console.log(`开始处理数据行，共${data.length-1}行数据`);
                 console.log(`使用列索引: LP号列=${lpColumnIndex}, 履约单号列=${contractColumnIndex}`);
                 
-                for (let i = 1; i < data.length; i++) {
-                    const row = data[i];
-                    console.log(`第${i+1}行原始数据:`, row);
+                // 过滤掉空行和无效数据
+                const validRows = data.slice(1).filter(row => {
+                    return Array.isArray(row) && row.length > 0 && 
+                           row.some(cell => cell !== undefined && cell !== null && String(cell).trim() !== '');
+                });
+                
+                console.log(`过滤后有效数据行数: ${validRows.length}`);
+                
+                for (let i = 0; i < validRows.length; i++) {
+                    const row = validRows[i];
+                    const actualRowIndex = i + 2; // 实际行号（包含标题行）
+                    console.log(`第${actualRowIndex}行原始数据:`, row);
                     
-                    if (row.length > Math.max(lpColumnIndex, contractColumnIndex) && row[lpColumnIndex] && row[contractColumnIndex]) {
+                    if (row.length > Math.max(lpColumnIndex, contractColumnIndex) && 
+                        row[lpColumnIndex] && row[contractColumnIndex] &&
+                        String(row[lpColumnIndex]).trim() !== '' && 
+                        String(row[contractColumnIndex]).trim() !== '') {
                         // 处理LP号：保留LP前缀和数字
                         let lpNumber = String(row[lpColumnIndex]).trim();
-                        console.log(`第${i+1}行LP号原始值: "${lpNumber}"`);
+                        console.log(`第${actualRowIndex}行LP号原始值: "${lpNumber}"`);
                         
                         if (lpNumber.startsWith('LP')) {
                             // 如果已经是LP格式，直接使用
@@ -1587,9 +1602,9 @@
                         }
                         
                         const contractNumber = String(row[contractColumnIndex]).trim();
-                        console.log(`第${i+1}行履约单号原始值: "${contractNumber}"`);
+                        console.log(`第${actualRowIndex}行履约单号原始值: "${contractNumber}"`);
                         
-                        console.log(`处理第${i+1}行: LP号="${lpNumber}", 履约单号="${contractNumber}"`);
+                        console.log(`处理第${actualRowIndex}行: LP号="${lpNumber}", 履约单号="${contractNumber}"`);
                         
                         if (lpNumber && contractNumber && lpNumber !== 'LP') {
                             databaseData.set(lpNumber, contractNumber);
@@ -1599,7 +1614,7 @@
                             console.log(`❌ 跳过无效记录: LP号="${lpNumber}", 履约单号="${contractNumber}"`);
                         }
                     } else {
-                        console.log(`❌ 第${i+1}行数据不完整或为空，跳过`);
+                        console.log(`❌ 第${actualRowIndex}行数据不完整或为空，跳过`);
                     }
                 }
 
