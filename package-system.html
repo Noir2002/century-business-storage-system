@@ -1495,23 +1495,39 @@
                 let lpColumnIndex = -1;
                 let contractColumnIndex = -1;
                 
+                console.log('Excel列标题:', headers);
+                
                 for (let i = 0; i < headers.length; i++) {
                     const header = String(headers[i] || '').toLowerCase().trim();
-                    if (header.includes('lp') || header.includes('lp号') || header.includes('lp号')) {
+                    console.log(`列${i}: "${header}"`);
+                    
+                    // 识别LP号列：指定运单号、运单号、LP号等
+                    if (header.includes('指定运单号') || header.includes('运单号') || 
+                        header.includes('lp') || header.includes('lp号') || 
+                        header.includes('运单') || header.includes('waybill')) {
                         lpColumnIndex = i;
-                    } else if (header.includes('履约') || header.includes('合同') || header.includes('contract')) {
+                        console.log(`✅ 找到LP号列: 第${i+1}列 "${header}"`);
+                    } 
+                    // 识别履约单号列：系统履约单号、履约单号、合同号等
+                    else if (header.includes('系统履约单号') || header.includes('履约单号') || 
+                             header.includes('履约') || header.includes('合同') || 
+                             header.includes('contract') || header.includes('fulfillment')) {
                         contractColumnIndex = i;
+                        console.log(`✅ 找到履约单号列: 第${i+1}列 "${header}"`);
                     }
                 }
                 
                 // 如果没找到明确的标题，尝试通过内容特征判断
                 if (lpColumnIndex === -1 || contractColumnIndex === -1) {
+                    console.log('通过内容特征进行二次识别...');
                     for (let i = 0; i < headers.length; i++) {
                         const header = String(headers[i] || '').toLowerCase().trim();
                         if (lpColumnIndex === -1 && (header.includes('号') || header.includes('number'))) {
                             lpColumnIndex = i;
+                            console.log(`🔍 通过内容特征找到LP号列: 第${i+1}列 "${header}"`);
                         } else if (contractColumnIndex === -1 && (header.includes('单') || header.includes('单号'))) {
                             contractColumnIndex = i;
+                            console.log(`🔍 通过内容特征找到履约单号列: 第${i+1}列 "${header}"`);
                         }
                     }
                 }
@@ -1533,12 +1549,29 @@
                 for (let i = 1; i < data.length; i++) {
                     const row = data[i];
                     if (row.length > Math.max(lpColumnIndex, contractColumnIndex) && row[lpColumnIndex] && row[contractColumnIndex]) {
-                        const lpNumber = String(row[lpColumnIndex]).replace(/[^\d]/g, '');
+                        // 处理LP号：保留LP前缀和数字
+                        let lpNumber = String(row[lpColumnIndex]).trim();
+                        if (lpNumber.startsWith('LP')) {
+                            // 如果已经是LP格式，直接使用
+                            lpNumber = lpNumber;
+                        } else {
+                            // 如果只是数字，添加LP前缀
+                            const digits = lpNumber.replace(/[^\d]/g, '');
+                            if (digits) {
+                                lpNumber = 'LP' + digits;
+                            }
+                        }
+                        
                         const contractNumber = String(row[contractColumnIndex]).trim();
                         
-                        if (lpNumber && contractNumber) {
+                        console.log(`处理第${i+1}行: LP号="${lpNumber}", 履约单号="${contractNumber}"`);
+                        
+                        if (lpNumber && contractNumber && lpNumber !== 'LP') {
                             databaseData.set(lpNumber, contractNumber);
                             validRecords++;
+                            console.log(`✅ 添加记录: ${lpNumber} -> ${contractNumber}`);
+                        } else {
+                            console.log(`❌ 跳过无效记录: LP号="${lpNumber}", 履约单号="${contractNumber}"`);
                         }
                     }
                 }
