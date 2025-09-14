@@ -1955,7 +1955,9 @@
             showStatus('uploadStatus', `正在上传到R2存储: ${folderName}` , 'info');
             showUploadProgress(0);
 
-            uploadFilesToR2(files, folderName, chosenLpNumber || lpSuffix, chosenContractNumber);
+            // 对于未匹配情况，使用lpSuffix或随机四位数作为contractNumber
+            const finalContractNumber = chosenContractNumber || lpSuffix || Math.floor(1000 + Math.random() * 9000).toString();
+            uploadFilesToR2(files, folderName, chosenLpNumber || lpSuffix, finalContractNumber);
 
             pendingUploadContext = null;
         }
@@ -2412,9 +2414,36 @@
             console.log('📊 当前文件记录数量:', uploadedFiles.size);
             console.log('📋 文件记录内容:', Array.from(uploadedFiles.entries()));
             
+            // 修复null文件夹路径
+            fixNullFolderPaths();
+            
             normalizeAndCleanupFiles();
             renderManageView();
             updatePackingInfo();
+        }
+        
+        function fixNullFolderPaths() {
+            let fixedCount = 0;
+            for (const [key, file] of uploadedFiles.entries()) {
+                if (file.folder && file.folder.includes('_null')) {
+                    // 生成随机的四位数替换null
+                    const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
+                    const newFolder = file.folder.replace('_null', `_${randomSuffix}`);
+                    
+                    // 更新文件记录
+                    file.folder = newFolder;
+                    file.contractNumber = randomSuffix;
+                    
+                    // 更新Map中的记录
+                    uploadedFiles.set(key, file);
+                    fixedCount++;
+                }
+            }
+            
+            if (fixedCount > 0) {
+                console.log(`🔧 修复了 ${fixedCount} 个null文件夹路径`);
+                saveFilesToLocal();
+            }
         }
 
         function renderManageView() {
