@@ -2656,8 +2656,8 @@
                 const folder = fileInfo.folder;
                 console.log(`🗂️ 检查文件: ${fileName} -> 文件夹: ${folder}`);
                 
-                // 检查新格式：package/YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号
-                const hierarchyMatch = folder.match(/^package\/\d{4}-\d{2}\/(\d{4}-\d{2}-\d{2})\/(\d{4}-\d{2}-\d{2})-(.+)$/);
+                // 检查新格式：package/YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ_履约单号 或 YYYY-MM-JJ-履约单号
+                const hierarchyMatch = folder.match(/^package\/\d{4}-\d{2}\/(\d{4}-\d{2}-\d{2})\/(\d{4}-\d{2}-\d{2})[_-](.+)$/);
                 
                 if (hierarchyMatch) {
                     const [, yearMonthDay, fullDate, contractNumber] = hierarchyMatch;
@@ -3792,10 +3792,10 @@
                             folder = `package/${yearMonth}/${yearMonthDay}/${folderName}`;
                         }
                         
-                        // 从文件夹名称中提取履约单号
+                        // 从文件夹名称中提取履约单号（支持下划线和连字符）
                         let contractNumber = '';
                         if (folder) {
-                            const folderMatch = folder.match(/(\d{4}-\d{2}-\d{2})-(.+)$/);
+                            const folderMatch = folder.match(/(\d{4}-\d{2}-\d{2})[_-](.+)$/);
                             if (folderMatch) {
                                 contractNumber = folderMatch[2];
                             }
