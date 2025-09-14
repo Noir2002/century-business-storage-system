@@ -3762,7 +3762,7 @@
             }
         }
         
-        // 从服务器加载文件列表
+        // 从R2直接加载文件列表
         async function loadServerFiles() {
             try {
                 const baseURL = getBaseURL();
@@ -3774,14 +3774,39 @@
                 
                 const result = await response.json();
                 if (result.success && result.files) {
-                    // 将服务器文件转换为本地格式
+                    console.log('📁 从R2获取到文件列表:', result.files);
+                    
+                    // 将R2文件转换为本地格式
                     result.files.forEach(file => {
+                        // 从R2路径中提取文件夹信息
+                        const r2Path = file.r2Path || '';
+                        const pathParts = r2Path.split('/');
+                        
+                        // 构建文件夹路径：package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD-履约单号
+                        let folder = '';
+                        if (pathParts.length >= 4) {
+                            // 新格式：package/2025-09/2025-09-14/2025-09-14-1251020358038567/filename.jpg
+                            const yearMonth = pathParts[1]; // 2025-09
+                            const yearMonthDay = pathParts[2]; // 2025-09-14
+                            const folderName = pathParts[3]; // 2025-09-14-1251020358038567
+                            folder = `package/${yearMonth}/${yearMonthDay}/${folderName}`;
+                        }
+                        
+                        // 从文件夹名称中提取履约单号
+                        let contractNumber = '';
+                        if (folder) {
+                            const folderMatch = folder.match(/(\d{4}-\d{2}-\d{2})-(.+)$/);
+                            if (folderMatch) {
+                                contractNumber = folderMatch[2];
+                            }
+                        }
+                        
                         const fileRecord = {
-                            name: file.originalName,
+                            name: file.originalName || file.fileName,
                             fileName: file.fileName,
-                            folder: extractFolderFromDescription(file.description || ''),
-                            lpNumber: extractLPFromDescription(file.description || ''),
-                            contractNumber: '',
+                            folder: folder,
+                            lpNumber: '', // R2中没有LP号信息
+                            contractNumber: contractNumber,
                             size: file.size,
                             url: file.publicUrl || '',
                             downloadUrl: `${baseURL}/api/package/${file.id}/download`,
@@ -3789,13 +3814,19 @@
                             r2Path: file.r2Path,
                             id: file.id
                         };
+                        
+                        console.log('📝 转换文件记录:', fileRecord);
                         uploadedFiles.set(file.fileName, fileRecord);
                     });
-                    console.log(`✅ 从服务器加载了 ${result.files.length} 个文件`);
+                    
+                    // 立即保存到本地存储
+                    saveFilesToLocal();
+                    
+                    console.log(`✅ 从R2加载了 ${result.files.length} 个文件`);
                     return true;
                 }
             } catch (error) {
-                console.warn('从服务器加载文件列表失败:', error);
+                console.warn('从R2加载文件列表失败:', error);
                 return false;
             }
         }
@@ -4018,11 +4049,11 @@
             loadDatabaseFromLocal();
             loadFilesFromLocal();
             
+            // 优先从R2加载文件列表（直接获取R2中的文件）
+            await loadServerFiles();
+            
             // 执行数据同步
             await performDataSync();
-            
-            // 从服务器加载文件列表
-            await loadServerFiles();
             
             updateDatabaseDisplay();
             displayFileList();
