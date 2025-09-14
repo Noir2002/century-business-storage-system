@@ -1876,20 +1876,30 @@ async function startReorganization(env, corsHeaders) {
       
       // 识别需要重新组织的文件
       let needsReorganization = false;
+      let reason = '';
       
       // 1. 根目录的图片和视频文件
       if (key.match(/\.(jpg|jpeg|png|gif|mp4|avi|mov)$/i) && !key.includes('/')) {
         needsReorganization = true;
+        reason = '根目录图片/视频文件';
         console.log(`📁 根目录文件需要重新组织: ${key}`);
       }
       // 2. 日期格式文件夹中的文件
       else if (key.match(/^\d{8}_[^/]+\//)) {
         needsReorganization = true;
+        reason = '日期格式文件夹中的文件';
         console.log(`📁 日期文件夹文件需要重新组织: ${key}`);
       }
-      // 3. package/文件夹中但路径不正确的文件
-      else if (key.startsWith('package/') && !key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\//)) {
+      // 3. package/文件夹中嵌套在时间戳文件夹中的文件
+      else if (key.startsWith('package/') && key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\/\d+\//)) {
         needsReorganization = true;
+        reason = 'package文件夹中嵌套在时间戳文件夹中的文件';
+        console.log(`📁 嵌套时间戳文件夹文件需要重新组织: ${key}`);
+      }
+      // 4. package/文件夹中但路径不正确的文件（其他情况）
+      else if (key.startsWith('package/') && !key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\/[^/]+$/)) {
+        needsReorganization = true;
+        reason = 'package文件夹中路径不正确的文件';
         console.log(`📁 package文件夹中路径不正确的文件需要重新组织: ${key}`);
       }
       
@@ -1910,6 +1920,9 @@ async function startReorganization(env, corsHeaders) {
       const folderPath = generateNewPath(file.key, file.uploaded, databaseData);
       const fileName = file.key.split('/').pop();
       const newFilePath = `${folderPath}/${fileName}`;
+      
+      console.log(`📋 移动计划: ${file.key} -> ${newFilePath}`);
+      
       return {
         source: file.key,
         destination: newFilePath,
@@ -2248,13 +2261,112 @@ async function moveFile(fileKey, env, corsHeaders) {
 }
 
 // 生成新的文件路径
-function generateNewPath(fileName, uploadTime, databaseData = null) {
-  // 尝试从文件名提取日期和LP号后四位（格式：20250901_0441）
-  const dateLpMatch = fileName.match(/^(\d{8})_(\d{4})/);
+function generateNewPath(fileKey, uploadTime, databaseData = null) {
+  console.log(`🔍 生成路径: ${fileKey}`);
   
-  if (dateLpMatch) {
-    const dateStr = dateLpMatch[1];
-    const lpSuffix = dateLpMatch[2];
+  // 处理嵌套在时间戳文件夹中的文件
+  // 格式：package/2025-09/2025-09-01/2025-09-01_0441/1756735814490/20250901_...
+  const nestedMatch = fileKey.match(/^package\/(\d{4}-\d{2})\/(\d{4}-\d{2}-\d{2})\/(\d{4}-\d{2}-\d{2})_(\d+)\/\d+\/(.+)$/);
+  if (nestedMatch) {
+    const yearMonth = nestedMatch[1];
+    const yearMonthDay = nestedMatch[2];
+    const contractSuffix = nestedMatch[4];
+    const fileName = nestedMatch[5];
+    
+    // 查找对应的履约单号
+    let contractNumber = contractSuffix; // 默认使用后缀
+    
+    if (databaseData && databaseData.has(contractSuffix)) {
+      contractNumber = databaseData.get(contractSuffix);
+      console.log(`🔍 找到匹配: 后缀 ${contractSuffix} -> 履约单号 ${contractNumber}`);
+    } else {
+      console.log(`⚠️ 未找到匹配: 后缀 ${contractSuffix}，使用后缀作为文件夹名`);
+    }
+    
+    return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
+  }
+  
+  // 处理根目录的图片和视频文件
+  if (fileKey.match(/\.(jpg|jpeg|png|gif|mp4|avi|mov)$/i) && !fileKey.includes('/')) {
+    const fileName = fileKey;
+    
+    // 尝试从文件名提取日期和LP号后四位（格式：20250901_0441）
+    const dateLpMatch = fileName.match(/^(\d{8})_(\d{4})/);
+    if (dateLpMatch) {
+      const dateStr = dateLpMatch[1];
+      const lpSuffix = dateLpMatch[2];
+      
+      // 将YYYYMMDD转换为YYYY-MM-DD格式
+      const year = dateStr.substring(0, 4);
+      const month = dateStr.substring(4, 6);
+      const day = dateStr.substring(6, 8);
+      const yearMonth = `${year}-${month}`;
+      const yearMonthDay = `${year}-${month}-${day}`;
+      
+      // 查找对应的履约单号
+      let contractNumber = lpSuffix;
+      
+      if (databaseData && databaseData.has(lpSuffix)) {
+        contractNumber = databaseData.get(lpSuffix);
+        console.log(`🔍 找到匹配: LP号后四位 ${lpSuffix} -> 履约单号 ${contractNumber}`);
+      } else {
+        console.log(`⚠️ 未找到匹配: LP号后四位 ${lpSuffix}，使用LP号后四位作为文件夹名`);
+      }
+      
+      return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
+    }
+    
+    // 尝试从时间戳文件名提取信息（格式：1757513851798-887008722.jpg）
+    const timestampMatch = fileName.match(/^(\d{13,})-(\d+)\./);
+    if (timestampMatch) {
+      const timestamp = parseInt(timestampMatch[1]);
+      const fileId = timestampMatch[2];
+      
+      // 使用时间戳推断日期
+      const uploadDate = new Date(timestamp);
+      const year = uploadDate.getFullYear();
+      const month = String(uploadDate.getMonth() + 1).padStart(2, '0');
+      const day = String(uploadDate.getDate()).padStart(2, '0');
+      const yearMonth = `${year}-${month}`;
+      const yearMonthDay = `${year}-${month}-${day}`;
+      
+      // 尝试从文件ID中提取LP号后四位
+      const lpSuffix = fileId.slice(-4);
+      let contractNumber = lpSuffix;
+      
+      if (databaseData && databaseData.has(lpSuffix)) {
+        contractNumber = databaseData.get(lpSuffix);
+        console.log(`🔍 找到匹配: 文件ID后四位 ${lpSuffix} -> 履约单号 ${contractNumber}`);
+      } else {
+        console.log(`⚠️ 未找到匹配: 文件ID后四位 ${lpSuffix}，使用文件ID后四位作为文件夹名`);
+      }
+      
+      return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
+    }
+    
+    // 使用上传时间推断日期
+    const uploadDate = new Date(uploadTime);
+    const year = uploadDate.getFullYear();
+    const month = String(uploadDate.getMonth() + 1).padStart(2, '0');
+    const day = String(uploadDate.getDate()).padStart(2, '0');
+    const yearMonth = `${year}-${month}`;
+    const yearMonthDay = `${year}-${month}-${day}`;
+    
+    // 从文件名中提取可能的数字作为默认履约单号
+    const numberMatch = fileName.match(/(\d{4,})/);
+    const defaultContract = numberMatch ? numberMatch[1].slice(-4) : 'UNKNOWN';
+    
+    console.log(`📅 使用上传时间推断日期: ${yearMonthDay}, 默认履约单号: ${defaultContract}`);
+    
+    return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${defaultContract}`;
+  }
+  
+  // 处理日期格式文件夹中的文件
+  const dateFolderMatch = fileKey.match(/^(\d{8})_([^/]+)\/(.+)$/);
+  if (dateFolderMatch) {
+    const dateStr = dateFolderMatch[1];
+    const folderSuffix = dateFolderMatch[2];
+    const fileName = dateFolderMatch[3];
     
     // 将YYYYMMDD转换为YYYY-MM-DD格式
     const year = dateStr.substring(0, 4);
@@ -2264,49 +2376,19 @@ function generateNewPath(fileName, uploadTime, databaseData = null) {
     const yearMonthDay = `${year}-${month}-${day}`;
     
     // 查找对应的履约单号
-    let contractNumber = lpSuffix; // 默认使用LP号后四位
+    let contractNumber = folderSuffix;
     
-    if (databaseData && databaseData.has(lpSuffix)) {
-      contractNumber = databaseData.get(lpSuffix); // 使用找到的履约单号
-      console.log(`🔍 找到匹配: LP号后四位 ${lpSuffix} -> 履约单号 ${contractNumber}`);
+    if (databaseData && databaseData.has(folderSuffix)) {
+      contractNumber = databaseData.get(folderSuffix);
+      console.log(`🔍 找到匹配: 文件夹后缀 ${folderSuffix} -> 履约单号 ${contractNumber}`);
     } else {
-      console.log(`⚠️ 未找到匹配: LP号后四位 ${lpSuffix}，使用LP号后四位作为文件夹名（用户将手动处理）`);
-    }
-    
-    // 只返回文件夹路径，不包含文件名
-    return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
-  }
-  
-  // 尝试从时间戳文件名提取信息（格式：1757513851798-887008722.jpg）
-  const timestampMatch = fileName.match(/^(\d{13,})-(\d+)\./);
-  if (timestampMatch) {
-    const timestamp = parseInt(timestampMatch[1]);
-    const fileId = timestampMatch[2];
-    
-    // 使用时间戳推断日期
-    const uploadDate = new Date(timestamp);
-    const year = uploadDate.getFullYear();
-    const month = String(uploadDate.getMonth() + 1).padStart(2, '0');
-    const day = String(uploadDate.getDate()).padStart(2, '0');
-    const yearMonth = `${year}-${month}`;
-    const yearMonthDay = `${year}-${month}-${day}`;
-    
-    // 尝试从文件ID中提取LP号后四位（取最后4位）
-    const lpSuffix = fileId.slice(-4);
-    let contractNumber = lpSuffix; // 默认使用文件ID后四位
-    
-    // 尝试在数据库中查找对应的履约单号
-    if (databaseData && databaseData.has(lpSuffix)) {
-      contractNumber = databaseData.get(lpSuffix);
-      console.log(`🔍 找到匹配: 文件ID后四位 ${lpSuffix} -> 履约单号 ${contractNumber}`);
-    } else {
-      console.log(`⚠️ 未找到匹配: 文件ID后四位 ${lpSuffix}，使用文件ID后四位作为文件夹名`);
+      console.log(`⚠️ 未找到匹配: 文件夹后缀 ${folderSuffix}，使用文件夹后缀作为文件夹名`);
     }
     
     return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
   }
   
-  // 如果没有匹配到任何模式，使用上传时间推断日期
+  // 默认情况：使用上传时间推断日期
   const uploadDate = new Date(uploadTime);
   const year = uploadDate.getFullYear();
   const month = String(uploadDate.getMonth() + 1).padStart(2, '0');
@@ -2314,11 +2396,11 @@ function generateNewPath(fileName, uploadTime, databaseData = null) {
   const yearMonth = `${year}-${month}`;
   const yearMonthDay = `${year}-${month}-${day}`;
   
-  // 从文件名中提取可能的数字作为默认履约单号
+  const fileName = fileKey.split('/').pop();
   const numberMatch = fileName.match(/(\d{4,})/);
   const defaultContract = numberMatch ? numberMatch[1].slice(-4) : 'UNKNOWN';
   
-  console.log(`📅 使用上传时间推断日期: ${yearMonthDay}, 默认履约单号: ${defaultContract}`);
+  console.log(`📅 默认情况: 使用上传时间推断日期: ${yearMonthDay}, 默认履约单号: ${defaultContract}`);
   
   return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${defaultContract}`;
 }
@@ -2462,7 +2544,7 @@ async function testReorganization(env, corsHeaders) {
         continue;
       }
       
-      // 识别需要重新组织的文件
+      // 识别需要重新组织的文件（与startReorganization使用相同逻辑）
       let needsReorganization = false;
       let reason = '';
       
@@ -2476,8 +2558,13 @@ async function testReorganization(env, corsHeaders) {
         needsReorganization = true;
         reason = '日期格式文件夹中的文件';
       }
-      // 3. package/文件夹中但路径不正确的文件
-      else if (key.startsWith('package/') && !key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\//)) {
+      // 3. package/文件夹中嵌套在时间戳文件夹中的文件
+      else if (key.startsWith('package/') && key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\/\d+\//)) {
+        needsReorganization = true;
+        reason = 'package文件夹中嵌套在时间戳文件夹中的文件';
+      }
+      // 4. package/文件夹中但路径不正确的文件（其他情况）
+      else if (key.startsWith('package/') && !key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\/[^/]+$/)) {
         needsReorganization = true;
         reason = 'package文件夹中路径不正确的文件';
       }
