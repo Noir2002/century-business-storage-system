@@ -1512,37 +1512,28 @@
                 
                 for (let i = 0; i < headers.length; i++) {
                     const header = String(headers[i] || '').trim();
-                    const headerLower = header.toLowerCase();
-                    console.log(`列${i}: 原始="${header}", 小写="${headerLower}"`);
+                    console.log(`列${i}: "${header}"`);
                     
-                    // 识别LP号列：快递运单号、指定运单号、运单号、LP号等
-                    if (headerLower.includes('快递运单号') || headerLower.includes('指定运单号') || 
-                        headerLower.includes('运单号') || headerLower.includes('lp') || 
-                        headerLower.includes('lp号') || headerLower.includes('运单') || 
-                        headerLower.includes('waybill') || headerLower.includes('快递单号')) {
+                    // 精确匹配列标题
+                    if (header === '指定运单号') {
                         lpColumnIndex = i;
                         console.log(`✅ 找到LP号列: 第${i+1}列 "${header}"`);
                     } 
-                    // 识别履约单号列：VO预约到仓单号、系统履约单号、履约单号、合同号等
-                    else if (headerLower.includes('vo预约到仓单号') || headerLower.includes('预约到仓单号') ||
-                             headerLower.includes('系统履约单号') || headerLower.includes('履约单号') || 
-                             headerLower.includes('履约') || headerLower.includes('合同') || 
-                             headerLower.includes('contract') || headerLower.includes('fulfillment') ||
-                             headerLower.includes('到仓单号')) {
+                    else if (header === '系统履约单号') {
                         contractColumnIndex = i;
                         console.log(`✅ 找到履约单号列: 第${i+1}列 "${header}"`);
                     }
                 }
                 
-                // 如果没找到明确的标题，尝试通过内容特征判断
+                // 如果没找到精确匹配的标题，尝试通过内容特征判断
                 if (lpColumnIndex === -1 || contractColumnIndex === -1) {
-                    console.log('通过内容特征进行二次识别...');
+                    console.log('⚠️ 未找到精确匹配的列标题，尝试通过内容特征识别...');
                     for (let i = 0; i < headers.length; i++) {
                         const header = String(headers[i] || '').toLowerCase().trim();
-                        if (lpColumnIndex === -1 && (header.includes('号') || header.includes('number'))) {
+                        if (lpColumnIndex === -1 && (header.includes('指定运单号') || header.includes('运单号') || header.includes('lp'))) {
                             lpColumnIndex = i;
                             console.log(`🔍 通过内容特征找到LP号列: 第${i+1}列 "${header}"`);
-                        } else if (contractColumnIndex === -1 && (header.includes('单') || header.includes('单号'))) {
+                        } else if (contractColumnIndex === -1 && (header.includes('系统履约单号') || header.includes('履约单号') || header.includes('履约'))) {
                             contractColumnIndex = i;
                             console.log(`🔍 通过内容特征找到履约单号列: 第${i+1}列 "${header}"`);
                         }
@@ -1582,12 +1573,22 @@
                     const actualRowIndex = i + 2; // 实际行号（包含标题行）
                     console.log(`第${actualRowIndex}行原始数据:`, row);
                     
+                    // 详细检查每列数据
+                    const lpValue = row[lpColumnIndex];
+                    const contractValue = row[contractColumnIndex];
+                    const lpStr = String(lpValue || '').trim();
+                    const contractStr = String(contractValue || '').trim();
+                    
+                    console.log(`第${actualRowIndex}行数据检查:`);
+                    console.log(`  LP号列(${lpColumnIndex}): "${lpValue}" -> 处理后: "${lpStr}"`);
+                    console.log(`  履约单号列(${contractColumnIndex}): "${contractValue}" -> 处理后: "${contractStr}"`);
+                    console.log(`  行长度: ${row.length}, 需要长度: ${Math.max(lpColumnIndex, contractColumnIndex) + 1}`);
+                    
                     if (row.length > Math.max(lpColumnIndex, contractColumnIndex) && 
-                        row[lpColumnIndex] && row[contractColumnIndex] &&
-                        String(row[lpColumnIndex]).trim() !== '' && 
-                        String(row[contractColumnIndex]).trim() !== '') {
+                        lpValue && contractValue &&
+                        lpStr !== '' && contractStr !== '') {
                         // 处理LP号：保留LP前缀和数字
-                        let lpNumber = String(row[lpColumnIndex]).trim();
+                        let lpNumber = String(lpValue).trim();
                         console.log(`第${actualRowIndex}行LP号原始值: "${lpNumber}"`);
                         
                         if (lpNumber.startsWith('LP')) {
@@ -1601,7 +1602,7 @@
                             }
                         }
                         
-                        const contractNumber = String(row[contractColumnIndex]).trim();
+                        const contractNumber = String(contractValue).trim();
                         console.log(`第${actualRowIndex}行履约单号原始值: "${contractNumber}"`);
                         
                         console.log(`处理第${actualRowIndex}行: LP号="${lpNumber}", 履约单号="${contractNumber}"`);
@@ -1614,7 +1615,25 @@
                             console.log(`❌ 跳过无效记录: LP号="${lpNumber}", 履约单号="${contractNumber}"`);
                         }
                     } else {
-                        console.log(`❌ 第${actualRowIndex}行数据不完整或为空，跳过`);
+                        // 详细说明跳过原因
+                        let skipReason = [];
+                        if (row.length <= Math.max(lpColumnIndex, contractColumnIndex)) {
+                            skipReason.push(`行长度不足(${row.length} < ${Math.max(lpColumnIndex, contractColumnIndex) + 1})`);
+                        }
+                        if (!lpValue) {
+                            skipReason.push(`LP号列为空`);
+                        }
+                        if (!contractValue) {
+                            skipReason.push(`履约单号列为空`);
+                        }
+                        if (lpStr === '') {
+                            skipReason.push(`LP号处理后为空`);
+                        }
+                        if (contractStr === '') {
+                            skipReason.push(`履约单号处理后为空`);
+                        }
+                        
+                        console.log(`❌ 第${actualRowIndex}行跳过，原因: ${skipReason.join(', ')}`);
                     }
                 }
 
