@@ -1999,16 +1999,8 @@
             let failedFiles = [];
             const totalFiles = files.length;
 
-            // 生成正确的文件夹路径结构
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            const yearMonth = `${year}-${month}`;
-            const yearMonthDay = `${year}-${month}-${day}`;
-            
-            // 构建完整的文件夹路径：package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD_履约单号
-            const fullFolderPath = `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
+            // 使用传入的folderName作为完整路径，确保与proceedUploadWithSelection中的逻辑一致
+            const fullFolderPath = `package/${folderName}`;
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
@@ -2112,12 +2104,15 @@
                 showStatus('uploadStatus', '❌ 所有文件上传失败，请检查网络连接', 'error');
             }
 
-            document.getElementById('fileInput').value = '';
-            document.getElementById('lpSuffix').value = '';
-            // 清空累计与展示
-            desktopSelectedFiles = [];
-            updateSelectedFilesInfo();
-            updateSelectedFilesPreview();
+            // 只在成功上传后才清空文件列表
+            if (successCount > 0) {
+                document.getElementById('fileInput').value = '';
+                document.getElementById('lpSuffix').value = '';
+                // 清空累计与展示
+                desktopSelectedFiles = [];
+                updateSelectedFilesInfo();
+                updateSelectedFilesPreview();
+            }
         }
 
         // 上传单个文件到R2
