@@ -1865,29 +1865,33 @@ async function startReorganization(env, corsHeaders) {
           obj.key.startsWith('package-sync/') ||
           obj.key.startsWith('wide/') ||
           obj.key.startsWith('records/') ||
-          obj.key.startsWith('tmall/')) {
+          obj.key.startsWith('tmall/') ||
+          obj.key.startsWith('reorganization/')) {
         continue;
       }
       
-      // 只处理以下类型的文件：
-      // 1. 直接存储在根目录的图片和视频文件
-      // 2. 以日期格式命名的文件夹中的文件
-      // 3. 不在package/文件夹中的打包系统文件
+      // 检查是否为图片或视频文件
       const isImageOrVideo = obj.httpMetadata?.contentType?.startsWith('image/') || 
-                            obj.httpMetadata?.contentType?.startsWith('video/');
-      const isDateFolderFile = /^\d{8}_[^/]+\//.test(obj.key);
-      const isRootFile = !obj.key.includes('/');
-      const isNotInPackage = !obj.key.startsWith('package/');
+                            obj.httpMetadata?.contentType?.startsWith('video/') ||
+                            obj.key.match(/\.(jpg|jpeg|png|gif|mp4|avi|mov|webp)$/i);
       
-      if ((isImageOrVideo && isRootFile) || 
-          (isDateFolderFile && isNotInPackage) ||
-          (isRootFile && isNotInPackage && (isImageOrVideo || obj.key.match(/\.(jpg|jpeg|png|gif|mp4|avi|mov)$/i)))) {
+      // 检查是否为需要重新组织的文件：
+      // 1. 直接存储在根目录的图片和视频文件
+      // 2. 在package/文件夹中但路径不正确的文件（需要重新组织到正确的日期文件夹）
+      // 3. 以时间戳命名的文件（如 1757513851798-887008722.jpg）
+      const isRootFile = !obj.key.includes('/');
+      const isInPackageButWrongPath = obj.key.startsWith('package/') && 
+                                     !obj.key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\//);
+      const isTimestampFile = obj.key.match(/^\d{13,}-\d+\.(jpg|jpeg|png|gif|mp4|avi|mov|webp)$/i);
+      
+      if (isImageOrVideo && (isRootFile || isInPackageButWrongPath || isTimestampFile)) {
         filesToMove.push({
           key: obj.key,
           size: obj.size,
           uploaded: obj.uploaded,
           contentType: obj.httpMetadata?.contentType || 'application/octet-stream'
         });
+        console.log(`📁 找到需要重新组织的文件: ${obj.key}`);
       }
     }
 
@@ -1911,16 +1915,87 @@ async function startReorganization(env, corsHeaders) {
       plan: movePlan,
       totalFiles: movePlan.length,
       createdAt: new Date().toISOString(),
-      status: 'pending'
+      status: 'in_progress'
     }), {
       httpMetadata: { contentType: 'application/json' }
     });
 
+    // 开始实际移动文件
+    let movedCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    console.log(`🔄 开始移动 ${movePlan.length} 个文件...`);
+
+    for (const item of movePlan) {
+      try {
+        // 检查源文件是否存在
+        const sourceObj = await env.R2_BUCKET.get(item.source);
+        if (!sourceObj) {
+          console.warn(`⚠️ 源文件不存在: ${item.source}`);
+          errorCount++;
+          errors.push(`源文件不存在: ${item.source}`);
+          continue;
+        }
+
+        // 检查目标文件是否已存在
+        const destObj = await env.R2_BUCKET.get(item.destination);
+        if (destObj) {
+          console.warn(`⚠️ 目标文件已存在: ${item.destination}`);
+          errorCount++;
+          errors.push(`目标文件已存在: ${item.destination}`);
+          continue;
+        }
+
+        // 移动文件（复制到新位置，然后删除原文件）
+        await env.R2_BUCKET.put(item.destination, sourceObj.body, {
+          httpMetadata: sourceObj.httpMetadata,
+          customMetadata: {
+            ...sourceObj.customMetadata,
+            originalPath: item.source,
+            movedAt: new Date().toISOString()
+          }
+        });
+
+        // 确认新文件创建成功后，删除原文件
+        const verifyObj = await env.R2_BUCKET.get(item.destination);
+        if (verifyObj) {
+          await env.R2_BUCKET.delete(item.source);
+          movedCount++;
+          console.log(`✅ 文件移动成功: ${item.source} -> ${item.destination}`);
+        } else {
+          throw new Error('新文件创建失败，取消移动操作');
+        }
+
+      } catch (error) {
+        console.error(`❌ 移动文件失败 ${item.source}:`, error);
+        errorCount++;
+        errors.push(`移动失败 ${item.source}: ${error.message}`);
+      }
+    }
+
+    // 更新计划状态
+    await env.R2_BUCKET.put('reorganization/plan.json', JSON.stringify({
+      plan: movePlan,
+      totalFiles: movePlan.length,
+      movedFiles: movedCount,
+      errorCount: errorCount,
+      errors: errors,
+      createdAt: new Date().toISOString(),
+      status: 'completed'
+    }), {
+      httpMetadata: { contentType: 'application/json' }
+    });
+
+    console.log(`🎉 文件重新组织完成: ${movedCount}/${movePlan.length} 个文件成功移动`);
+
     return Response.json({
       success: true,
-      message: `找到 ${movePlan.length} 个文件需要重新组织`,
+      message: `文件重新组织完成: ${movedCount}/${movePlan.length} 个文件成功移动`,
       totalFiles: movePlan.length,
-      plan: movePlan.slice(0, 10) // 只返回前10个作为预览
+      movedFiles: movedCount,
+      errorCount: errorCount,
+      errors: errors.slice(0, 5) // 只返回前5个错误
     }, { headers: corsHeaders });
 
   } catch (error) {
@@ -2153,7 +2228,7 @@ async function moveFile(fileKey, env, corsHeaders) {
 
 // 生成新的文件路径
 function generateNewPath(fileName, uploadTime, databaseData = null) {
-  // 尝试从文件名提取日期和LP号后四位
+  // 尝试从文件名提取日期和LP号后四位（格式：20250901_0441）
   const dateLpMatch = fileName.match(/^(\d{8})_(\d{4})/);
   
   if (dateLpMatch) {
@@ -2181,7 +2256,36 @@ function generateNewPath(fileName, uploadTime, databaseData = null) {
     return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
   }
   
-  // 如果没有匹配到，使用上传时间推断日期
+  // 尝试从时间戳文件名提取信息（格式：1757513851798-887008722.jpg）
+  const timestampMatch = fileName.match(/^(\d{13,})-(\d+)\./);
+  if (timestampMatch) {
+    const timestamp = parseInt(timestampMatch[1]);
+    const fileId = timestampMatch[2];
+    
+    // 使用时间戳推断日期
+    const uploadDate = new Date(timestamp);
+    const year = uploadDate.getFullYear();
+    const month = String(uploadDate.getMonth() + 1).padStart(2, '0');
+    const day = String(uploadDate.getDate()).padStart(2, '0');
+    const yearMonth = `${year}-${month}`;
+    const yearMonthDay = `${year}-${month}-${day}`;
+    
+    // 尝试从文件ID中提取LP号后四位（取最后4位）
+    const lpSuffix = fileId.slice(-4);
+    let contractNumber = lpSuffix; // 默认使用文件ID后四位
+    
+    // 尝试在数据库中查找对应的履约单号
+    if (databaseData && databaseData.has(lpSuffix)) {
+      contractNumber = databaseData.get(lpSuffix);
+      console.log(`🔍 找到匹配: 文件ID后四位 ${lpSuffix} -> 履约单号 ${contractNumber}`);
+    } else {
+      console.log(`⚠️ 未找到匹配: 文件ID后四位 ${lpSuffix}，使用文件ID后四位作为文件夹名`);
+    }
+    
+    return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
+  }
+  
+  // 如果没有匹配到任何模式，使用上传时间推断日期
   const uploadDate = new Date(uploadTime);
   const year = uploadDate.getFullYear();
   const month = String(uploadDate.getMonth() + 1).padStart(2, '0');
@@ -2189,8 +2293,11 @@ function generateNewPath(fileName, uploadTime, databaseData = null) {
   const yearMonth = `${year}-${month}`;
   const yearMonthDay = `${year}-${month}-${day}`;
   
-  // 生成一个基于文件名的默认履约单号
-  const defaultContract = `DEFAULT_${fileName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20)}`;
+  // 从文件名中提取可能的数字作为默认履约单号
+  const numberMatch = fileName.match(/(\d{4,})/);
+  const defaultContract = numberMatch ? numberMatch[1].slice(-4) : 'UNKNOWN';
+  
+  console.log(`📅 使用上传时间推断日期: ${yearMonthDay}, 默认履约单号: ${defaultContract}`);
   
   return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${defaultContract}`;
 }
