@@ -738,6 +738,24 @@
                         ).join('')}
                         ${test.filesToMove.length > 10 ? `<div>... 还有 ${test.filesToMove.length - 10} 个文件</div>` : ''}
                         
+                        <div style="margin-top: 15px;"><strong>跳过的文件统计:</strong></div>
+                        ${Object.entries(test.skippedFiles.reduce((acc, file) => {
+                            acc[file.reason] = (acc[file.reason] || 0) + 1;
+                            return acc;
+                        }, {})).map(([reason, count]) => 
+                            `<div style="margin: 5px 0; padding: 5px; background: #f5f5f5; border-radius: 4px;">
+                                ${reason}: ${count} 个文件
+                            </div>`
+                        ).join('')}
+                        
+                        <div style="margin-top: 15px;"><strong>跳过的文件示例 (前20个):</strong></div>
+                        ${test.skippedFiles.slice(0, 20).map(file => 
+                            `<div style="margin: 2px 0; padding: 2px; background: #f9f9f9; border-radius: 2px; font-size: 11px;">
+                                ${file.key} - ${file.reason}
+                            </div>`
+                        ).join('')}
+                        ${test.skippedFiles.length > 20 ? `<div>... 还有 ${test.skippedFiles.length - 20} 个文件</div>` : ''}
+                        
                         ${test.errors.length > 0 ? `
                             <div style="margin-top: 10px;"><strong>错误 (${test.errors.length}):</strong></div>
                             ${test.errors.map(error => 

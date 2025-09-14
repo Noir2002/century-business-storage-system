@@ -2503,9 +2503,17 @@ async function testReorganization(env, corsHeaders) {
           });
         }
       } else {
+        // 检查为什么被跳过
+        let skipReason = '不需要重新组织';
+        if (key.startsWith('package/') && key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\//)) {
+          skipReason = '已在正确路径中';
+        } else if (!key.match(/\.(jpg|jpeg|png|gif|mp4|avi|mov)$/i)) {
+          skipReason = '不是图片/视频文件';
+        }
+        
         testResults.skippedFiles.push({
           key: key,
-          reason: '不需要重新组织'
+          reason: skipReason
         });
       }
     }
