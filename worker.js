@@ -1826,6 +1826,28 @@ async function startReorganization(env, corsHeaders) {
       throw new Error('R2存储桶不可用');
     }
 
+    // 获取数据库数据
+    let databaseData = null;
+    try {
+      const dbObj = await env.R2_BUCKET.get('package-sync/database.json');
+      if (dbObj) {
+        const dbContent = await dbObj.json();
+        if (dbContent && dbContent.data) {
+          databaseData = new Map();
+          for (const record of dbContent.data) {
+            if (record.lp && record.contract) {
+              // 存储LP号后四位到履约单号的映射
+              const lpSuffix = record.lp.slice(-4); // 取LP号后四位
+              databaseData.set(lpSuffix, record.contract);
+            }
+          }
+          console.log(`📊 加载数据库数据: ${databaseData.size} 条记录`);
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ 无法加载数据库数据，将使用LP号后四位作为履约单号:', error.message);
+    }
+
     // 获取所有文件
     const allObjects = await env.R2_BUCKET.list({ limit: 1000 });
     const filesToMove = [];
@@ -1867,10 +1889,12 @@ async function startReorganization(env, corsHeaders) {
 
     // 生成移动计划
     const movePlan = filesToMove.map(file => {
-      const newPath = generateNewPath(file.key, file.uploaded);
+      const folderPath = generateNewPath(file.key, file.uploaded, databaseData);
+      const fileName = file.key.split('/').pop();
+      const newFilePath = `${folderPath}/${fileName}`;
       return {
         source: file.key,
-        destination: newPath,
+        destination: newFilePath,
         size: file.size,
         contentType: file.contentType
       };
@@ -2070,11 +2094,15 @@ async function moveFile(fileKey, env, corsHeaders) {
       }, { status: 404, headers: corsHeaders });
     }
 
-    // 生成新路径
-    const newPath = generateNewPath(fileKey, sourceObj.uploaded);
+    // 生成新路径（文件夹路径）
+    const folderPath = generateNewPath(fileKey, sourceObj.uploaded);
+    
+    // 从原文件路径中提取文件名
+    const fileName = fileKey.split('/').pop();
+    const newFilePath = `${folderPath}/${fileName}`;
     
     // 检查目标文件是否已存在
-    const destObj = await env.R2_BUCKET.get(newPath);
+    const destObj = await env.R2_BUCKET.get(newFilePath);
     if (destObj) {
       return Response.json({
         success: false,
@@ -2082,8 +2110,8 @@ async function moveFile(fileKey, env, corsHeaders) {
       }, { status: 409, headers: corsHeaders });
     }
 
-    // 复制文件到新位置
-    await env.R2_BUCKET.put(newPath, sourceObj.body, {
+    // 移动文件到新位置（先复制，再删除）
+    await env.R2_BUCKET.put(newFilePath, sourceObj.body, {
       httpMetadata: sourceObj.httpMetadata,
       customMetadata: {
         ...sourceObj.customMetadata,
@@ -2092,16 +2120,20 @@ async function moveFile(fileKey, env, corsHeaders) {
       }
     });
 
-    // 删除原文件
-    await env.R2_BUCKET.delete(fileKey);
-
-    console.log(`✅ 文件移动成功: ${fileKey} -> ${newPath}`);
+    // 确认新文件创建成功后，删除原文件
+    const verifyObj = await env.R2_BUCKET.get(newFilePath);
+    if (verifyObj) {
+      await env.R2_BUCKET.delete(fileKey);
+      console.log(`✅ 文件移动成功: ${fileKey} -> ${newFilePath}`);
+    } else {
+      throw new Error('新文件创建失败，取消移动操作');
+    }
 
     return Response.json({
       success: true,
       message: '文件移动成功',
       source: fileKey,
-      destination: newPath
+      destination: newFilePath
     }, { headers: corsHeaders });
 
   } catch (error) {
@@ -2114,13 +2146,13 @@ async function moveFile(fileKey, env, corsHeaders) {
 }
 
 // 生成新的文件路径
-function generateNewPath(fileName, uploadTime) {
-  // 尝试从文件名提取日期和履约单号
-  const dateContractMatch = fileName.match(/^(\d{8})_([^_]+)_/);
+function generateNewPath(fileName, uploadTime, databaseData = null) {
+  // 尝试从文件名提取日期和LP号后四位
+  const dateLpMatch = fileName.match(/^(\d{8})_(\d{4})/);
   
-  if (dateContractMatch) {
-    const dateStr = dateContractMatch[1];
-    const contract = dateContractMatch[2];
+  if (dateLpMatch) {
+    const dateStr = dateLpMatch[1];
+    const lpSuffix = dateLpMatch[2];
     
     // 将YYYYMMDD转换为YYYY-MM-DD格式
     const year = dateStr.substring(0, 4);
@@ -2129,7 +2161,18 @@ function generateNewPath(fileName, uploadTime) {
     const yearMonth = `${year}-${month}`;
     const yearMonthDay = `${year}-${month}-${day}`;
     
-    return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contract}/${fileName}`;
+    // 查找对应的履约单号
+    let contractNumber = lpSuffix; // 默认使用LP号后四位
+    
+    if (databaseData && databaseData.has(lpSuffix)) {
+      contractNumber = databaseData.get(lpSuffix); // 使用找到的履约单号
+      console.log(`🔍 找到匹配: LP号后四位 ${lpSuffix} -> 履约单号 ${contractNumber}`);
+    } else {
+      console.log(`⚠️ 未找到匹配: LP号后四位 ${lpSuffix}，使用LP号后四位作为文件夹名（用户将手动处理）`);
+    }
+    
+    // 只返回文件夹路径，不包含文件名
+    return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
   }
   
   // 如果没有匹配到，使用上传时间推断日期
@@ -2143,5 +2186,5 @@ function generateNewPath(fileName, uploadTime) {
   // 生成一个基于文件名的默认履约单号
   const defaultContract = `DEFAULT_${fileName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20)}`;
   
-  return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${defaultContract}/${fileName}`;
+  return `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${defaultContract}`;
 }
