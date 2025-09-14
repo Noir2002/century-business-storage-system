@@ -1817,7 +1817,7 @@
                         formData.append('description', `LP号:${lpNumber} 文件夹:${folderName}`);
                         
                         const baseURL = getBaseURL();
-                        const uploadResponse = await fetch(`${baseURL}/api/package/upload`, {
+                        const uploadResponse = await fetch(`${baseURL}/api/r2/upload/package/${encodeURIComponent(folderName)}/${encodeURIComponent(fileName)}`, {
                             method: 'POST',
                             body: formData
                         });
