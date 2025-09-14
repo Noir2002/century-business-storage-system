@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Century Business 打包系统 - R2云存储</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -909,6 +910,7 @@
                         <button onclick="downloadDatabase()" class="btn btn-secondary">📥 导出数据库</button>
                         <button onclick="toggleDatabasePreview()" id="databasePreviewBtn" class="btn btn-secondary">👁️ 预览数据库</button>
                         <button onclick="debugDatabase()" class="btn btn-info">🔍 调试数据库</button>
+                        <button onclick="testExcelParsing()" class="btn btn-warning">🧪 测试Excel解析</button>
                     </div>
 
                     <div id="databasePreview" style="display: none; margin-top: 15px;">
@@ -1506,22 +1508,24 @@
                 let contractColumnIndex = -1;
                 
                 console.log('Excel列标题:', headers);
+                console.log('Excel原始数据前3行:', data.slice(0, 3));
                 
                 for (let i = 0; i < headers.length; i++) {
-                    const header = String(headers[i] || '').toLowerCase().trim();
-                    console.log(`列${i}: "${header}"`);
+                    const header = String(headers[i] || '').trim();
+                    const headerLower = header.toLowerCase();
+                    console.log(`列${i}: 原始="${header}", 小写="${headerLower}"`);
                     
                     // 识别LP号列：指定运单号、运单号、LP号等
-                    if (header.includes('指定运单号') || header.includes('运单号') || 
-                        header.includes('lp') || header.includes('lp号') || 
-                        header.includes('运单') || header.includes('waybill')) {
+                    if (headerLower.includes('指定运单号') || headerLower.includes('运单号') || 
+                        headerLower.includes('lp') || headerLower.includes('lp号') || 
+                        headerLower.includes('运单') || headerLower.includes('waybill')) {
                         lpColumnIndex = i;
                         console.log(`✅ 找到LP号列: 第${i+1}列 "${header}"`);
                     } 
                     // 识别履约单号列：系统履约单号、履约单号、合同号等
-                    else if (header.includes('系统履约单号') || header.includes('履约单号') || 
-                             header.includes('履约') || header.includes('合同') || 
-                             header.includes('contract') || header.includes('fulfillment')) {
+                    else if (headerLower.includes('系统履约单号') || headerLower.includes('履约单号') || 
+                             headerLower.includes('履约') || headerLower.includes('合同') || 
+                             headerLower.includes('contract') || headerLower.includes('fulfillment')) {
                         contractColumnIndex = i;
                         console.log(`✅ 找到履约单号列: 第${i+1}列 "${header}"`);
                     }
@@ -1559,11 +1563,18 @@
                 
                 let validRecords = 0;
 
+                console.log(`开始处理数据行，共${data.length-1}行数据`);
+                console.log(`使用列索引: LP号列=${lpColumnIndex}, 履约单号列=${contractColumnIndex}`);
+                
                 for (let i = 1; i < data.length; i++) {
                     const row = data[i];
+                    console.log(`第${i+1}行原始数据:`, row);
+                    
                     if (row.length > Math.max(lpColumnIndex, contractColumnIndex) && row[lpColumnIndex] && row[contractColumnIndex]) {
                         // 处理LP号：保留LP前缀和数字
                         let lpNumber = String(row[lpColumnIndex]).trim();
+                        console.log(`第${i+1}行LP号原始值: "${lpNumber}"`);
+                        
                         if (lpNumber.startsWith('LP')) {
                             // 如果已经是LP格式，直接使用
                             lpNumber = lpNumber;
@@ -1576,6 +1587,7 @@
                         }
                         
                         const contractNumber = String(row[contractColumnIndex]).trim();
+                        console.log(`第${i+1}行履约单号原始值: "${contractNumber}"`);
                         
                         console.log(`处理第${i+1}行: LP号="${lpNumber}", 履约单号="${contractNumber}"`);
                         
@@ -1586,6 +1598,8 @@
                         } else {
                             console.log(`❌ 跳过无效记录: LP号="${lpNumber}", 履约单号="${contractNumber}"`);
                         }
+                    } else {
+                        console.log(`❌ 第${i+1}行数据不完整或为空，跳过`);
                     }
                 }
 
@@ -1750,6 +1764,46 @@
             console.log('💾 本地存储数据:', localData);
             
             alert(`数据库调试信息已输出到控制台\n\n记录数: ${databaseData.size}\n导入日期: ${databaseImportDate || '未知'}\n\n请按F12查看详细日志`);
+        }
+
+        // 测试Excel解析
+        async function testExcelParsing() {
+            const fileInput = document.getElementById('databaseFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('请先选择一个Excel文件');
+                return;
+            }
+            
+            try {
+                console.log('🧪 开始测试Excel解析...');
+                console.log('📁 文件信息:', file.name, file.size);
+                
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                console.log('📊 Excel解析结果:');
+                console.log('- 工作表数量:', workbook.SheetNames.length);
+                console.log('- 工作表名称:', workbook.SheetNames);
+                console.log('- 数据行数:', data.length);
+                console.log('- 前5行数据:', data.slice(0, 5));
+                
+                // 分析列标题
+                const headers = data[0] || [];
+                console.log('📋 列标题分析:');
+                headers.forEach((header, index) => {
+                    console.log(`  列${index}: "${header}" (类型: ${typeof header})`);
+                });
+                
+                alert(`Excel解析测试完成！\n\n数据行数: ${data.length}\n列数: ${headers.length}\n\n请按F12查看详细日志`);
+                
+            } catch (error) {
+                console.error('❌ Excel解析测试失败:', error);
+                alert(`Excel解析测试失败: ${error.message}`);
+            }
         }
 
         // 文件上传相关函数
