@@ -1950,6 +1950,8 @@ async function startReorganization(env, corsHeaders) {
 
     for (const item of movePlan) {
       try {
+        console.log(`🔍 检查文件: ${item.source}`);
+        
         // 检查目标文件是否已存在（如果存在，说明已经移动过了）
         const destObj = await env.R2_BUCKET.get(item.destination);
         if (destObj) {
@@ -1962,6 +1964,17 @@ async function startReorganization(env, corsHeaders) {
         const sourceObj = await env.R2_BUCKET.get(item.source);
         if (!sourceObj) {
           console.warn(`⚠️ 源文件不存在: ${item.source}`);
+          console.warn(`🔍 尝试查找相似文件...`);
+          
+          // 尝试列出所有文件来调试
+          const allFiles = await env.R2_BUCKET.list({ prefix: 'package/' });
+          const similarFiles = allFiles.objects.filter(obj => 
+            obj.key.includes(item.source.split('/').pop()) || 
+            item.source.split('/').pop().includes(obj.key.split('/').pop())
+          );
+          
+          console.warn(`🔍 找到相似文件:`, similarFiles.map(f => f.key));
+          
           errorCount++;
           errors.push(`源文件不存在: ${item.source}`);
           continue;
