@@ -2530,20 +2530,21 @@
                 // 从文件夹路径中提取日期信息
                 let date = 'unknown';
                 if (folder !== 'unknown') {
-                    // 尝试从新格式中提取日期: YYYY-MM/YYYY-MM-JJ/...
-                    const pathParts = folder.split('/');
-                    if (pathParts.length >= 3) {
-                        const dateMatch = pathParts[1].match(/^(\d{4})-(\d{2})-(\d{2})$/);
-                        if (dateMatch) {
-                            date = `${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}`;
-                        }
-                    } else {
-                        // 兼容旧格式: YYYYMMDD_...
-                        const oldDateMatch = folder.match(/^(\d{8})/);
-                        if (oldDateMatch) {
-                            date = oldDateMatch[1];
-                        }
+                // 尝试从新格式中提取日期: package/YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ_履约单号
+                const pathParts = folder.split('/');
+                if (pathParts.length >= 3) {
+                    // 从第二个路径部分提取日期: YYYY-MM-JJ
+                    const dateMatch = pathParts[2].match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    if (dateMatch) {
+                        date = `${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}`;
                     }
+                } else {
+                    // 兼容旧格式: YYYYMMDD_...
+                    const oldDateMatch = folder.match(/^(\d{8})/);
+                    if (oldDateMatch) {
+                        date = oldDateMatch[1];
+                    }
+                }
                 }
 
                 // 在界面层隐藏 unknown
@@ -2978,11 +2979,16 @@
             if (type === 'packed') {
                 title.textContent = '已打包文件夹列表';
                 // 汇总：文件夹 / 履约单号 / LP号
-                const rows = (packedDetails || []).map(it => ({
-                    folder: it.folder,
-                    contract: it.contract || '',
-                    lp: it.lp || ''
-                }));
+                console.log('📋 已打包详情数据:', packedDetails);
+                const rows = (packedDetails || []).map(it => {
+                    console.log('📝 处理已打包项:', it);
+                    return {
+                        folder: it.folder,
+                        contract: it.contract || '',
+                        lp: it.lp || ''
+                    };
+                });
+                console.log('📊 处理后的行数据:', rows);
                 // 去重文件夹
                 const seen = new Set();
                 const dedup = [];
