@@ -1896,11 +1896,11 @@ async function startReorganization(env, corsHeaders) {
         reason = 'package文件夹中嵌套在时间戳文件夹中的文件';
         console.log(`📁 嵌套时间戳文件夹文件需要重新组织: ${key}`);
       }
-      // 4. package/文件夹中但路径不正确的文件（其他情况）
-      else if (key.startsWith('package/') && !key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\/[^/]+$/)) {
+      // 4. package/文件夹中的所有文件都需要重新组织（确保使用正确的履约单号）
+      else if (key.startsWith('package/')) {
         needsReorganization = true;
-        reason = 'package文件夹中路径不正确的文件';
-        console.log(`📁 package文件夹中路径不正确的文件需要重新组织: ${key}`);
+        reason = 'package文件夹中的文件需要重新组织（确保使用正确的履约单号）';
+        console.log(`📁 package文件夹中的文件需要重新组织: ${key}`);
       }
       
       if (needsReorganization) {
@@ -2563,10 +2563,10 @@ async function testReorganization(env, corsHeaders) {
         needsReorganization = true;
         reason = 'package文件夹中嵌套在时间戳文件夹中的文件';
       }
-      // 4. package/文件夹中但路径不正确的文件（其他情况）
-      else if (key.startsWith('package/') && !key.match(/^package\/\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}_\d+\/[^/]+$/)) {
+      // 4. package/文件夹中的所有文件都需要重新组织（确保使用正确的履约单号）
+      else if (key.startsWith('package/')) {
         needsReorganization = true;
-        reason = 'package文件夹中路径不正确的文件';
+        reason = 'package文件夹中的文件需要重新组织（确保使用正确的履约单号）';
       }
       
       if (needsReorganization) {
