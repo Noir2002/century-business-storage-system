@@ -1929,21 +1929,20 @@ async function startReorganization(env, corsHeaders) {
 
     for (const item of movePlan) {
       try {
+        // 检查目标文件是否已存在（如果存在，说明已经移动过了）
+        const destObj = await env.R2_BUCKET.get(item.destination);
+        if (destObj) {
+          console.log(`✅ 文件已存在: ${item.destination}，跳过移动`);
+          movedCount++;
+          continue;
+        }
+
         // 检查源文件是否存在
         const sourceObj = await env.R2_BUCKET.get(item.source);
         if (!sourceObj) {
           console.warn(`⚠️ 源文件不存在: ${item.source}`);
           errorCount++;
           errors.push(`源文件不存在: ${item.source}`);
-          continue;
-        }
-
-        // 检查目标文件是否已存在
-        const destObj = await env.R2_BUCKET.get(item.destination);
-        if (destObj) {
-          console.warn(`⚠️ 目标文件已存在: ${item.destination}`);
-          errorCount++;
-          errors.push(`目标文件已存在: ${item.destination}`);
           continue;
         }
 
@@ -2027,11 +2026,19 @@ async function getReorganizationStatus(env, corsHeaders) {
     
     // 检查实际移动进度
     let movedCount = 0;
+    let errorCount = 0;
     for (const item of plan.plan) {
       const destObj = await env.R2_BUCKET.get(item.destination);
+      const sourceObj = await env.R2_BUCKET.get(item.source);
+      
       if (destObj) {
+        // 目标文件存在，说明移动成功
         movedCount++;
+      } else if (sourceObj) {
+        // 源文件存在但目标文件不存在，说明移动失败
+        errorCount++;
       }
+      // 如果源文件和目标文件都不存在，可能是已经被其他操作处理了
     }
 
     return Response.json({
@@ -2039,6 +2046,7 @@ async function getReorganizationStatus(env, corsHeaders) {
       status: plan.status,
       totalFiles: plan.totalFiles,
       movedFiles: movedCount,
+      errorCount: errorCount,
       progress: plan.totalFiles > 0 ? Math.round((movedCount / plan.totalFiles) * 100) : 0,
       createdAt: plan.createdAt
     }, { headers: corsHeaders });
