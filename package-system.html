@@ -2057,6 +2057,9 @@
                         successCount++;
                         console.log(`✅ 文件上传成功: ${file.name} -> ${uploadResult.file.fileName}`);
                         console.log(`📝 文件记录已保存:`, fileRecord);
+                        
+                        // 立即保存到本地存储，防止丢失
+                        saveFilesToLocal();
                     } catch (error) {
                         console.error(`❌ 上传失败 ${file.name}:`, error);
                         failedFiles.push({
@@ -3842,20 +3845,31 @@
                     
                     // 如果服务器数据更新，则同步到本地
                     if (serverTimestamp > localTimestamp) {
-                        uploadedFiles.clear();
-                        Object.entries(serverData.files || {}).forEach(([key, value]) => {
-                            uploadedFiles.set(key, value);
-                        });
+                        // 检查服务器数据是否为空
+                        const serverFiles = serverData.files || {};
+                        const serverFileCount = Object.keys(serverFiles).length;
                         
-                        saveFilesToLocal();
-                        localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', serverTimestamp);
+                        console.log(`🔄 服务器文件记录数量: ${serverFileCount}, 本地文件记录数量: ${uploadedFiles.size}`);
                         
-                        // 同时保存到本地存储作为备份
-                        localStorage.setItem('SYNC_FILES_GLOBAL', JSON.stringify(serverData));
-                        localStorage.setItem('SYNC_FILES_TIMESTAMP', serverTimestamp.toString());
-                        
-                        console.log('✅ 文件注册表已从服务器同步加载');
-                        return true;
+                        // 只有当服务器有文件记录时才覆盖本地数据
+                        if (serverFileCount > 0) {
+                            uploadedFiles.clear();
+                            Object.entries(serverFiles).forEach(([key, value]) => {
+                                uploadedFiles.set(key, value);
+                            });
+                            
+                            saveFilesToLocal();
+                            localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', serverTimestamp);
+                            
+                            // 同时保存到本地存储作为备份
+                            localStorage.setItem('SYNC_FILES_GLOBAL', JSON.stringify(serverData));
+                            localStorage.setItem('SYNC_FILES_TIMESTAMP', serverTimestamp.toString());
+                            
+                            console.log('✅ 文件注册表已从服务器同步加载');
+                            return true;
+                        } else {
+                            console.log('⚠️ 服务器文件记录为空，保持本地数据不变');
+                        }
                     }
                 }
                 
@@ -3867,16 +3881,27 @@
                     const currentTimestamp = localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || 0;
                     
                     if (localTimestamp > currentTimestamp) {
-                        uploadedFiles.clear();
-                        Object.entries(localData.files || serverData.data || {}).forEach(([key, value]) => {
-                            uploadedFiles.set(key, value);
-                        });
+                        // 检查本地存储数据是否为空
+                        const localFiles = localData.files || localData.data || {};
+                        const localFileCount = Object.keys(localFiles).length;
                         
-                        saveFilesToLocal();
-                        localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', localTimestamp);
+                        console.log(`🔄 本地存储文件记录数量: ${localFileCount}, 当前文件记录数量: ${uploadedFiles.size}`);
                         
-                        console.log('✅ 文件注册表已从本地存储同步加载');
-                        return true;
+                        // 只有当本地存储有文件记录时才覆盖当前数据
+                        if (localFileCount > 0) {
+                            uploadedFiles.clear();
+                            Object.entries(localFiles).forEach(([key, value]) => {
+                                uploadedFiles.set(key, value);
+                            });
+                            
+                            saveFilesToLocal();
+                            localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', localTimestamp);
+                            
+                            console.log('✅ 文件注册表已从本地存储同步加载');
+                            return true;
+                        } else {
+                            console.log('⚠️ 本地存储文件记录为空，保持当前数据不变');
+                        }
                     }
                 }
                 
@@ -3892,16 +3917,27 @@
                         const currentTimestamp = localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || 0;
                         
                         if (localTimestamp > currentTimestamp) {
-                            uploadedFiles.clear();
-                            Object.entries(localData.files || localData.data || {}).forEach(([key, value]) => {
-                                uploadedFiles.set(key, value);
-                            });
+                            // 检查本地存储数据是否为空
+                            const localFiles = localData.files || localData.data || {};
+                            const localFileCount = Object.keys(localFiles).length;
                             
-                            saveFilesToLocal();
-                            localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', localTimestamp);
+                            console.log(`🔄 错误恢复：本地存储文件记录数量: ${localFileCount}, 当前文件记录数量: ${uploadedFiles.size}`);
                             
-                            console.log('⚠️ 服务器加载失败，已从本地存储加载');
-                            return true;
+                            // 只有当本地存储有文件记录时才覆盖当前数据
+                            if (localFileCount > 0) {
+                                uploadedFiles.clear();
+                                Object.entries(localFiles).forEach(([key, value]) => {
+                                    uploadedFiles.set(key, value);
+                                });
+                                
+                                saveFilesToLocal();
+                                localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', localTimestamp);
+                                
+                                console.log('⚠️ 服务器加载失败，已从本地存储加载');
+                                return true;
+                            } else {
+                                console.log('⚠️ 本地存储文件记录为空，保持当前数据不变');
+                            }
                         }
                     }
                 } catch (localError) {
