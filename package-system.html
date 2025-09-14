@@ -1998,8 +1998,8 @@
             const yearMonth = `${year}-${month}`;
             const yearMonthDay = `${year}-${month}-${day}`;
             
-            // 构建完整的文件夹路径：package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD_履约单号
-            const fullFolderPath = `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
+            // 构建完整的文件夹路径：package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD-履约单号
+            const fullFolderPath = `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}-${contractNumber}`;
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
