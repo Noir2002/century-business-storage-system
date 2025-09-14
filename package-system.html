@@ -1411,7 +1411,8 @@
                 const yearMonthDay = `${year}-${month}-${day}`;
                 
                 // 创建当日文件夹结构（空文件夹作为标记）
-                const folderPath = `${yearMonth}/${yearMonthDay}`;
+                // 使用完整的package路径结构
+                const folderPath = `package/${yearMonth}/${yearMonthDay}`;
                 
                 // 检查是否已存在当日文件夹
                 let folderExists = false;
@@ -1796,6 +1797,17 @@
             let failedFiles = [];
             const totalFiles = files.length;
 
+            // 生成正确的文件夹路径结构
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const yearMonth = `${year}-${month}`;
+            const yearMonthDay = `${year}-${month}-${day}`;
+            
+            // 构建完整的文件夹路径：package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD_履约单号
+            const fullFolderPath = `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
+
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 
@@ -1814,10 +1826,10 @@
                     try {
                         const formData = new FormData();
                         formData.append('file', file);
-                        formData.append('description', `LP号:${lpNumber} 文件夹:${folderName}`);
+                        formData.append('description', `LP号:${lpNumber} 文件夹:${fullFolderPath}`);
                         
                         const baseURL = getBaseURL();
-                        const uploadResponse = await fetch(`${baseURL}/api/r2/upload/package/${encodeURIComponent(folderName)}/${encodeURIComponent(fileName)}`, {
+                        const uploadResponse = await fetch(`${baseURL}/api/r2/upload/package/${encodeURIComponent(fullFolderPath)}/${encodeURIComponent(fileName)}`, {
                             method: 'POST',
                             body: formData
                         });
@@ -1835,7 +1847,7 @@
                         const fileRecord = {
                             name: file.name,
                             fileName: uploadResult.file.fileName,
-                            folder: folderName,
+                            folder: fullFolderPath, // 使用完整的文件夹路径
                             lpNumber: lpNumber,
                             contractNumber: contractNumber,
                             size: file.size,

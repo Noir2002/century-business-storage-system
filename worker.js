@@ -1173,21 +1173,48 @@ async function handleR2Routes(request, env, path, method, corsHeaders) {
       const targetPath = decodeURIComponent(path.replace('/api/r2/upload/package/', ''));
       const formData = await request.formData();
       const file = formData.get('file');
+      const description = formData.get('description') || '';
+      
       if (!file) {
         return Response.json({ success: false, error: '没有上传文件' }, { headers: corsHeaders });
       }
-      const r2Key = `package/${targetPath}`;
+      
+      // 直接使用targetPath作为R2键，因为前端已经构建了完整的路径
+      const r2Key = targetPath;
+      
       if (!env.R2_BUCKET) {
         return Response.json({ success: false, error: 'R2存储桶不可用' }, { headers: corsHeaders, status: 500 });
       }
+      
+      console.log(`📁 上传文件到R2: ${r2Key}`);
+      
       await env.R2_BUCKET.put(r2Key, file.stream(), {
         httpMetadata: { contentType: file.type || 'application/octet-stream' },
         customMetadata: {
           originalName: file.name,
-          uploadTime: new Date().toISOString()
+          uploadTime: new Date().toISOString(),
+          description: description
         }
       });
-      return Response.json({ success: true, message: '上传成功', filePath: r2Key, size: file.size || 0 }, { headers: corsHeaders });
+      
+      // 构建文件信息返回给前端
+      const fileInfo = {
+        id: Date.now(),
+        fileName: file.name,
+        originalName: file.name,
+        size: file.size,
+        uploadTime: new Date().toISOString(),
+        r2Path: r2Key,
+        publicUrl: `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${r2Key}`
+      };
+      
+      return Response.json({ 
+        success: true, 
+        message: '上传成功', 
+        file: fileInfo,
+        filePath: r2Key, 
+        size: file.size || 0 
+      }, { headers: corsHeaders });
     }
 
     // 列表：/api/r2/list-files?folder=package&prefix=...&limit=...
