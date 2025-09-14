@@ -1936,12 +1936,21 @@
             const day = String(today.getDate()).padStart(2, '0');
             const dateStr = `${year}${month}${day}`;
             
-            // 创建层级目录结构: YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号
+            // 创建层级目录结构: YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ_履约单号 或 YYYY-MM-JJ_未匹配四位数
             const yearMonth = `${year}-${month}`;
             const yearMonthDay = `${year}-${month}-${day}`;
-            const folderName = chosenContractNumber ?
-                `${yearMonth}/${yearMonthDay}/${yearMonthDay}_${chosenContractNumber}` :
-                `${yearMonth}/${yearMonthDay}/${yearMonthDay}_${lpSuffix}`;
+            let folderName;
+            if (chosenContractNumber) {
+                // 有匹配的履约单号
+                folderName = `${yearMonth}/${yearMonthDay}/${yearMonthDay}_${chosenContractNumber}`;
+            } else if (lpSuffix && lpSuffix.length === 4) {
+                // 未匹配的四位数
+                folderName = `${yearMonth}/${yearMonthDay}/${yearMonthDay}_${lpSuffix}`;
+            } else {
+                // 生成随机的四位数作为未匹配标识
+                const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
+                folderName = `${yearMonth}/${yearMonthDay}/${yearMonthDay}_${randomSuffix}`;
+            }
 
             showStatus('uploadStatus', `正在上传到R2存储: ${folderName}` , 'info');
             showUploadProgress(0);
@@ -2256,19 +2265,14 @@
                 const newFiles = Array.from(input.files || []);
                 if (!newFiles.length) return;
 
-                if (isMobile) {
-                    // 移动端保持原有行为（一次性多选）
-                    desktopSelectedFiles = newFiles.slice(0, 10);
-                } else {
-                    // 桌面端累积
-                    const existingNames = new Set(desktopSelectedFiles.map(f => f.name + '_' + f.size));
-                    for (const f of newFiles) {
-                        const key = f.name + '_' + f.size;
-                        if (!existingNames.has(key)) {
-                            desktopSelectedFiles.push(f);
-                            existingNames.add(key);
-                            if (desktopSelectedFiles.length >= 10) break;
-                        }
+                // 统一处理：累积添加文件（手机端和桌面端都支持多次选择）
+                const existingNames = new Set(desktopSelectedFiles.map(f => f.name + '_' + f.size));
+                for (const f of newFiles) {
+                    const key = f.name + '_' + f.size;
+                    if (!existingNames.has(key)) {
+                        desktopSelectedFiles.push(f);
+                        existingNames.add(key);
+                        if (desktopSelectedFiles.length >= 10) break;
                     }
                 }
 
@@ -2744,23 +2748,28 @@
                 }
             }
 
-            // 统计未匹配文件夹：命名为 YYYYMMDD_后四位数字，且文件夹内无任何出现在数据库中的LP
-            const unmatchedRegex = new RegExp(`^${dateStr}_(\\d{4})$`);
+            // 统计未匹配文件夹：新格式 package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD_四位数
+            const unmatchedRegex = new RegExp(`^package/\\d{4}-\\d{2}/(\\d{4}-\\d{2}-\\d{2})/\\1_(\\d{4})$`);
             for (const [folder, lps] of folderToLPs.entries()) {
                 const m = folder.match(unmatchedRegex);
                 if (!m) continue;
-                const suffix = m[1];
-                let hasMatchedLP = false;
-                for (const lp of lps) {
-                    if (result.requiredLPs.has(lp)) { hasMatchedLP = true; break; }
-                }
-                if (!hasMatchedLP) {
-                    result.unmatchedFolders.add(folder);
-                    result.unmatchedDetails.push({
-                        folder,
-                        suffix,
-                        fileCount: folderToFilesCount.get(folder) || 0
-                    });
+                const folderDate = m[1].replace(/-/g, ''); // 转换为YYYYMMDD格式
+                const suffix = m[2];
+                
+                // 检查是否是当天的文件夹
+                if (folderDate === dateStr) {
+                    let hasMatchedLP = false;
+                    for (const lp of lps) {
+                        if (result.requiredLPs.has(lp)) { hasMatchedLP = true; break; }
+                    }
+                    if (!hasMatchedLP) {
+                        result.unmatchedFolders.add(folder);
+                        result.unmatchedDetails.push({
+                            folder,
+                            suffix,
+                            fileCount: folderToFilesCount.get(folder) || 0
+                        });
+                    }
                 }
             }
 
