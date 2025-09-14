@@ -2104,6 +2104,11 @@ async function analyzeFiles(env, corsHeaders) {
     for (const obj of allObjects.objects) {
       const key = obj.key;
       
+      // 跳过重组相关的临时文件
+      if (key === 'reorganization/plan.json' || key.startsWith('reorganization/temp/')) {
+        continue;
+      }
+      
       // 库存系统文件
       if (key.startsWith('arc/') || 
           key.startsWith('package-sync/') ||
