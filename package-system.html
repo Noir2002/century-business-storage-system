@@ -1940,8 +1940,8 @@
             const yearMonth = `${year}-${month}`;
             const yearMonthDay = `${year}-${month}-${day}`;
             const folderName = chosenContractNumber ?
-                `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${chosenContractNumber}` :
-                `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${lpSuffix}`;
+                `${yearMonth}/${yearMonthDay}/${yearMonthDay}_${chosenContractNumber}` :
+                `${yearMonth}/${yearMonthDay}/${yearMonthDay}_${lpSuffix}`;
 
             showStatus('uploadStatus', `正在上传到R2存储: ${folderName}` , 'info');
             showUploadProgress(0);
@@ -1998,8 +1998,8 @@
             const yearMonth = `${year}-${month}`;
             const yearMonthDay = `${year}-${month}-${day}`;
             
-            // 构建完整的文件夹路径：package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD-履约单号
-            const fullFolderPath = `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}-${contractNumber}`;
+            // 构建完整的文件夹路径：package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD_履约单号
+            const fullFolderPath = `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contractNumber}`;
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
@@ -2656,8 +2656,8 @@
                 const folder = fileInfo.folder;
                 console.log(`🗂️ 检查文件: ${fileName} -> 文件夹: ${folder}`);
                 
-                // 检查新格式：package/YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ_履约单号 或 YYYY-MM-JJ-履约单号
-                const hierarchyMatch = folder.match(/^package\/\d{4}-\d{2}\/(\d{4}-\d{2}-\d{2})\/(\d{4}-\d{2}-\d{2})[_-](.+)$/);
+                // 检查新格式：package/YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ_履约单号
+                const hierarchyMatch = folder.match(/^package\/\d{4}-\d{2}\/(\d{4}-\d{2}-\d{2})\/(\d{4}-\d{2}-\d{2})_(.+)$/);
                 
                 if (hierarchyMatch) {
                     const [, yearMonthDay, fullDate, contractNumber] = hierarchyMatch;
@@ -2902,7 +2902,7 @@
                 const day = String(today.getDate()).padStart(2, '0');
                 const yearMonth = `${year}-${month}`;
                 const yearMonthDay = `${year}-${month}-${day}`;
-                const newFolder = `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${contract}`;
+                const newFolder = `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contract}`;
                 let changed = false;
                 for (const [key, file] of Array.from(uploadedFiles.entries())) {
                     if (file && String(file.folder) === folder) {
@@ -2945,7 +2945,7 @@
                     const day = String(today.getDate()).padStart(2, '0');
                     const yearMonth = `${year}-${month}`;
                     const yearMonthDay = `${year}-${month}-${day}`;
-                    const newFolder = `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${contract}`;
+                    const newFolder = `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contract}`;
                     let changed = false;
                     for (const [key, file] of Array.from(uploadedFiles.entries())) {
                         if (file && String(file.folder) === folder) {
@@ -3131,7 +3131,7 @@
                 const day = String(today.getDate()).padStart(2, '0');
                 const yearMonth = `${year}-${month}`;
                 const yearMonthDay = `${year}-${month}-${day}`;
-                const newFolder = `${yearMonth}/${yearMonthDay}/${yearMonthDay}-${contract}`;
+                const newFolder = `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contract}`;
 
                 // 执行修正：更新 uploadedFiles 中该文件夹的所有记录的 folder、lpNumber、contractNumber
                 let changed = false;
@@ -3792,10 +3792,10 @@
                             folder = `package/${yearMonth}/${yearMonthDay}/${folderName}`;
                         }
                         
-                        // 从文件夹名称中提取履约单号（支持下划线和连字符）
+                        // 从文件夹名称中提取履约单号（使用下划线格式）
                         let contractNumber = '';
                         if (folder) {
-                            const folderMatch = folder.match(/(\d{4}-\d{2}-\d{2})[_-](.+)$/);
+                            const folderMatch = folder.match(/(\d{4}-\d{2}-\d{2})_(.+)$/);
                             if (folderMatch) {
                                 contractNumber = folderMatch[2];
                             }
