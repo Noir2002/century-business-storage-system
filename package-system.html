@@ -2526,17 +2526,22 @@
 
             for (const [key, file] of entries) {
                 const folder = file.folder || 'unknown';
+                console.log(`🗂️ 处理文件: ${key} -> 文件夹: ${folder}`);
+                
                 // 新的目录结构: YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ-履约单号
                 // 从文件夹路径中提取日期信息
                 let date = 'unknown';
                 if (folder !== 'unknown') {
                 // 尝试从新格式中提取日期: package/YYYY-MM/YYYY-MM-JJ/YYYY-MM-JJ_履约单号
                 const pathParts = folder.split('/');
+                console.log(`📁 路径部分:`, pathParts);
                 if (pathParts.length >= 3) {
                     // 从第二个路径部分提取日期: YYYY-MM-JJ
                     const dateMatch = pathParts[2].match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    console.log(`📅 日期匹配结果:`, dateMatch);
                     if (dateMatch) {
                         date = `${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}`;
+                        console.log(`✅ 提取到日期: ${date}`);
                     }
                 } else {
                     // 兼容旧格式: YYYYMMDD_...
@@ -2567,6 +2572,11 @@
                 filesByFolder.get(folder).push({ key, file });
             }
 
+            console.log('📊 分组数据结果:');
+            console.log('📅 日期统计:', Object.fromEntries(dates));
+            console.log('📁 按日期分组的文件夹:', Object.fromEntries(foldersByDate));
+            console.log('📂 按文件夹分组的文件:', Object.fromEntries(filesByFolder));
+            
             return { dates, foldersByDate, filesByFolder };
         }
 
