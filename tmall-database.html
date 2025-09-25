@@ -199,6 +199,13 @@
       <div class="layui-form-item"><label class="layui-form-label">初始库存</label><div class="layui-input-block"><input type="number" name="initialStock" required lay-verify="required|number" placeholder="请输入初始库存数量" autocomplete="off" class="layui-input"></div></div>
       <div class="layui-form-item"><label class="layui-form-label">日期</label><div class="layui-input-block"><input type="text" name="date" required lay-verify="required|date" placeholder="如 2024-07-18 11:30" autocomplete="off" class="layui-input"></div></div>
       <div class="layui-form-item"><label class="layui-form-label">库存</label><div class="layui-input-block"><input type="number" name="stock" required lay-verify="required|number" placeholder="请输入库存数量" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">系统履约单号</label><div class="layui-input-block"><input type="text" name="orderId" placeholder="请输入系统履约单号" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">店铺订单时间</label><div class="layui-input-block"><input type="text" name="orderTime" placeholder="请输入店铺订单时间" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">尺码</label><div class="layui-input-block"><input type="text" name="size" placeholder="请输入尺码" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">标题</label><div class="layui-input-block"><input type="text" name="title" placeholder="请输入商品标题" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">商品数量</label><div class="layui-input-block"><input type="number" name="quantity" placeholder="请输入商品数量" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">商品单价</label><div class="layui-input-block"><input type="number" name="unitPrice" step="0.01" placeholder="请输入商品单价" autocomplete="off" class="layui-input"></div></div>
+      <div class="layui-form-item"><label class="layui-form-label">订单金额</label><div class="layui-input-block"><input type="number" name="totalAmount" step="0.01" placeholder="请输入订单金额" autocomplete="off" class="layui-input"></div></div>
       <div class="layui-form-item"><div class="layui-input-block"><button class="layui-btn" lay-submit lay-filter="submitEdit">保存</button></div></div>
     </form>
   </div>
@@ -247,9 +254,13 @@
           {data: '系统履约单号', type: 'text'},
           {data: '店铺订单时间', type: 'text'},
           {data: 'SKU', type: 'text'},
-          {data: '商品数量', type: 'numeric'}
+          {data: '尺码', type: 'text'},
+          {data: '标题', type: 'text'},
+          {data: '商品数量', type: 'numeric'},
+          {data: '商品单价', type: 'numeric'},
+          {data: '订单金额', type: 'numeric'}
         ];
-        const colHeaders = ['系统履约单号', '店铺订单时间', 'SKU', '商品数量'];
+        const colHeaders = ['系统履约单号', '店铺订单时间', 'SKU', '尺码', '标题', '商品数量', '商品单价', '订单金额'];
         loadWideTableData(columns, colHeaders);
       }
       function loadWideTableData(columns, colHeaders) {
@@ -332,14 +343,21 @@
                 page: true,
                 limit: 20,
                 cols: [[
-                  {field:'SKU', title:'SKU', width:150, sort:true},
-                  {field:'产品中文名', title:'产品中文名', width:180},
-                  {field:'网页链接', title:'网页链接', width:220, templet: function(d){ return d['网页链接'] ? '<a href="'+d['网页链接']+'" target="_blank">'+d['网页链接']+'</a>' : ''; }},
-                  {field:'初始库存', title:'初始库存', width:100, sort:true},
-                  {field:'日期', title:'日期', width:160, sort:true},
-                  {field:'库存', title:'库存', width:100, sort:true},
-                  {field:'销量', title:'销量', width:100, sort:true, templet: function(d){ return '<span style="color: ' + (d['销量'] > 0 ? '#52c41a' : '#999') + ';">' + d['销量'] + '</span>'; }},
-                  {title:'操作', width:180, align:'center', toolbar:'#rowBar'}
+                  {field:'SKU', title:'SKU', width:120, sort:true},
+                  {field:'产品中文名', title:'产品中文名', width:150},
+                  {field:'网页链接', title:'网页链接', width:180, templet: function(d){ return d['网页链接'] ? '<a href="'+d['网页链接']+'" target="_blank">'+d['网页链接']+'</a>' : ''; }},
+                  {field:'初始库存', title:'初始库存', width:90, sort:true},
+                  {field:'日期', title:'日期', width:140, sort:true},
+                  {field:'库存', title:'库存', width:90, sort:true},
+                  {field:'销量', title:'销量', width:90, sort:true, templet: function(d){ return '<span style="color: ' + (d['销量'] > 0 ? '#52c41a' : '#999') + ';">' + d['销量'] + '</span>'; }},
+                  {field:'系统履约单号', title:'系统履约单号', width:140},
+                  {field:'店铺订单时间', title:'店铺订单时间', width:140},
+                  {field:'尺码', title:'尺码', width:80},
+                  {field:'标题', title:'标题', width:200},
+                  {field:'商品数量', title:'商品数量', width:90, sort:true},
+                  {field:'商品单价', title:'商品单价', width:100, sort:true},
+                  {field:'订单金额', title:'订单金额', width:100, sort:true},
+                  {title:'操作', width:150, align:'center', toolbar:'#rowBar'}
                 ]],
                 text: {none: '暂无数据'}
               });
@@ -471,21 +489,14 @@
         });
       });
       $('#downloadTemplateBtn').on('click', function() {
-        const today = new Date();
-        const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存'];
-        for (let i = 4; i >= 0; i--) {
-          const date = new Date(today);
-          date.setDate(date.getDate() - i);
-          const dateStr = date.toISOString().split('T')[0];
-          colHeaders.push(dateStr);
-        }
+        const colHeaders = ['系统履约单号', '店铺订单时间', 'SKU', '尺码', '标题', '商品数量', '商品单价', '订单金额'];
         const ws = XLSX.utils.aoa_to_sheet([colHeaders]);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '天猫宽表模板');
         XLSX.writeFile(wb, 'tmall-wide-table-template.xlsx');
       });
 
-      // 解析Excel为宽表JSON（系统履约单号/店铺订单时间/SKU/商品数量）
+      // 解析Excel为宽表JSON（支持新旧两种格式）
       async function parseExcelToWideJSON(file) {
         const arrayBuffer = await file.arrayBuffer();
         const wb = XLSX.read(arrayBuffer, { type: 'array' });
@@ -495,21 +506,29 @@
         // 尝试根据常见中文列头自动匹配
         const mapKey = (obj, keys) => keys.find(k => Object.prototype.hasOwnProperty.call(obj, k));
         const data = rows.map((row, idx) => {
-          const idKey = mapKey(row, ['系统履约单号','系统履约单编号','系统履约单号 ']);
-          const timeKey = mapKey(row, ['店铺订单时间','下单时间','店铺下单时间']);
-          const skuKey = mapKey(row, ['SKU','Sku','sku']);
-          const qtyKey = mapKey(row, ['商品数量','数量','件数','qty','Qty']);
+          const idKey = mapKey(row, ['系统履约单号','系统履约单编号','系统履约单号 ','订单编号']);
+          const timeKey = mapKey(row, ['店铺订单时间','下单时间','店铺下单时间','订单时间']);
+          const skuKey = mapKey(row, ['SKU','Sku','sku','商品SKU']);
+          const sizeKey = mapKey(row, ['尺码','Size','size','规格']);
+          const titleKey = mapKey(row, ['标题','商品标题','产品标题','商品名称']);
+          const qtyKey = mapKey(row, ['商品数量','数量','件数','qty','Qty','数量（件）']);
+          const priceKey = mapKey(row, ['商品单价','单价','价格','Price','price']);
+          const amountKey = mapKey(row, ['订单金额','金额','总价','总金额','Amount','amount']);
 
           const item = {
             '系统履约单号': idKey ? String(row[idKey]).trim() : String(row['A']||'').trim(),
             '店铺订单时间': timeKey ? String(row[timeKey]).trim() : '',
             'SKU': skuKey ? String(row[skuKey]).trim() : '',
-            '商品数量': qtyKey ? Number(row[qtyKey]||0) : 0
+            '尺码': sizeKey ? String(row[sizeKey]).trim() : '',
+            '标题': titleKey ? String(row[titleKey]).trim() : '',
+            '商品数量': qtyKey ? Number(row[qtyKey]||0) : 0,
+            '商品单价': priceKey ? Number(row[priceKey]||0) : 0,
+            '订单金额': amountKey ? Number(row[amountKey]||0) : 0
           };
           return item;
         }).filter(x => x['系统履约单号'] || x['SKU']);
 
-        if (!data.length) throw new Error('未识别到有效数据，请检查表头是否为：系统履约单号/店铺订单时间/SKU/商品数量');
+        if (!data.length) throw new Error('未识别到有效数据，请检查表头是否包含：系统履约单号/店铺订单时间/SKU/商品数量等字段');
         return data;
       }
       $('#clearOldDataBtn').on('click', function() {
@@ -596,7 +615,7 @@
         });
       });
       $('#downloadRecordTemplateBtn').on('click', function() {
-        const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存', '日期（YYYY-MM-DD HH:mm）', '库存'];
+        const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存', '日期（YYYY-MM-DD HH:mm）', '库存', '系统履约单号', '店铺订单时间', '尺码', '标题', '商品数量', '商品单价', '订单金额'];
         const ws = XLSX.utils.aoa_to_sheet([colHeaders]);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '天猫记录模板');
@@ -622,14 +641,21 @@
       table.on('tool(recordTable)', function(obj){
         var data = obj.data;
         if(obj.event === 'edit'){
-          form.val('editForm', {
-            sku: data.SKU,
-            name: data['产品中文名'],
-            url: data['网页链接'],
-            initialStock: data['初始库存'],
-            date: data['日期'],
-            stock: data['库存']
-          });
+        form.val('editForm', {
+          sku: data.SKU,
+          name: data['产品中文名'],
+          url: data['网页链接'],
+          initialStock: data['初始库存'],
+          date: data['日期'],
+          stock: data['库存'],
+          orderId: data['系统履约单号'] || '',
+          orderTime: data['店铺订单时间'] || '',
+          size: data['尺码'] || '',
+          title: data['标题'] || '',
+          quantity: data['商品数量'] || '',
+          unitPrice: data['商品单价'] || '',
+          totalAmount: data['订单金额'] || ''
+        });
           layer.open({ type:1, title:'编辑记录', area:['400px','480px'], content:$('#editFormModal'), btn:[], shadeClose:true });
           $('#editFormModal').data('editId', data.id);
         } else if(obj.event === 'del'){
@@ -658,7 +684,14 @@
           '网页链接': formObj.field.url,
           '初始库存': formObj.field.initialStock,
           '日期': formObj.field.date,
-          '库存': formObj.field.stock
+          '库存': formObj.field.stock,
+          '系统履约单号': formObj.field.orderId,
+          '店铺订单时间': formObj.field.orderTime,
+          '尺码': formObj.field.size,
+          '标题': formObj.field.title,
+          '商品数量': formObj.field.quantity,
+          '商品单价': formObj.field.unitPrice,
+          '订单金额': formObj.field.totalAmount
         };
         var token = localStorage.getItem('token');
         var headers = { 'Content-Type': 'application/json' };

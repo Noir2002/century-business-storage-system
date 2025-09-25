@@ -3290,13 +3290,17 @@ function convertTmallRowsToWideTable(rows) {
   rows.forEach((row, idx) => {
     console.log(`【调试】第${idx+2}行内容:`, row);
   });
-  // 新逻辑：直接返回明细行，不聚合
+  // 新逻辑：直接返回明细行，不聚合，支持新格式
   return rows.map((row, idx) => {
     return {
       '系统履约单号': getCell(row, '系统履约单号', '履约单号', '订单编号'),
       '店铺订单时间': getCell(row, '店铺订单时间', '门店订单时间', '订单时间', '下单时间', 'date', '时间'),
       'SKU': getCell(row, 'SKU', 'sku', '商品SKU'),
-      '商品数量': parseInt(getCell(row, '商品数量', '数量', '商品数', 'qty', '数量（件）') || 1)
+      '尺码': getCell(row, '尺码', 'Size', 'size', '规格'),
+      '标题': getCell(row, '标题', '商品标题', '产品标题', '商品名称'),
+      '商品数量': parseInt(getCell(row, '商品数量', '数量', '商品数', 'qty', '数量（件）') || 1),
+      '商品单价': parseFloat(getCell(row, '商品单价', '单价', '价格', 'Price', 'price') || 0),
+      '订单金额': parseFloat(getCell(row, '订单金额', '金额', '总价', '总金额', 'Amount', 'amount') || 0)
     };
   });
 } 

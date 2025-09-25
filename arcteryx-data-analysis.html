@@ -890,9 +890,12 @@
                     <tr>
                       <th>排名</th>
                       <th>SKU编码</th>
+                      <th>尺码</th>
+                      <th>商品标题</th>
+                      <th>单价</th>
                       <th>总销量</th>
+                      <th>总金额</th>
                       <th>平均日销量</th>
-                      <th>销量明细</th>
                     </tr>
                   </thead>
                   <tbody id="tmallSkuTableBody">
@@ -1764,43 +1767,52 @@
         } else {
           startDate = new Date('2020-01-01');
         }
-        
+
         // 2. 处理数据
         var skuMap = {};
         tmallData.forEach(row => {
           var sku = row['SKU'] || row['商品编码'];
           if (!sku) return;
-          
-          var orderTime = row['付款时间'] || row['下单时间'];
-          var quantity = parseInt(row['购买数量'] || row['数量']) || 0;
-          
+
+          var orderTime = row['店铺订单时间'] || row['下单时间'] || row['订单时间'];
+          var quantity = parseInt(row['商品数量'] || row['数量']) || 0;
+          var unitPrice = parseFloat(row['商品单价'] || row['单价']) || 0;
+          var totalAmount = parseFloat(row['订单金额'] || row['金额']) || 0;
+
           if (orderTime && quantity > 0) {
             var orderDate = normalizeDateToYMD(orderTime);
             if (orderDate && new Date(orderDate) >= startDate) {
               if (!skuMap[sku]) {
                 skuMap[sku] = {
                   sku: sku,
+                  size: row['尺码'] || '',
+                  title: row['标题'] || '',
+                  unitPrice: unitPrice,
+                  totalAmount: 0,
                   totalSales: 0,
+                  totalQuantity: 0,
                   salesByDate: {}
                 };
               }
-              skuMap[sku].totalSales += quantity;
-              skuMap[sku].salesByDate[orderDate] = (skuMap[sku].salesByDate[orderDate] || 0) + quantity;
+              skuMap[sku].totalSales += totalAmount;
+              skuMap[sku].totalQuantity += quantity;
+              skuMap[sku].totalAmount += totalAmount;
+              skuMap[sku].salesByDate[orderDate] = (skuMap[sku].salesByDate[orderDate] || 0) + totalAmount;
             }
           }
         });
-        
+
         // 3. 转换为数组并排序
-        var skuArr = Object.values(skuMap).sort((a, b) => b.totalSales - a.totalSales);
-        var hotArr = skuArr.filter(item => item.totalSales >= 5);
-        var slowArr = skuArr.filter(item => item.totalSales <= 2);
-        
+        var skuArr = Object.values(skuMap).sort((a, b) => b.totalAmount - a.totalAmount);
+        var hotArr = skuArr.filter(item => item.totalQuantity >= 5);
+        var slowArr = skuArr.filter(item => item.totalQuantity <= 2);
+
         // 4. 更新统计
         $('#tmallTotalSku').text(skuArr.length);
         $('#tmallHotCount').text(hotArr.length);
         $('#tmallSlowCount').text(slowArr.length);
-        $('#tmallTotalSales').text(skuArr.reduce((sum, item) => sum + item.totalSales, 0));
-        
+        $('#tmallTotalSales').text(Math.round(skuArr.reduce((sum, item) => sum + item.totalAmount, 0) * 100) / 100);
+
         // 5. 生成图表
         generateTmallDailyTotalSalesChart(skuArr);
         generateTmallSalesTrendChart(skuArr);
@@ -1808,7 +1820,7 @@
         generateTmallHotLevelCharts(skuArr);
         generateTmallSlowProductsChart(slowArr);
         renderTmallSkuTable(skuArr);
-        
+
         layer.msg('天猫数据分析完成！', {icon: 1});
       }
       
@@ -2448,15 +2460,17 @@
         
         tbody.innerHTML = currentPageData.map((item, index) => {
           const globalIndex = startIndex + index + 1;
-          const salesDetail = Object.entries(item.salesByDate).map(([date, qty]) => `${date}: ${qty}`).join('<br>');
-          
+
           return `
             <tr>
               <td>${globalIndex}</td>
               <td class="sku-cell">${item.sku}</td>
-              <td>${item.totalSales}</td>
-              <td>${Math.round(item.totalSales / tmallTimeRange * 10) / 10}</td>
-              <td>${salesDetail}</td>
+              <td>${item.size || '-'}</td>
+              <td title="${item.title || ''}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.title || '-'}</td>
+              <td>¥${item.unitPrice || 0}</td>
+              <td>${item.totalQuantity || 0}</td>
+              <td>¥${Math.round(item.totalAmount * 100) / 100}</td>
+              <td>${Math.round(item.totalQuantity / tmallTimeRange * 10) / 10}</td>
             </tr>
           `;
         }).join('');
