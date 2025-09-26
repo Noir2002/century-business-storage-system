@@ -781,18 +781,30 @@ function parsePrice(priceStr) {
   if (!priceStr || priceStr === '') return 0;
   let cleanedStr = String(priceStr).trim();
 
-  // 移除常见货币符号 (€, $, ¥, £, ￥等)
-  cleanedStr = cleanedStr.replace(/^[\s\u20AC\u24\u00A2\u00A3\u00A5\uFFE5$€¥£]+/, '');
+  // 移除常见货币符号 (€, $, ¥, £, ￥等) - 包括前缀和后缀
+  cleanedStr = cleanedStr.replace(/^[\s\u20AC\u24\u00A2\u00A3\u00A5\uFFE5$€¥£]+|[\s\u20AC\u24\u00A2\u00A3\u00A5\uFFE5$€¥£]+$/g, '');
 
-  // 处理千分位分隔符 (逗号或点)
-  // 如果是欧洲格式 (402,50)，转换为美国格式 (402.50)
-  if (cleanedStr.includes(',') && cleanedStr.includes('.')) {
-    // 同时包含逗号和点，可能是混合格式，如 1.402,50
-    cleanedStr = cleanedStr.replace(/\./g, '').replace(',', '.');
-  } else if (cleanedStr.includes(',')) {
-    // 只有逗号，可能是千分位分隔符，移除
-    cleanedStr = cleanedStr.replace(/,/g, '');
+  // 检测是否是纯数字（整数或小数）
+  if (/^\d+(\.\d+)?$/.test(cleanedStr)) {
+    const num = parseFloat(cleanedStr);
+    return isNaN(num) ? 0 : num;
   }
+
+  // 处理欧洲格式 (402,50) - 最后一个逗号后面有1-3位数字
+  const lastCommaIndex = cleanedStr.lastIndexOf(',');
+  if (lastCommaIndex !== -1) {
+    const afterLastComma = cleanedStr.substring(lastCommaIndex + 1);
+    if (afterLastComma.length >= 1 && afterLastComma.length <= 3 && /^\d+$/.test(afterLastComma)) {
+      // 欧洲格式：将最后一个逗号转换为小数点
+      cleanedStr = cleanedStr.substring(0, lastCommaIndex) + '.' + afterLastComma;
+    } else {
+      // 千分位分隔符：移除所有逗号
+      cleanedStr = cleanedStr.replace(/,/g, '');
+    }
+  }
+
+  // 移除所有点（如果还有的话）
+  cleanedStr = cleanedStr.replace(/\./g, '');
 
   // 转换为数字
   const num = parseFloat(cleanedStr);
