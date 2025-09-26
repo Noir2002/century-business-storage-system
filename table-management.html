@@ -246,8 +246,8 @@
         </a>
       </li>
       <li class="layui-nav-item">
-        <a href="data-upload.html">
-          <i class="layui-icon layui-icon-upload-drag"></i> 数据导入
+        <a href="local-database.html">
+          <i class="layui-icon layui-icon-database"></i> 本地数据库
         </a>
       </li>
       <li class="layui-nav-item">
@@ -525,7 +525,7 @@
         tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #999;">' +
           '<i class="layui-icon layui-icon-file" style="font-size: 48px; color: #ddd; display: block; margin-bottom: 10px;"></i>' +
           '<div>暂无Excel文件</div>' +
-          '<div style="margin-top: 10px;"><a href="data-upload.html">立即上传文件</a></div>' +
+          '<div style="margin-top: 10px;"><a href="local-database.html">立即上传文件</a></div>' +
           '</td></tr>';
       }
       
@@ -683,7 +683,7 @@
       
       // 导入数据
       window.importData = function() {
-        window.location.href = 'data-upload.html';
+        window.location.href = 'local-database.html';
       };
       
       // 导出数据
