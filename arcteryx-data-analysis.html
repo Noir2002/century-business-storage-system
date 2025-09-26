@@ -92,16 +92,19 @@
     }
     
     .data-source-tabs .layui-tab-title li {
-      padding: 18px 30px;
+      padding: 15px 25px;
       font-size: 16px;
       font-weight: 500;
       position: relative;
       margin: 0;
-      flex: 1;
+      min-width: 200px;
       text-align: center;
       cursor: pointer;
       transition: all 0.3s ease;
       border-right: 1px solid #e6e6e6;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     
     .data-source-tabs .layui-tab-title li:last-child {
@@ -415,6 +418,62 @@
     .hot-product { color: #FF5722; font-weight: bold; }
     .slow-product { color: #757575; }
     .normal-product { color: #333; }
+
+    /* 移动端适配 */
+    @media (max-width: 768px) {
+      /* 数据源切换标签移动端适配 */
+      .data-source-tabs .layui-tab-title {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .data-source-tabs .layui-tab-title li {
+        min-width: 150px;
+        padding: 12px 20px;
+        border-right: none;
+        border-bottom: 1px solid #e6e6e6;
+        margin: 0;
+      }
+
+      .data-source-tabs .layui-tab-title li:last-child {
+        border-bottom: none;
+      }
+
+      /* 统计卡片移动端适配 */
+      .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+      }
+
+      .stats-value {
+        font-size: 2em;
+      }
+
+      /* 图表容器移动端适配 */
+      .chart {
+        height: 250px;
+      }
+
+      .chart-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+
+      .chart-controls {
+        align-self: flex-end;
+      }
+
+      /* 表格移动端适配 */
+      .analysis-table {
+        font-size: 12px;
+      }
+
+      .analysis-table th,
+      .analysis-table td {
+        padding: 8px 10px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1181,6 +1240,8 @@
           renderStockChart({dates: [], series: {total: [], healthy: [], warning: [], outOfStock: []}});
           renderSalesChart({dates: [], daily: [], weekly: [], monthly: []});
           renderSkuTable([]);
+          // 显示空数据提示
+          layer.msg('数据库中暂无数据，请先导入数据', {icon: 3, time: 3000});
         });
         
         // 加载爆款滞销分析数据
@@ -1192,7 +1253,24 @@
         console.log('generateAnalysisFromRealData 开始处理数据');
         console.log('输入宽表数据:', wideData);
         console.log('输入记录数据:', recordData);
-        
+
+        // 检查数据是否为空
+        if ((!wideData || wideData.length === 0) && (!recordData || recordData.length === 0)) {
+          console.log('数据为空，返回空分析结果');
+          return {
+            stats: {
+              totalSku: 0,
+              healthRate: 0,
+              avgTurnoverRate: 0,
+              warningCount: 0,
+              totalRecords: 0
+            },
+            stockTrends: {dates: [], series: {total: [], healthy: [], warning: [], outOfStock: []}},
+            salesTrends: {dates: [], daily: [], weekly: [], monthly: []},
+            skuSummary: []
+          };
+        }
+
         // 统计基础数据
         const skuSet = new Set();
         let totalStock = 0;
@@ -1329,15 +1407,24 @@
         if (cards.length >= 5) {
           // 总SKU数
           cards[0].querySelector('.stats-value').textContent = data.totalSku || 0;
+          cards[0].querySelector('.stats-trend').textContent = data.totalSku > 0 ? '↗ 较昨日 +0' : '→ 无数据';
+
           // 库存健康率
-          cards[1].querySelector('.stats-value').textContent = (data.healthRate || 0) + '%';
+          const healthRate = data.healthRate || 0;
+          cards[1].querySelector('.stats-value').textContent = healthRate + '%';
+          cards[1].querySelector('.stats-trend').textContent = data.totalSku > 0 ? (healthRate >= 80 ? '↗ 较昨日 +0%' : '→ 较昨日 +0%') : '→ 无数据';
+
           // 平均周转率
-          cards[2].querySelector('.stats-value').textContent = data.avgTurnover || 0;
+          cards[2].querySelector('.stats-value').textContent = data.avgTurnoverRate || 0;
+          cards[2].querySelector('.stats-trend').textContent = data.totalSku > 0 ? '↗ 较昨日 +0' : '→ 无数据';
+
           // 库存预警
           cards[3].querySelector('.stats-value').textContent = data.warningCount || 0;
-          // 库存价值（移除金额显示，改为记录总数）
+          cards[3].querySelector('.stats-trend').textContent = data.totalSku > 0 ? '↘ 较昨日 -0' : '→ 无数据';
+
+          // 历史记录
           cards[4].querySelector('.stats-value').textContent = data.totalRecords || 0;
-          cards[4].querySelector('.stats-label').textContent = '历史记录';
+          cards[4].querySelector('.stats-trend').textContent = data.totalSku > 0 ? '↗ 较昨日 +0' : '→ 无数据';
         }
       }
       
@@ -1635,10 +1722,32 @@
           processHotSlowData();
         }).fail(function() {
           layer.msg('数据加载失败', {icon:2});
+          // 显示空数据提示
+          layer.msg('数据库中暂无数据，请先导入数据', {icon: 3, time: 3000});
         });
       }
       
       function processHotSlowData() {
+        // 检查数据是否为空
+        if ((!allWideData || allWideData.length === 0) && (!allRecordData || allRecordData.length === 0)) {
+          console.log('爆款滞销数据为空，清空所有图表');
+          // 更新统计
+          $('#totalProducts').text(0);
+          $('#hotProducts').text(0);
+          $('#slowProducts').text(0);
+          $('#totalSales').text(0);
+
+          // 生成空的图表
+          generateDailyTotalSalesChart([]);
+          generateSalesTrendChart([], currentTimeRange);
+          generateHotProductsChart([]);
+          generateHotLevelCharts([]);
+          generateSlowProductsChart([]);
+          generateProductTableWithPagination([]);
+
+          return;
+        }
+
         // 1. 过滤时间范围
         var now = new Date();
         var startDate = new Date(now);
@@ -1750,15 +1859,37 @@
               processTmallData();
             } else {
               layer.msg('天猫数据加载失败', {icon:2});
+              layer.msg('数据库中暂无数据，请先导入数据', {icon: 3, time: 3000});
             }
           },
-          error: function() { 
-            layer.msg('天猫数据加载失败', {icon:2}); 
+          error: function() {
+            layer.msg('天猫数据加载失败', {icon:2});
+            layer.msg('数据库中暂无数据，请先导入数据', {icon: 3, time: 3000});
           }
         });
       }
       
       function processTmallData() {
+        // 检查数据是否为空
+        if (!tmallData || tmallData.length === 0) {
+          console.log('天猫数据为空，清空所有图表');
+          // 更新统计
+          $('#tmallTotalSku').text(0);
+          $('#tmallHotCount').text(0);
+          $('#tmallSlowCount').text(0);
+          $('#tmallTotalSales').text(0);
+
+          // 生成空的图表
+          generateTmallDailyTotalSalesChart([]);
+          generateTmallSalesTrendChart([]);
+          generateTmallHotProductsChart([]);
+          generateTmallHotLevelCharts([]);
+          generateTmallSlowProductsChart([]);
+          renderTmallSkuTable([]);
+
+          return;
+        }
+
         // 1. 过滤时间范围
         var now = new Date();
         var startDate = new Date(now);

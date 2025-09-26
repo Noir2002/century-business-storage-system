@@ -11,26 +11,11 @@ class APIConfig {
     const override = (queryOverride || storageOverride || '').toLowerCase();
     
     // 根据环境设置API基础URL（终极方案：同源 Worker 托管）
-    if (override === 'workers') {
-      this.baseURL = 'https://century-business-system.anthonin815.workers.dev';
-    } else if (override === 'local') {
+    if (override === 'local') {
       this.baseURL = 'http://localhost:3000';
     } else {
-      if (this.isLocal) {
-        this.baseURL = 'http://localhost:3000';
-      } else if (this.isPages) {
-        // 在 Pages 环境可以继续指向 Workers 子域（使用正确的Worker名称）
-        this.baseURL = 'https://century-business-system.anthonin815.workers.dev';
-      } else {
-        // 对于自定义域名，检查是否有存储的Worker URL，否则使用默认
-        const storedWorkerUrl = localStorage.getItem('workerBaseURL');
-        if (storedWorkerUrl) {
-          this.baseURL = storedWorkerUrl;
-        } else {
-          // 使用正确的Worker URL
-          this.baseURL = 'https://century-business-system.anthonin815.workers.dev';
-        }
-      }
+      // 默认使用生产环境Worker
+      this.baseURL = 'https://century-business-system.anthonin815.workers.dev';
     }
     
     console.log('🔧 API配置:', {

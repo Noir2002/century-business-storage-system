@@ -759,6 +759,44 @@ function getFileExtension(fileName) {
   return lastDot !== -1 ? fileName.substring(lastDot + 1) : 'xlsx';
 }
 
+// 智能匹配列名函数 - 支持新旧格式
+function getCell(row, ...keys) {
+  for (const key of keys) {
+    for (const k in row) {
+      // 去除所有空格、全角空格、不可见字符，忽略大小写
+      const cleanK = k.replace(/[\s\u3000\u200B\uFEFF]/g, '').toLowerCase();
+      const cleanKey = key.replace(/[\s\u3000\u200B\uFEFF]/g, '').toLowerCase();
+      if (cleanK === cleanKey) {
+        return row[k];
+      }
+    }
+  }
+  // 兜底：返回第一个非空字段
+  const values = Object.values(row).filter(v => v !== undefined && v !== null && v !== '');
+  return values.length > 0 ? values[0] : '';
+}
+
+// 转换天猫订单行数据为宽表格式 - 支持新格式
+function convertTmallRowsToWideTable(rows) {
+  console.log('【调试】表头keys:', Object.keys(rows[0] || {}));
+  rows.forEach((row, idx) => {
+    console.log(`【调试】第${idx+2}行内容:`, row);
+  });
+
+  return rows.map((row, idx) => {
+    return {
+      '系统履约单号': getCell(row, '系统履约单号', '履约单号', '订单编号'),
+      '店铺订单时间': getCell(row, '店铺订单时间', '门店订单时间', '订单时间', '下单时间', 'date', '时间'),
+      'SKU': getCell(row, 'SKU', 'sku', '商品SKU'),
+      '尺码': getCell(row, '尺码', 'Size', 'size', '规格'),
+      '标题': getCell(row, '标题', '商品标题', '产品标题', '商品名称'),
+      '商品数量': parseInt(getCell(row, '商品数量', '数量', '商品数', 'qty', '数量（件）') || 1),
+      '商品单价': parseFloat(getCell(row, '商品单价', '单价', '价格', 'Price', 'price') || 0),
+      '订单金额': parseFloat(getCell(row, '订单金额', '金额', '总价', '总金额', 'Amount', 'amount') || 0)
+    };
+  });
+}
+
 // 处理本地数据库API请求
 async function handleLocalDB(request, env, path, method, corsHeaders) {
   console.log('🔄 处理本地数据库请求:', path);
@@ -782,10 +820,15 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
         } catch (e) { console.warn('读取R2宽表失败:', e); }
       }
       await archiveOldDatesToRecords(env, 5);
-      data = wideTableCache;
+
+      // 确保数据不为null或undefined
+      data = Array.isArray(data) ? data : [];
+      wideTableCache = data;
+
       // 读取后计算销量列（不归档，避免破坏前端列结构）
       wideTableCache = computeSalesForWideTableRows(wideTableCache);
       data = wideTableCache;
+
       return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
     }
     
@@ -877,7 +920,16 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           const requestData = await request.json();
           console.log('📤 批量JSON数据:', requestData);
           if (requestData && Array.isArray(requestData.data)) {
-            wideTableCache = requestData.data;
+            let processedData = requestData.data;
+
+            // 如果数据看起来是原始的Excel行数据（包含标题、尺码等新字段），进行转换
+            if (requestData.data.length > 0 && requestData.data[0].hasOwnProperty('标题')) {
+              console.log('🔄 检测到新格式Excel数据，正在转换...');
+              processedData = convertTmallRowsToWideTable(requestData.data);
+              console.log('✅ 数据转换完成:', processedData.length, '条记录');
+            }
+
+            wideTableCache = processedData;
             // 计算销量并持久化到R2
             wideTableCache = computeSalesForWideTableRows(wideTableCache);
             if (env.R2_BUCKET) {
@@ -890,7 +942,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
             }
             // 不自动归档，保持列结构不变
           }
-          
+
           return Response.json({ success: true, message: '批量数据上传成功', processed: requestData.data ? requestData.data.length : 0, data: Array.isArray(wideTableCache) ? wideTableCache : [] }, { headers: corsHeaders });
         }
         
@@ -922,6 +974,8 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
       if ((!data || data.length === 0) && env.R2_BUCKET) {
         try { const obj = await env.R2_BUCKET.get(RECORDS_R2_KEY); if (obj) { const text = await obj.text(); const parsed = JSON.parse(text); if (Array.isArray(parsed)) { recordsCache = parsed; data = parsed; } } } catch(e){ console.warn('读取R2记录失败:', e); }
       }
+      // 确保返回空数组而不是null或undefined
+      data = Array.isArray(data) ? data : [];
       return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
     }
     
