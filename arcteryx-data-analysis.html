@@ -97,18 +97,25 @@
       font-weight: 500;
       position: relative;
       margin: 0;
-      min-width: 200px;
+      flex: 1;
       text-align: center;
       cursor: pointer;
       transition: all 0.3s ease;
       border-right: 1px solid #e6e6e6;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      border-bottom: none;
     }
-    
+
     .data-source-tabs .layui-tab-title li:last-child {
       border-right: none;
+    }
+
+    /* 隐藏折叠按钮 */
+    .data-source-tabs .layui-tab-title .layui-tab-bar {
+      display: none !important;
+    }
+
+    .data-source-tabs .layui-tab-title {
+      justify-content: center;
     }
     
     .data-source-tabs .layui-tab-title li:hover {
@@ -1958,13 +1965,29 @@
       function normalizeDateToYMD(value) {
         if (!value) return null;
         var str = value.toString().trim();
-        var match = str.match(/(\d{4})[^\d]?(\d{1,2})[^\d]?(\d{1,2})/);
+
+        // 匹配日期格式：YYYY/MM/DD HH:mm:ss 或 YYYY/MM/DD
+        var match = str.match(/(\d{4})[^\d]?(\d{1,2})[^\d]?(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
         if (match) {
           var year = match[1];
           var month = match[2].padStart(2, '0');
           var day = match[3].padStart(2, '0');
           return year + '-' + month + '-' + day;
         }
+
+        // 兜底：尝试标准日期格式 YYYY-MM-DD
+        try {
+          var date = new Date(str);
+          if (!isNaN(date.getTime())) {
+            var y = date.getFullYear();
+            var m = String(date.getMonth() + 1).padStart(2, '0');
+            var d = String(date.getDate()).padStart(2, '0');
+            return y + '-' + m + '-' + d;
+          }
+        } catch (e) {
+          console.warn('日期解析失败:', str);
+        }
+
         return null;
       }
       
@@ -2476,12 +2499,12 @@
         var option = {
           title: { text: '销量趋势分析', left: 'center' },
           tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-          legend: { data: top.map(s => s.sku), type: 'scroll', bottom: 10 },
+          legend: { data: top.map(s => s.title || s.name || s.sku), type: 'scroll', bottom: 10 },
           grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
           xAxis: { type: 'category', data: ['总销量', '平均日销量'] },
           yAxis: { type: 'value' },
           series: top.map((s, i) => ({
-            name: s.sku,
+            name: s.title || s.name || s.sku,
             type: 'bar',
             data: [s.totalSales, Math.round(s.totalSales / tmallTimeRange * 10) / 10],
             itemStyle: { color: i < 3 ? '#FF5722' : '#1E9FFF' }
@@ -2504,7 +2527,7 @@
           tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
           grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
           xAxis: { type: 'value' },
-          yAxis: { type: 'category', data: hotArr.map(s => s.sku) },
+          yAxis: { type: 'category', data: hotArr.map(s => s.title || s.name || s.sku) },
           series: [{ name: '销量', type: 'bar', data: hotArr.map(s => s.totalSales), itemStyle: { color: '#FF5722' } }]
         };
         tmallHotProductsChart.setOption(option);
@@ -2535,7 +2558,7 @@
             tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
             grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
             xAxis: { type: 'value' },
-            yAxis: { type: 'category', data: data.map(s => s.sku) },
+            yAxis: { type: 'category', data: data.map(s => s.title || s.name || s.sku) },
             series: [{ name: '销量', type: 'bar', data: data.map(s => s.totalSales), itemStyle: { color: '#FF5722' } }]
           };
           chart.setOption(option);
@@ -2566,7 +2589,7 @@
           tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
           grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
           xAxis: { type: 'value' },
-          yAxis: { type: 'category', data: data.map(s => s.sku) },
+          yAxis: { type: 'category', data: data.map(s => s.title || s.name || s.sku) },
           series: [{ name: '销量', type: 'bar', data: data.map(s => s.totalSales), itemStyle: { color: '#FFB800' } }]
         };
         tmallSlowProductsChart.setOption(option);

@@ -777,6 +777,36 @@ function getCell(row, ...keys) {
 }
 
 // 转换天猫订单行数据为宽表格式 - 支持新格式
+// 增强的日期格式化函数 - 支持两种日期格式
+function normalizeDateToYMD(value) {
+  if (!value) return null;
+  var str = value.toString().trim();
+
+  // 匹配日期格式：YYYY/MM/DD HH:mm:ss 或 YYYY/MM/DD
+  var match = str.match(/(\d{4})[^\d]?(\d{1,2})[^\d]?(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (match) {
+    var year = match[1];
+    var month = match[2].padStart(2, '0');
+    var day = match[3].padStart(2, '0');
+    return year + '-' + month + '-' + day;
+  }
+
+  // 兜底：尝试标准日期格式 YYYY-MM-DD
+  try {
+    var date = new Date(str);
+    if (!isNaN(date.getTime())) {
+      var y = date.getFullYear();
+      var m = String(date.getMonth() + 1).padStart(2, '0');
+      var d = String(date.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + d;
+    }
+  } catch (e) {
+    console.warn('日期解析失败:', str);
+  }
+
+  return null;
+}
+
 function convertTmallRowsToWideTable(rows) {
   console.log('【调试】表头keys:', Object.keys(rows[0] || {}));
   rows.forEach((row, idx) => {
@@ -786,7 +816,7 @@ function convertTmallRowsToWideTable(rows) {
   return rows.map((row, idx) => {
     return {
       '系统履约单号': getCell(row, '系统履约单号', '履约单号', '订单编号'),
-      '店铺订单时间': getCell(row, '店铺订单时间', '门店订单时间', '订单时间', '下单时间', 'date', '时间'),
+      '店铺订单时间': normalizeDateToYMD(getCell(row, '店铺订单时间', '门店订单时间', '订单时间', '下单时间', 'date', '时间')) || '',
       'SKU': getCell(row, 'SKU', 'sku', '商品SKU'),
       '尺码': getCell(row, '尺码', 'Size', 'size', '规格'),
       '标题': getCell(row, '标题', '商品标题', '产品标题', '商品名称'),
