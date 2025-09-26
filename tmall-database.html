@@ -328,7 +328,7 @@
               data: JSON.stringify({ data }),
               success: function(res) {
                 layer.closeAll();
-                if(res.success) { layer.msg('导入成功', {icon:1}); initWideTable(); if (currentMode === 'record') { renderRecordTable(); } }
+                if(res.success) { layer.msg('导入成功', {icon:1}); initTmallTable(); }
                 else { layer.msg('导入失败: ' + (res.error||'未知错误'), {icon:2}); }
               },
               error: function(xhr) { layer.closeAll(); if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导入失败', {icon:2}); } }
@@ -359,7 +359,7 @@
               type: 'POST',
               headers: headers,
               data: JSON.stringify({ data }),
-              success: function(res) { layer.closeAll(); if(res.success) { layer.msg('导入成功', {icon:1}); initWideTable(); } else { layer.msg('导入失败: ' + (res.error||'未知错误'), {icon:2}); } },
+              success: function(res) { layer.closeAll(); if(res.success) { layer.msg('导入成功', {icon:1}); initTmallTable(); } else { layer.msg('导入失败: ' + (res.error||'未知错误'), {icon:2}); } },
               error: function(xhr) { layer.closeAll(); if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导入失败', {icon:2}); } }
             });
           } catch (err) {
@@ -443,7 +443,7 @@
             url: window.apiConfig.baseURL + '/api/tmall-orders/wide/clear',
             type: 'POST',
             headers: headers,
-            success: function(res) { if(res.success) { layer.msg('清理成功: ' + res.message, {icon:1}); initWideTable(); } else { layer.msg('清理失败: ' + res.error, {icon:2}); } },
+            success: function(res) { if(res.success) { layer.msg('清理成功: ' + res.message, {icon:1}); initTmallTable(); } else { layer.msg('清理失败: ' + res.error, {icon:2}); } },
             error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('清理失败', {icon:2}); } }
           });
           layer.close(index);
@@ -492,12 +492,12 @@
           type: method,
           headers: headers,
           data: JSON.stringify(data),
-          success: function(res){ if(res.success){ layer.msg('保存成功', {icon:1}); layer.closeAll(); if (currentMode === 'record') { renderRecordTable(); } }else{ layer.msg('保存失败: '+res.error, {icon:2}); } },
+          success: function(res){ if(res.success){ layer.msg('保存成功', {icon:1}); layer.closeAll(); }else{ layer.msg('保存失败: '+res.error, {icon:2}); } },
           error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('保存失败', {icon:2}); } }
         });
         return false;
       });
-      initWideTable();
+      initTmallTable();
     });
     function logout() {
       layer.confirm('确定要退出登录吗？', {icon: 3, title: '提示'}, function(index){
