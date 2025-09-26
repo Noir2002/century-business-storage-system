@@ -776,6 +776,29 @@ function getCell(row, ...keys) {
   return values.length > 0 ? values[0] : '';
 }
 
+// 解析价格字符串，移除货币符号并转换为数字
+function parsePrice(priceStr) {
+  if (!priceStr || priceStr === '') return 0;
+  let cleanedStr = String(priceStr).trim();
+
+  // 移除常见货币符号 (€, $, ¥, £, ￥等)
+  cleanedStr = cleanedStr.replace(/^[\s\u20AC\u24\u00A2\u00A3\u00A5\uFFE5$€¥£]+/, '');
+
+  // 处理千分位分隔符 (逗号或点)
+  // 如果是欧洲格式 (402,50)，转换为美国格式 (402.50)
+  if (cleanedStr.includes(',') && cleanedStr.includes('.')) {
+    // 同时包含逗号和点，可能是混合格式，如 1.402,50
+    cleanedStr = cleanedStr.replace(/\./g, '').replace(',', '.');
+  } else if (cleanedStr.includes(',')) {
+    // 只有逗号，可能是千分位分隔符，移除
+    cleanedStr = cleanedStr.replace(/,/g, '');
+  }
+
+  // 转换为数字
+  const num = parseFloat(cleanedStr);
+  return isNaN(num) ? 0 : num;
+}
+
 // 转换天猫订单行数据为宽表格式 - 支持新格式
 // 增强的日期格式化函数 - 支持两种日期格式
 function normalizeDateToYMD(value) {
@@ -820,8 +843,8 @@ function convertTmallRowsToWideTable(rows) {
       '尺码': getCell(row, '尺码', 'Size', 'size', '规格'),
       '标题': getCell(row, '标题', '商品标题', '产品标题', '商品名称'),
       '商品数量': parseInt(getCell(row, '商品数量', '数量', '商品数', 'qty', '数量（件）') || 1),
-      '商品单价': parseFloat(getCell(row, '商品单价', '单价', '价格', 'Price', 'price') || 0),
-      '订单金额': parseFloat(getCell(row, '订单金额', '金额', '总价', '总金额', 'Amount', 'amount') || 0)
+      '商品单价': parsePrice(getCell(row, '商品单价', '单价', '价格', 'Price', 'price') || 0),
+      '订单金额': parsePrice(getCell(row, '订单金额', '金额', '总价', '总金额', 'Amount', 'amount') || 0)
     };
   });
 }

@@ -103,6 +103,10 @@
       transition: all 0.3s ease;
       border-right: 1px solid #e6e6e6;
       border-bottom: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.2;
     }
 
     .data-source-tabs .layui-tab-title li:last-child {
@@ -1933,7 +1937,7 @@
               }
               skuMap[sku].totalQuantity += quantity;
               skuMap[sku].totalAmount += totalAmount;
-              skuMap[sku].salesByDate[orderDate] = (skuMap[sku].salesByDate[orderDate] || 0) + totalAmount;
+              skuMap[sku].salesByDate[orderDate] = (skuMap[sku].salesByDate[orderDate] || 0) + quantity;
             }
           }
         });
@@ -2619,9 +2623,9 @@
               <td class="sku-cell">${item.sku}</td>
               <td>${item.size || '-'}</td>
               <td title="${item.title || ''}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.title || '-'}</td>
-              <td>¥${(item.unitPrice || 0).toFixed(2)}</td>
+              <td>€${(item.unitPrice || 0).toFixed(2)}</td>
               <td>${item.totalQuantity || 0}</td>
-              <td>¥${(item.totalAmount || 0).toFixed(2)}</td>
+              <td>€${(item.totalAmount || 0).toFixed(2)}</td>
               <td>${Math.round(item.totalQuantity / tmallTimeRange * 10) / 10}</td>
             </tr>
           `;
