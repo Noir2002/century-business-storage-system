@@ -815,7 +815,6 @@ function convertTmallRowsToWideTable(rows) {
 
   return rows.map((row, idx) => {
     return {
-      '系统履约单号': getCell(row, '系统履约单号', '履约单号', '订单编号'),
       '店铺订单时间': normalizeDateToYMD(getCell(row, '店铺订单时间', '门店订单时间', '订单时间', '下单时间', 'date', '时间')) || '',
       'SKU': getCell(row, 'SKU', 'sku', '商品SKU'),
       '尺码': getCell(row, '尺码', 'Size', 'size', '规格'),

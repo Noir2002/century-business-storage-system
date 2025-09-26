@@ -1927,12 +1927,10 @@
                   title: row['标题'] || '',
                   unitPrice: unitPrice,
                   totalAmount: 0,
-                  totalSales: 0,
                   totalQuantity: 0,
                   salesByDate: {}
                 };
               }
-              skuMap[sku].totalSales += totalAmount;
               skuMap[sku].totalQuantity += quantity;
               skuMap[sku].totalAmount += totalAmount;
               skuMap[sku].salesByDate[orderDate] = (skuMap[sku].salesByDate[orderDate] || 0) + totalAmount;
@@ -1941,7 +1939,7 @@
         });
 
         // 3. 转换为数组并排序
-        var skuArr = Object.values(skuMap).sort((a, b) => b.totalAmount - a.totalAmount);
+        var skuArr = Object.values(skuMap).sort((a, b) => b.totalQuantity - a.totalQuantity);
         var hotArr = skuArr.filter(item => item.totalQuantity >= 5);
         var slowArr = skuArr.filter(item => item.totalQuantity <= 2);
 
@@ -1949,7 +1947,7 @@
         $('#tmallTotalSku').text(skuArr.length);
         $('#tmallHotCount').text(hotArr.length);
         $('#tmallSlowCount').text(slowArr.length);
-        $('#tmallTotalSales').text(Math.round(skuArr.reduce((sum, item) => sum + item.totalAmount, 0) * 100) / 100);
+        $('#tmallTotalSales').text(Math.round(skuArr.reduce((sum, item) => sum + item.totalQuantity, 0)));
 
         // 5. 生成图表
         generateTmallDailyTotalSalesChart(skuArr);
@@ -2506,7 +2504,7 @@
           series: top.map((s, i) => ({
             name: s.title || s.name || s.sku,
             type: 'bar',
-            data: [s.totalSales, Math.round(s.totalSales / tmallTimeRange * 10) / 10],
+            data: [s.totalQuantity, Math.round(s.totalQuantity / tmallTimeRange * 10) / 10],
             itemStyle: { color: i < 3 ? '#FF5722' : '#1E9FFF' }
           }))
         };
@@ -2528,7 +2526,7 @@
           grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
           xAxis: { type: 'value' },
           yAxis: { type: 'category', data: hotArr.map(s => s.title || s.name || s.sku) },
-          series: [{ name: '销量', type: 'bar', data: hotArr.map(s => s.totalSales), itemStyle: { color: '#FF5722' } }]
+          series: [{ name: '销量', type: 'bar', data: hotArr.map(s => s.totalQuantity), itemStyle: { color: '#FF5722' } }]
         };
         tmallHotProductsChart.setOption(option);
       }
@@ -2559,7 +2557,7 @@
             grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
             xAxis: { type: 'value' },
             yAxis: { type: 'category', data: data.map(s => s.title || s.name || s.sku) },
-            series: [{ name: '销量', type: 'bar', data: data.map(s => s.totalSales), itemStyle: { color: '#FF5722' } }]
+            series: [{ name: '销量', type: 'bar', data: data.map(s => s.totalQuantity), itemStyle: { color: '#FF5722' } }]
           };
           chart.setOption(option);
         }
@@ -2590,7 +2588,7 @@
           grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
           xAxis: { type: 'value' },
           yAxis: { type: 'category', data: data.map(s => s.title || s.name || s.sku) },
-          series: [{ name: '销量', type: 'bar', data: data.map(s => s.totalSales), itemStyle: { color: '#FFB800' } }]
+          series: [{ name: '销量', type: 'bar', data: data.map(s => s.totalQuantity), itemStyle: { color: '#FFB800' } }]
         };
         tmallSlowProductsChart.setOption(option);
       }
@@ -2621,9 +2619,9 @@
               <td class="sku-cell">${item.sku}</td>
               <td>${item.size || '-'}</td>
               <td title="${item.title || ''}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.title || '-'}</td>
-              <td>¥${item.unitPrice || 0}</td>
+              <td>¥${(item.unitPrice || 0).toFixed(2)}</td>
               <td>${item.totalQuantity || 0}</td>
-              <td>¥${Math.round(item.totalAmount * 100) / 100}</td>
+              <td>¥${(item.totalAmount || 0).toFixed(2)}</td>
               <td>${Math.round(item.totalQuantity / tmallTimeRange * 10) / 10}</td>
             </tr>
           `;

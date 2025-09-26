@@ -42,8 +42,7 @@
     .action-buttons { text-align: right; margin-bottom: 15px; }
     .action-buttons .layui-btn { margin-left: 10px; border-radius: 6px; transition: all 0.3s ease; }
     .action-buttons .layui-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-    .wide-table-container, .record-table-container { display: none; }
-    .wide-table-container.active, .record-table-container.active { display: block; }
+    .table-container { display: block; }
     .handsontable-container { padding: 20px; }
     .layui-table-cell { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     
@@ -152,43 +151,21 @@
       <p class="page-subtitle">管理您的天猫订单SKU库存和销售数据</p>
       <div class="breadcrumb"><a href="dashboard.html">首页</a> / 天猫数据库</div>
     </div>
-    <div class="mode-switch">
-      <button class="layui-btn layui-btn-primary active" id="wideTableMode"><i class="layui-icon layui-icon-table"></i> 宽表模式（最近5天）</button>
-      <button class="layui-btn layui-btn-primary" id="recordMode"><i class="layui-icon layui-icon-list"></i> 行记录模式（历史数据）</button>
-    </div>
-    <div class="mode-description" id="modeDescription">宽表模式：适合日常快速录入和查看最近5天的天猫订单数据，支持批量编辑</div>
-    <div class="wide-table-container active" id="wideTableContainer">
-      <div class="table-container">
-        <div class="table-header">
-          <div class="table-stats"><span>宽表数据管理</span><span>最近5天天猫订单数据</span></div>
-        </div>
-        <div class="action-buttons">
-          <button class="layui-btn layui-btn-normal" id="addRowBtn"><i class="layui-icon layui-icon-add-1"></i> 新增记录</button>
-          <button class="layui-btn layui-btn-primary" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
-          <button class="layui-btn layui-btn-danger" id="saveWideTableBtn"><i class="layui-icon layui-icon-ok"></i> 保存</button>
-          <button class="layui-btn layui-btn-lg" id="smartImportBtn"><i class="layui-icon layui-icon-magic"></i> 智能导入</button>
-          <button class="layui-btn" id="importBtn"><i class="layui-icon layui-icon-upload"></i> 导入Excel</button>
-          <button class="layui-btn" id="exportBtn"><i class="layui-icon layui-icon-download-circle"></i> 导出Excel</button>
-          <button class="layui-btn layui-btn-warm" id="downloadTemplateBtn"><i class="layui-icon layui-icon-template"></i> 下载模板</button>
-          <button class="layui-btn layui-btn-danger" id="clearOldDataBtn"><i class="layui-icon layui-icon-delete"></i> 清理旧数据</button>
-          <button class="layui-btn layui-btn-danger" id="clearAllDataBtn"><i class="layui-icon layui-icon-close"></i> 清空所有数据</button>
-        </div>
-        <div class="handsontable-container"><div id="wideTable" style="width:100%;min-height:500px;"></div></div>
+    <div class="table-container">
+      <div class="table-header">
+        <div class="table-stats"><span>天猫订单数据管理</span><span>统一管理所有天猫订单数据</span></div>
       </div>
-    </div>
-    <div class="record-table-container" id="recordTableContainer">
-      <div class="table-container">
-        <div class="table-header"><div class="table-stats"><span>历史记录管理</span><span>天猫订单历史数据查询</span></div></div>
-        <div class="action-buttons">
-          <button class="layui-btn" id="addRecordBtn"><i class="layui-icon layui-icon-add-1"></i> 新增记录</button>
-          <button class="layui-btn layui-btn-primary" id="refreshRecordBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
-          <button class="layui-btn" id="importRecordBtn"><i class="layui-icon layui-icon-upload"></i> 批量导入</button>
-          <button class="layui-btn" id="exportRecordBtn"><i class="layui-icon layui-icon-download-circle"></i> 导出数据</button>
-          <button class="layui-btn layui-btn-warm" id="downloadRecordTemplateBtn"><i class="layui-icon layui-icon-template"></i> 下载模板</button>
-          <button class="layui-btn layui-btn-danger" id="clearAllRecordDataBtn"><i class="layui-icon layui-icon-close"></i> 清空所有数据</button>
-        </div>
-        <div style="padding: 20px;"><table class="layui-hide" id="recordTable" lay-filter="recordTable"></table></div>
+      <div class="action-buttons">
+        <button class="layui-btn layui-btn-normal" id="addRowBtn"><i class="layui-icon layui-icon-add-1"></i> 新增记录</button>
+        <button class="layui-btn layui-btn-primary" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
+        <button class="layui-btn layui-btn-danger" id="saveBtn"><i class="layui-icon layui-icon-ok"></i> 保存</button>
+        <button class="layui-btn layui-btn-lg" id="smartImportBtn"><i class="layui-icon layui-icon-magic"></i> 智能导入</button>
+        <button class="layui-btn" id="importBtn"><i class="layui-icon layui-icon-upload"></i> 导入Excel</button>
+        <button class="layui-btn" id="exportBtn"><i class="layui-icon layui-icon-download-circle"></i> 导出Excel</button>
+        <button class="layui-btn layui-btn-warm" id="downloadTemplateBtn"><i class="layui-icon layui-icon-template"></i> 下载模板</button>
+        <button class="layui-btn layui-btn-danger" id="clearAllDataBtn"><i class="layui-icon layui-icon-close"></i> 清空所有数据</button>
       </div>
+      <div class="handsontable-container"><div id="tmallTable" style="width:100%;min-height:500px;"></div></div>
     </div>
   </div>
   <div id="editFormModal" style="display:none;padding:20px 30px 0 0;">
@@ -199,7 +176,6 @@
       <div class="layui-form-item"><label class="layui-form-label">初始库存</label><div class="layui-input-block"><input type="number" name="initialStock" required lay-verify="required|number" placeholder="请输入初始库存数量" autocomplete="off" class="layui-input"></div></div>
       <div class="layui-form-item"><label class="layui-form-label">日期</label><div class="layui-input-block"><input type="text" name="date" required lay-verify="required|date" placeholder="如 2024-07-18 11:30" autocomplete="off" class="layui-input"></div></div>
       <div class="layui-form-item"><label class="layui-form-label">库存</label><div class="layui-input-block"><input type="number" name="stock" required lay-verify="required|number" placeholder="请输入库存数量" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">系统履约单号</label><div class="layui-input-block"><input type="text" name="orderId" placeholder="请输入系统履约单号" autocomplete="off" class="layui-input"></div></div>
       <div class="layui-form-item"><label class="layui-form-label">店铺订单时间</label><div class="layui-input-block"><input type="text" name="orderTime" placeholder="请输入店铺订单时间" autocomplete="off" class="layui-input"></div></div>
       <div class="layui-form-item"><label class="layui-form-label">尺码</label><div class="layui-input-block"><input type="text" name="size" placeholder="请输入尺码" autocomplete="off" class="layui-input"></div></div>
       <div class="layui-form-item"><label class="layui-form-label">标题</label><div class="layui-input-block"><input type="text" name="title" placeholder="请输入商品标题" autocomplete="off" class="layui-input"></div></div>
@@ -219,7 +195,6 @@
       var form = layui.form;
       var $ = layui.$;
 
-      var currentMode = 'wide';
       var hot = null;
       var userInfo = JSON.parse(localStorage.getItem('currentUser') || '{}');
       if (!userInfo.username) {
@@ -227,31 +202,9 @@
         return;
       }
       document.getElementById('currentUser').textContent = userInfo.realname || userInfo.username;
-      $('#wideTableMode').on('click', function() { switchMode('wide'); });
-      $('#recordMode').on('click', function() { switchMode('record'); });
-      function switchMode(mode) {
-        currentMode = mode;
-        $('.mode-switch .layui-btn').removeClass('active');
-        if (mode === 'wide') {
-          $('#wideTableMode').addClass('active');
-          $('#modeDescription').text('宽表模式：适合日常快速录入和查看最近5天的天猫订单数据，支持批量编辑');
-        } else {
-          $('#recordMode').addClass('active');
-          $('#modeDescription').text('行记录模式：管理天猫订单历史数据，支持单条记录操作和批量导入导出');
-        }
-        $('.wide-table-container, .record-table-container').removeClass('active');
-        if (mode === 'wide') {
-          $('#wideTableContainer').addClass('active');
-          initWideTable();
-        } else {
-          $('#recordTableContainer').addClass('active');
-          initRecordTable();
-        }
-      }
-      function initWideTable() {
+      function initTmallTable() {
         if (hot) { hot.destroy(); hot = null; }
         const columns = [
-          {data: '系统履约单号', type: 'text'},
           {data: '店铺订单时间', type: 'text'},
           {data: 'SKU', type: 'text'},
           {data: '尺码', type: 'text'},
@@ -260,10 +213,10 @@
           {data: '商品单价', type: 'numeric'},
           {data: '订单金额', type: 'numeric'}
         ];
-        const colHeaders = ['系统履约单号', '店铺订单时间', 'SKU', '尺码', '标题', '商品数量', '商品单价', '订单金额'];
-        loadWideTableData(columns, colHeaders);
+        const colHeaders = ['店铺订单时间', 'SKU', '尺码', '商品标题', '商品数量', '商品单价', '订单金额'];
+        loadTmallTableData(columns, colHeaders);
       }
-      function loadWideTableData(columns, colHeaders) {
+      function loadTmallTableData(columns, colHeaders) {
         var token = localStorage.getItem('token');
         var headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -273,7 +226,7 @@
           headers: headers,
           success: function(res) {
             if(res.success) {
-              hot = new Handsontable(document.getElementById('wideTable'), {
+              hot = new Handsontable(document.getElementById('tmallTable'), {
                 data: res.data,
                 columns: columns,
                 colHeaders: colHeaders,
@@ -326,62 +279,14 @@
           });
         });
       }
-      function initRecordTable() { renderRecordTable(); }
-      function renderRecordTable() {
-        var token = localStorage.getItem('token');
-        var headers = {};
-        if (token) headers['Authorization'] = 'Bearer ' + token;
-        $.ajax({
-          url: window.apiConfig.baseURL + '/api/tmall-orders/records',
-          type: 'GET',
-          headers: headers,
-          success: function(res) {
-            if(res.success) {
-              table.render({
-                elem: '#recordTable',
-                data: res.data,
-                page: true,
-                limit: 20,
-                cols: [[
-                  {field:'SKU', title:'SKU', width:120, sort:true},
-                  {field:'产品中文名', title:'产品中文名', width:150},
-                  {field:'网页链接', title:'网页链接', width:180, templet: function(d){ return d['网页链接'] ? '<a href="'+d['网页链接']+'" target="_blank">'+d['网页链接']+'</a>' : ''; }},
-                  {field:'初始库存', title:'初始库存', width:90, sort:true},
-                  {field:'日期', title:'日期', width:140, sort:true},
-                  {field:'库存', title:'库存', width:90, sort:true},
-                  {field:'销量', title:'销量', width:90, sort:true, templet: function(d){ return '<span style="color: ' + (d['销量'] > 0 ? '#52c41a' : '#999') + ';">' + d['销量'] + '</span>'; }},
-                  {field:'系统履约单号', title:'系统履约单号', width:140},
-                  {field:'店铺订单时间', title:'店铺订单时间', width:140},
-                  {field:'尺码', title:'尺码', width:80},
-                  {field:'标题', title:'标题', width:200},
-                  {field:'商品数量', title:'商品数量', width:90, sort:true},
-                  {field:'商品单价', title:'商品单价', width:100, sort:true},
-                  {field:'订单金额', title:'订单金额', width:100, sort:true},
-                  {title:'操作', width:150, align:'center', toolbar:'#rowBar'}
-                ]],
-                text: {none: '暂无数据'}
-              });
-            } else {
-              layer.msg('数据加载失败: ' + res.error, {icon:2});
-            }
-          },
-          error: function(xhr) {
-            if (xhr.status === 401) {
-              layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; });
-            } else {
-              layer.msg('数据加载失败', {icon:2});
-            }
-          }
-        });
-      }
       var rowBarHtml = '<div class="layui-btn-group">'
         +'<button class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>'
         +'<button class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</button>'
         +'</div>';
       $(document.body).append('<script type="text/html" id="rowBar">'+rowBarHtml+'<\/script>');
       $('#addRowBtn').on('click', function(){ if (hot) hot.alter('insert_row', hot.countRows()); });
-      $('#refreshBtn').on('click', function() { if (hot) { calculateSales(hot.getSourceData(), hot.getSettings().columns); hot.render(); } initWideTable(); });
-      $('#saveWideTableBtn').on('click', function() {
+      $('#refreshBtn').on('click', function() { if (hot) { calculateSales(hot.getSourceData(), hot.getSettings().columns); hot.render(); } initTmallTable(); });
+      $('#saveBtn').on('click', function() {
         if (!hot) return;
         var data = hot.getSourceData();
         var columns = hot.getSettings().columns;
@@ -397,7 +302,7 @@
           data: JSON.stringify({ data: data }),
           success: function(res) {
             layer.closeAll();
-            if(res.success) { layer.msg('保存成功', {icon:1}); initWideTable(); } else { layer.msg('保存失败: ' + res.error, {icon:2}); }
+            if(res.success) { layer.msg('保存成功', {icon:1}); initTmallTable(); } else { layer.msg('保存失败: ' + res.error, {icon:2}); }
           },
           error: function(xhr) { layer.closeAll(); if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('保存失败', {icon:2}); } }
         });
@@ -489,11 +394,11 @@
         });
       });
       $('#downloadTemplateBtn').on('click', function() {
-        const colHeaders = ['系统履约单号', '店铺订单时间', 'SKU', '尺码', '标题', '商品数量', '商品单价', '订单金额'];
+        const colHeaders = ['店铺订单时间', 'SKU', '尺码', '标题', '商品数量', '商品单价', '订单金额'];
         const ws = XLSX.utils.aoa_to_sheet([colHeaders]);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, '天猫宽表模板');
-        XLSX.writeFile(wb, 'tmall-wide-table-template.xlsx');
+        XLSX.utils.book_append_sheet(wb, ws, '天猫订单模板');
+        XLSX.writeFile(wb, 'tmall-orders-template.xlsx');
       });
 
       // 解析Excel为宽表JSON（支持新旧两种格式）
@@ -506,7 +411,6 @@
         // 尝试根据常见中文列头自动匹配
         const mapKey = (obj, keys) => keys.find(k => Object.prototype.hasOwnProperty.call(obj, k));
         const data = rows.map((row, idx) => {
-          const idKey = mapKey(row, ['系统履约单号','系统履约单编号','系统履约单号 ','订单编号']);
           const timeKey = mapKey(row, ['店铺订单时间','下单时间','店铺下单时间','订单时间']);
           const skuKey = mapKey(row, ['SKU','Sku','sku','商品SKU']);
           const sizeKey = mapKey(row, ['尺码','Size','size','规格']);
@@ -516,7 +420,6 @@
           const amountKey = mapKey(row, ['订单金额','金额','总价','总金额','Amount','amount']);
 
           const item = {
-            '系统履约单号': idKey ? String(row[idKey]).trim() : String(row['A']||'').trim(),
             '店铺订单时间': timeKey ? String(row[timeKey]).trim() : '',
             'SKU': skuKey ? String(row[skuKey]).trim() : '',
             '尺码': sizeKey ? String(row[sizeKey]).trim() : '',
@@ -526,9 +429,9 @@
             '订单金额': amountKey ? Number(row[amountKey]||0) : 0
           };
           return item;
-        }).filter(x => x['系统履约单号'] || x['SKU']);
+        }).filter(x => x['SKU'] || x['标题']);
 
-        if (!data.length) throw new Error('未识别到有效数据，请检查表头是否包含：系统履约单号/店铺订单时间/SKU/商品数量等字段');
+        if (!data.length) throw new Error('未识别到有效数据，请检查表头是否包含：店铺订单时间/SKU/商品数量等字段');
         return data;
       }
       $('#clearOldDataBtn').on('click', function() {
@@ -547,7 +450,7 @@
         });
       });
       $('#clearAllDataBtn').on('click', function() {
-        layer.confirm('⚠️ 警告：此操作将清空所有天猫宽表数据，且无法恢复！确定要继续吗？', {
+        layer.confirm('⚠️ 警告：此操作将清空所有天猫订单数据，且无法恢复！确定要继续吗？', {
           icon: 3, title: '确认清空', btn: ['确定清空', '取消']
         }, function(index) {
           var token = localStorage.getItem('token');
@@ -557,122 +460,11 @@
             url: window.apiConfig.baseURL + '/api/tmall-orders/wide/clear-all',
             type: 'POST',
             headers: headers,
-            success: function(res) { if(res.success) { layer.msg('清空成功: ' + res.message, {icon:1}); initWideTable(); } else { layer.msg('清空失败: ' + res.error, {icon:2}); } },
+            success: function(res) { if(res.success) { layer.msg('清空成功: ' + res.message, {icon:1}); initTmallTable(); } else { layer.msg('清空失败: ' + res.error, {icon:2}); } },
             error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('清空失败', {icon:2}); } }
           });
           layer.close(index);
         });
-      });
-      $('#addRecordBtn').on('click', function(){ form.val('editForm', {sku:'', name:'', url:'', initialStock:'', date:'', stock:''}); layer.open({ type:1, title:'新增记录', area:['400px','480px'], content:$('#editFormModal'), btn:[], shadeClose:true }); });
-      $('#refreshRecordBtn').on('click', renderRecordTable);
-      $('#importRecordBtn').on('click', function() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.xlsx,.xls,.csv';
-        input.onchange = function(e) {
-          const file = e.target.files[0];
-          if (!file) return;
-          var token = localStorage.getItem('token');
-          var formData = new FormData();
-          formData.append('file', file);
-          var headers = {};
-          if (token) headers['Authorization'] = 'Bearer ' + token;
-          $.ajax({
-            url: window.apiConfig.baseURL + '/api/tmall-orders/records/batch',
-            type: 'POST',
-            headers: headers,
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(res) { if(res.success) { layer.msg('导入成功: ' + res.message, {icon:1}); renderRecordTable(); } else { layer.msg('导入失败: ' + res.error, {icon:2}); } },
-            error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导入失败', {icon:2}); } }
-          });
-        };
-        input.click();
-      });
-      $('#exportRecordBtn').on('click', function() {
-        var token = localStorage.getItem('token');
-        var headers = {};
-        if (token) headers['Authorization'] = 'Bearer ' + token;
-        $.ajax({
-          url: window.apiConfig.baseURL + '/api/tmall-orders/records/export',
-          type: 'GET',
-          headers: headers,
-          xhrFields: { responseType: 'blob' },
-          success: function(data) {
-            const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'tmall-records-export.xlsx';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            layer.msg('导出成功', {icon:1});
-          },
-          error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('导出失败', {icon:2}); } }
-        });
-      });
-      $('#downloadRecordTemplateBtn').on('click', function() {
-        const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存', '日期（YYYY-MM-DD HH:mm）', '库存', '系统履约单号', '店铺订单时间', '尺码', '标题', '商品数量', '商品单价', '订单金额'];
-        const ws = XLSX.utils.aoa_to_sheet([colHeaders]);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, '天猫记录模板');
-        XLSX.writeFile(wb, 'tmall-records-template.xlsx');
-      });
-      $('#clearAllRecordDataBtn').on('click', function() {
-        layer.confirm('⚠️ 警告：此操作将清空所有天猫历史记录数据，且无法恢复！确定要继续吗？', {
-          icon: 3, title: '确认清空', btn: ['确定清空', '取消']
-        }, function(index) {
-          var token = localStorage.getItem('token');
-          var headers = {};
-          if (token) headers['Authorization'] = 'Bearer ' + token;
-          $.ajax({
-            url: window.apiConfig.baseURL + '/api/tmall-orders/records/clear-all',
-            type: 'POST',
-            headers: headers,
-            success: function(res) { if(res.success) { layer.msg('清空成功: ' + res.message, {icon:1}); renderRecordTable(); } else { layer.msg('清空失败: ' + res.error, {icon:2}); } },
-            error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('清空失败', {icon:2}); } }
-          });
-          layer.close(index);
-        });
-      });
-      table.on('tool(recordTable)', function(obj){
-        var data = obj.data;
-        if(obj.event === 'edit'){
-        form.val('editForm', {
-          sku: data.SKU,
-          name: data['产品中文名'],
-          url: data['网页链接'],
-          initialStock: data['初始库存'],
-          date: data['日期'],
-          stock: data['库存'],
-          orderId: data['系统履约单号'] || '',
-          orderTime: data['店铺订单时间'] || '',
-          size: data['尺码'] || '',
-          title: data['标题'] || '',
-          quantity: data['商品数量'] || '',
-          unitPrice: data['商品单价'] || '',
-          totalAmount: data['订单金额'] || ''
-        });
-          layer.open({ type:1, title:'编辑记录', area:['400px','480px'], content:$('#editFormModal'), btn:[], shadeClose:true });
-          $('#editFormModal').data('editId', data.id);
-        } else if(obj.event === 'del'){
-          layer.confirm('确定要删除该记录吗？', function(index){
-            var token = localStorage.getItem('token');
-            var headers = {};
-            if (token) headers['Authorization'] = 'Bearer ' + token;
-            $.ajax({
-              url: window.apiConfig.baseURL + '/api/tmall-orders/records/'+data.id,
-              type: 'DELETE',
-              headers: headers,
-              success: function(res){ if(res.success){ layer.msg('删除成功', {icon:1}); renderRecordTable(); }else{ layer.msg('删除失败: '+res.error, {icon:2}); } },
-              error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('删除失败', {icon:2}); } }
-            });
-            layer.close(index);
-          });
-        }
       });
       form.on('submit(submitEdit)', function(formObj){
         var editId = $('#editFormModal').data('editId');
@@ -685,7 +477,6 @@
           '初始库存': formObj.field.initialStock,
           '日期': formObj.field.date,
           '库存': formObj.field.stock,
-          '系统履约单号': formObj.field.orderId,
           '店铺订单时间': formObj.field.orderTime,
           '尺码': formObj.field.size,
           '标题': formObj.field.title,
