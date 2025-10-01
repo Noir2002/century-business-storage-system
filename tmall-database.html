@@ -156,7 +156,6 @@
         <div class="table-stats"><span>天猫订单数据管理</span><span>统一管理所有天猫订单数据</span></div>
       </div>
       <div class="action-buttons">
-        <button class="layui-btn layui-btn-normal" id="addRowBtn"><i class="layui-icon layui-icon-add-1"></i> 新增记录</button>
         <button class="layui-btn layui-btn-primary" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
         <button class="layui-btn layui-btn-danger" id="saveBtn"><i class="layui-icon layui-icon-ok"></i> 保存</button>
         <button class="layui-btn layui-btn-lg" id="smartImportBtn"><i class="layui-icon layui-icon-magic"></i> 智能导入</button>
@@ -263,12 +262,7 @@
           });
         });
       }
-      var rowBarHtml = '<div class="layui-btn-group">'
-        +'<button class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>'
-        +'<button class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</button>'
-        +'</div>';
-      $(document.body).append('<script type="text/html" id="rowBar">'+rowBarHtml+'<\/script>');
-      $('#addRowBtn').on('click', function(){ if (hot) hot.alter('insert_row', hot.countRows()); });
+      // 注意：行内编辑按钮已被移除，系统现在只使用宽表批量编辑模式
       $('#refreshBtn').on('click', function() { if (hot) { calculateSales(hot.getSourceData(), hot.getSettings().columns); hot.render(); } initTmallTable(); });
       $('#saveBtn').on('click', function() {
         if (!hot) return;
