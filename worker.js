@@ -296,9 +296,9 @@ export default {
       return new Response('Not Found', { status: 404, headers: corsHeaders });
     } catch (error) {
       console.error('Worker Error:', error);
-      return new Response(JSON.stringify({
-        success: false,
-        error: error.message
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: error.message 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -393,7 +393,7 @@ async function handleExcelUpload(request, env, corsHeaders) {
 // 处理本地数据库API请求
 async function handleLocalDB(request, env, path, method, corsHeaders) {
   console.log('🔄 处理本地数据库请求:', path);
-
+  
   try {
     // 宽表相关API
     if (path === '/api/localdb/wide' && method === 'GET') {
@@ -415,10 +415,10 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
             const jsonObj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY);
             if (jsonObj) {
               const text = await jsonObj.text();
-              const parsed = JSON.parse(text);
-              if (Array.isArray(parsed)) {
-                wideTableCache = parsed;
-                data = parsed;
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed)) {
+              wideTableCache = parsed;
+              data = parsed;
               }
             }
           }
@@ -435,17 +435,17 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
 
       return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
     }
-
+    
     else if (path === '/api/localdb/wide' && method === 'POST') {
       // 保存宽表数据
       const requestData = await request.json();
       console.log('💾 保存宽表数据:', requestData);
       if (requestData && Array.isArray(requestData.data)) {
         wideTableCache = requestData.data;
-
+        
         // 计算销量
         wideTableCache = computeSalesForWideTableRows(wideTableCache);
-
+        
         // 持久化到R2（JSON和Excel格式）- 只保存宽表数据
         if (env.R2_BUCKET) {
           try {
@@ -454,7 +454,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
               httpMetadata: { contentType: 'application/json' },
               customMetadata: { updatedAt: new Date().toISOString() }
             });
-
+            
             // 保存Excel格式
             if (wideTableCache.length > 0) {
               const excelBuffer = arrayToExcelBuffer(wideTableCache);
@@ -463,10 +463,10 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
                 customMetadata: { updatedAt: new Date().toISOString() }
               });
             }
-
+            
             console.log('✅ 宽表数据已持久化到R2:', wideTableCache.length, '行');
-          } catch (e) {
-            console.warn('写入R2失败:', e);
+          } catch (e) { 
+            console.warn('写入R2失败:', e); 
           }
         }
       }
@@ -476,7 +476,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
         wideTableCount: wideTableCache.length
       }, { headers: corsHeaders });
     }
-
+    
     else if (path === '/api/localdb/wide/export' && method === 'GET') {
       // 导出宽表数据：优先从Excel文件导出
       let data = Array.isArray(wideTableCache) ? wideTableCache : [];
@@ -494,9 +494,9 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
             const jsonObj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY);
             if (jsonObj) {
               const text = await jsonObj.text();
-              const parsed = JSON.parse(text);
-              if (Array.isArray(parsed)) {
-                data = parsed;
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed)) {
+              data = parsed;
               }
             }
           }
@@ -520,12 +520,12 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
         return Response.json({ success: false, error: '导出失败: ' + error.message }, { status: 500, headers: corsHeaders });
       }
     }
-
+    
     else if (path === '/api/localdb/wide/batch' && method === 'POST') {
       // 批量上传处理 - 支持文件上传和JSON数据
       try {
         const contentType = request.headers.get('content-type') || '';
-
+        
         if (contentType.includes('multipart/form-data')) {
           // 处理文件直传：当前不在服务端解析Excel，提示前端改为JSON上传
           const formData = await request.formData();
@@ -535,7 +535,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           }
           console.log('📤 收到Excel文件直传(不解析):', file.name);
           return Response.json({ success: true, message: `文件 ${file.name} 已接收；请在前端解析后以JSON提交`, processed: 0, data: [] }, { headers: corsHeaders });
-
+          
         } else {
           // 处理JSON数据
           const requestData = await request.json();
@@ -576,19 +576,19 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
 
           return Response.json({ success: true, message: '宽表数据上传成功', processed: requestData.data ? requestData.data.length : 0, data: Array.isArray(wideTableCache) ? wideTableCache : [] }, { headers: corsHeaders });
         }
-
+        
       } catch (parseError) {
         console.error('批量上传解析错误:', parseError);
         return Response.json({
           success: false,
           error: `数据解析失败: ${parseError.message}`
-        }, {
+        }, { 
           status: 400,
-          headers: corsHeaders
+          headers: corsHeaders 
         });
       }
     }
-
+    
     else if (path === '/api/localdb/wide/clear-all' && (method === 'POST' || method === 'GET')) {
       // 清空缓存并返回成功；支持 POST/GET 方便浏览器直接验证
       wideTableCache = [];
@@ -597,21 +597,21 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
       }
       return Response.json({ success: true, message: '成功清空所有宽表数据' }, { headers: corsHeaders });
     }
-
+    
     // 注意：用户要求只使用宽表模式，所有行记录相关API已被移除
-
+    
     else {
       return new Response('Not Found', { status: 404, headers: corsHeaders });
     }
-
+    
   } catch (error) {
     console.error('❌ LocalDB API错误:', error);
     return Response.json({
       success: false,
       error: error.message
-    }, {
+    }, { 
       status: 500,
-      headers: corsHeaders
+      headers: corsHeaders 
     });
   }
 }
@@ -619,11 +619,11 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
 // 处理天猫订单API请求 - 只使用宽表模式
 async function handleTmallOrders(request, env, path, method, corsHeaders) {
   console.log('🔄 处理天猫订单请求:', path);
-
+  
   try {
     // 只映射到宽表相关的路径
     let mappedPath = path.replace('/api/tmall-orders/', '/api/localdb/');
-
+    
     // 特殊路径映射（只保留宽表相关）
     if (path.endsWith('/smart-import')) {
       mappedPath = '/api/localdb/wide/batch';
@@ -632,20 +632,20 @@ async function handleTmallOrders(request, env, path, method, corsHeaders) {
     } else if (path.endsWith('/wide/clear')) {
       mappedPath = '/api/localdb/wide/clear-all';
     }
-
+    
     console.log(`📍 路径映射: ${path} → ${mappedPath}`);
-
+    
     // 调用现有的localdb处理函数
     return await handleLocalDB(request, env, mappedPath, method, corsHeaders);
-
+    
   } catch (error) {
     console.error('❌ 天猫订单API错误:', error);
     return Response.json({
       success: false,
       error: error.message
-    }, {
+    }, { 
       status: 500,
-      headers: corsHeaders
+      headers: corsHeaders 
     });
   }
 }
