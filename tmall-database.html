@@ -168,23 +168,7 @@
       <div class="handsontable-container"><div id="tmallTable" style="width:100%;min-height:500px;"></div></div>
     </div>
   </div>
-  <div id="editFormModal" style="display:none;padding:20px 30px 0 0;">
-    <form class="layui-form" lay-filter="editForm">
-      <div class="layui-form-item"><label class="layui-form-label">SKU</label><div class="layui-input-block"><input type="text" name="sku" required lay-verify="required" placeholder="请输入SKU" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">产品中文名</label><div class="layui-input-block"><input type="text" name="name" required lay-verify="required" placeholder="请输入产品中文名" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">网页链接</label><div class="layui-input-block"><input type="url" name="url" placeholder="请输入网页链接" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">初始库存</label><div class="layui-input-block"><input type="number" name="initialStock" required lay-verify="required|number" placeholder="请输入初始库存数量" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">日期</label><div class="layui-input-block"><input type="text" name="date" required lay-verify="required|date" placeholder="如 2024-07-18 11:30" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">库存</label><div class="layui-input-block"><input type="number" name="stock" required lay-verify="required|number" placeholder="请输入库存数量" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">店铺订单时间</label><div class="layui-input-block"><input type="text" name="orderTime" placeholder="请输入店铺订单时间" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">尺码</label><div class="layui-input-block"><input type="text" name="size" placeholder="请输入尺码" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">标题</label><div class="layui-input-block"><input type="text" name="title" placeholder="请输入商品标题" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">商品数量</label><div class="layui-input-block"><input type="number" name="quantity" placeholder="请输入商品数量" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">商品单价</label><div class="layui-input-block"><input type="number" name="unitPrice" step="0.01" placeholder="请输入商品单价" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><label class="layui-form-label">订单金额</label><div class="layui-input-block"><input type="number" name="totalAmount" step="0.01" placeholder="请输入订单金额" autocomplete="off" class="layui-input"></div></div>
-      <div class="layui-form-item"><div class="layui-input-block"><button class="layui-btn" lay-submit lay-filter="submitEdit">保存</button></div></div>
-    </form>
-  </div>
+  <!-- 注意：行记录编辑表单已被移除，系统现在只使用宽表模式 -->
   <script src="./src/modules/jquery.js"></script>
   <script src="./src/layui.js"></script>
   <script src="./api-config.js"></script>
@@ -470,7 +454,7 @@
         return data;
       }
       $('#clearOldDataBtn').on('click', function() {
-        layer.confirm('确定要清理5天前的数据吗？清理后的数据将移动到历史记录中。', function(index) {
+        layer.confirm('确定要清理5天前的数据吗？', function(index) {
           var token = localStorage.getItem('token');
           var headers = {};
           if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -501,37 +485,7 @@
           layer.close(index);
         });
       });
-      form.on('submit(submitEdit)', function(formObj){
-        var editId = $('#editFormModal').data('editId');
-        var method = editId ? 'PUT' : 'POST';
-        var url = window.apiConfig.baseURL + '/api/tmall-orders/records' + (editId ? ('/'+editId) : '');
-        var data = {
-          SKU: formObj.field.sku,
-          '产品中文名': formObj.field.name,
-          '网页链接': formObj.field.url,
-          '初始库存': formObj.field.initialStock,
-          '日期': formObj.field.date,
-          '库存': formObj.field.stock,
-          '店铺订单时间': formObj.field.orderTime,
-          '尺码': formObj.field.size,
-          '标题': formObj.field.title,
-          '商品数量': formObj.field.quantity,
-          '商品单价': formObj.field.unitPrice,
-          '订单金额': formObj.field.totalAmount
-        };
-        var token = localStorage.getItem('token');
-        var headers = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = 'Bearer ' + token;
-        $.ajax({
-          url: url,
-          type: method,
-          headers: headers,
-          data: JSON.stringify(data),
-          success: function(res){ if(res.success){ layer.msg('保存成功', {icon:1}); layer.closeAll(); }else{ layer.msg('保存失败: '+res.error, {icon:2}); } },
-          error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('保存失败', {icon:2}); } }
-        });
-        return false;
-      });
+      // 注意：行记录编辑功能已被移除，系统现在只使用宽表模式
       initTmallTable();
     });
     function logout() {
