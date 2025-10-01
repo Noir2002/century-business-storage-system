@@ -1,9 +1,119 @@
 // 简化的Cloudflare Workers - 专注于Excel文件上传到R2
-// 轻量级内存缓存：用于在同一 Worker 实例中暂存“宽表”数据，便于上传后即时刷新
+// 轻量级内存缓存：用于在同一 Worker 实例中暂存"宽表"数据，便于上传后即时刷新
+
+// Excel处理函数（简化版，不依赖外部库）
+function arrayToExcelBuffer(data) {
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('数据为空或格式错误');
+  }
+
+  // 获取所有列名
+  const columns = new Set();
+  data.forEach(row => {
+    Object.keys(row).forEach(key => columns.add(key));
+  });
+  const columnList = Array.from(columns);
+
+  // 创建CSV内容（简单替代方案）
+  let csvContent = columnList.join(',') + '\n';
+
+  data.forEach(row => {
+    const values = columnList.map(col => {
+      const value = row[col];
+      if (value === null || value === undefined) return '';
+      return typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : String(value);
+    });
+    csvContent += values.join(',') + '\n';
+  });
+
+  // 返回UTF-8编码的Buffer
+  return new TextEncoder().encode(csvContent).buffer;
+}
+
+// 解析CSV文本为数组对象
+function parseCSVToArray(csvText) {
+  if (!csvText || typeof csvText !== 'string') {
+    return [];
+  }
+
+  const lines = csvText.split('\n').filter(line => line.trim());
+  if (lines.length < 2) {
+    return [];
+  }
+
+  // 第一行是标题
+  const headers = parseCSVLine(lines[0]);
+  if (headers.length === 0) {
+    return [];
+  }
+
+  const result = [];
+
+  // 处理数据行
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCSVLine(lines[i]);
+    if (values.length === headers.length) {
+      const row = {};
+      headers.forEach((header, index) => {
+        const value = values[index];
+        // 尝试转换为数字或保持字符串
+        if (value === '') {
+          row[header] = '';
+        } else if (!isNaN(value) && value !== '') {
+          // 检查是否为整数
+          if (value.indexOf('.') === -1) {
+            row[header] = parseInt(value, 10);
+          } else {
+            row[header] = parseFloat(value);
+          }
+        } else {
+          row[header] = value;
+        }
+      });
+      result.push(row);
+    }
+  }
+
+  return result;
+}
+
+// 解析CSV行，处理引号和逗号
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        // 双引号转义
+        current += '"';
+        i++; // 跳过下一个引号
+      } else {
+        // 开始或结束引号
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // 字段分隔符
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  // 添加最后一个字段
+  result.push(current);
+
+  return result;
+}
 let wideTableCache = [];
 let recordsCache = [];
 let tmallWideCache = [];
 const WIDE_TABLE_R2_KEY = 'wide/latest.json';
+const WIDE_TABLE_EXCEL_R2_KEY = 'wide/latest.xlsx';
 const RECORDS_R2_KEY = 'records/latest.json';
 const TMALL_WIDE_R2_KEY = 'tmall/wide.json';
 
@@ -55,13 +165,23 @@ async function archiveOldDatesToRecords(env, keepDays = 5) {
     if (!Array.isArray(recordsCache)) recordsCache = [];
     // 新归档的放到最前面
     recordsCache = [...archived, ...recordsCache];
-    // 持久化两份数据
-    if (env && env.R2_BUCKET) {
-      try {
-        await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), { httpMetadata: { contentType: 'application/json' } });
-        await env.R2_BUCKET.put(RECORDS_R2_KEY, JSON.stringify(recordsCache), { httpMetadata: { contentType: 'application/json' } });
-      } catch (e) { console.warn('归档持久化失败:', e); }
-    }
+        // 持久化三份数据：JSON、Excel和记录
+        if (env && env.R2_BUCKET) {
+          try {
+            // 保存JSON格式（向后兼容）
+            await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), { httpMetadata: { contentType: 'application/json' } });
+            await env.R2_BUCKET.put(RECORDS_R2_KEY, JSON.stringify(recordsCache), { httpMetadata: { contentType: 'application/json' } });
+
+            // 保存Excel格式（新的主要存储方式）
+            if (wideTableCache.length > 0) {
+              const excelBuffer = arrayToExcelBuffer(wideTableCache);
+              await env.R2_BUCKET.put(WIDE_TABLE_EXCEL_R2_KEY, excelBuffer, {
+                httpMetadata: { contentType: 'text/csv; charset=utf-8' }
+              });
+              console.log('✅ Excel文件已保存到R2:', WIDE_TABLE_EXCEL_R2_KEY);
+            }
+          } catch (e) { console.warn('归档持久化失败:', e); }
+        }
   }
 }
 
@@ -252,12 +372,12 @@ async function handlePackageUpload(request, env, corsHeaders) {
 // 处理Excel文件上传
 async function handleExcelUpload(request, env, corsHeaders) {
   console.log('🔄 处理Excel文件上传...');
-  
+
   try {
     const formData = await request.formData();
     const file = formData.get('file');
     const description = formData.get('description') || '';
-    
+
     if (!file) {
       return Response.json({
         success: false,
@@ -279,7 +399,7 @@ async function handleExcelUpload(request, env, corsHeaders) {
     const fileExtension = getFileExtension(file.name);
     const fileName = `${timestamp}-${randomSuffix}.${fileExtension}`;
     const filePath = `arc/${fileName}`;
-    
+
     console.log(`📁 上传文件路径: ${filePath}`);
 
     // 上传到R2
@@ -298,7 +418,7 @@ async function handleExcelUpload(request, env, corsHeaders) {
     } else {
       throw new Error('R2存储桶不可用');
     }
-    
+
     // 构建文件信息
     const fileInfo = {
       id: timestamp,
@@ -311,23 +431,23 @@ async function handleExcelUpload(request, env, corsHeaders) {
       r2Path: filePath,
       publicUrl: `https://23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/century-business-system/${filePath}`
     };
-    
+
     console.log('✅ 文件上传成功:', fileInfo);
-    
+
     return Response.json({
       success: true,
       message: '文件上传成功',
       file: fileInfo
     }, { headers: corsHeaders });
-    
+
   } catch (error) {
     console.error('❌ 文件上传失败:', error);
     return Response.json({
       success: false,
       error: `文件上传失败: ${error.message}`
-    }, { 
+    }, {
       status: 500,
-      headers: corsHeaders 
+      headers: corsHeaders
     });
   }
 }
@@ -868,17 +988,29 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
   try {
     // 宽表相关API
     if (path === '/api/localdb/wide' && method === 'GET') {
-      // 返回宽表数据：优先内存；若为空则尝试从R2读取并缓存
+      // 返回宽表数据：优先内存；若为空则尝试从R2读取并缓存（优先Excel格式）
       let data = Array.isArray(wideTableCache) ? wideTableCache : [];
       if ((!data || data.length === 0) && env.R2_BUCKET) {
         try {
-          const obj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY);
-          if (obj) {
-            const text = await obj.text();
-            const parsed = JSON.parse(text);
-            if (Array.isArray(parsed)) {
-              wideTableCache = parsed;
-              data = parsed;
+          // 优先尝试读取Excel格式
+          let excelObj = await env.R2_BUCKET.get(WIDE_TABLE_EXCEL_R2_KEY);
+          if (excelObj) {
+            const csvText = new TextDecoder('utf-8').decode(excelObj.body);
+            data = parseCSVToArray(csvText);
+            if (Array.isArray(data) && data.length > 0) {
+              wideTableCache = data;
+              console.log('✅ 从Excel文件加载宽表数据成功:', data.length, '条记录');
+            }
+          } else {
+            // 如果没有Excel文件，回退到JSON格式
+            const jsonObj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY);
+            if (jsonObj) {
+              const text = await jsonObj.text();
+              const parsed = JSON.parse(text);
+              if (Array.isArray(parsed)) {
+                wideTableCache = parsed;
+                data = parsed;
+              }
             }
           }
         } catch (e) { console.warn('读取R2宽表失败:', e); }
@@ -915,13 +1047,23 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           console.log('🔄 为新导入数据生成了', recordsCache.length, '条测试历史记录');
         }
         
-        // 持久化到R2
+        // 持久化到R2（JSON和Excel格式）
         if (env.R2_BUCKET) {
           try {
+            // 保存JSON格式
             await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), {
               httpMetadata: { contentType: 'application/json' },
               customMetadata: { updatedAt: new Date().toISOString() }
             });
+
+            // 保存Excel格式
+            if (wideTableCache.length > 0) {
+              const excelBuffer = arrayToExcelBuffer(wideTableCache);
+              await env.R2_BUCKET.put(WIDE_TABLE_EXCEL_R2_KEY, excelBuffer, {
+                httpMetadata: { contentType: 'text/csv; charset=utf-8' },
+                customMetadata: { updatedAt: new Date().toISOString() }
+              });
+            }
             
             // 同时保存历史记录到R2
             if (Array.isArray(recordsCache) && recordsCache.length > 0) {
@@ -946,22 +1088,47 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
     }
     
     else if (path === '/api/localdb/wide/export' && method === 'GET') {
-      // 导出宽表数据：仅导出真实数据，必要时从R2回填
+      // 导出宽表数据：优先从Excel文件导出
       let data = Array.isArray(wideTableCache) ? wideTableCache : [];
+
       if ((!data || data.length === 0) && env.R2_BUCKET) {
         try {
-          const obj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY);
-          if (obj) {
-            const text = await obj.text();
-            const parsed = JSON.parse(text);
-            if (Array.isArray(parsed)) {
-              wideTableCache = parsed;
-              data = parsed;
+          // 优先尝试读取Excel格式
+          const excelObj = await env.R2_BUCKET.get(WIDE_TABLE_EXCEL_R2_KEY);
+          if (excelObj) {
+            const csvText = new TextDecoder('utf-8').decode(excelObj.body);
+            data = parseCSVToArray(csvText);
+            console.log('✅ 从Excel文件导出宽表数据成功:', data.length, '条记录');
+          } else {
+            // 如果没有Excel文件，回退到JSON格式
+            const jsonObj = await env.R2_BUCKET.get(WIDE_TABLE_R2_KEY);
+            if (jsonObj) {
+              const text = await jsonObj.text();
+              const parsed = JSON.parse(text);
+              if (Array.isArray(parsed)) {
+                data = parsed;
+              }
             }
           }
         } catch (e) { console.warn('读取R2宽表失败:', e); }
       }
-      return Response.json({ success: true, data, message: '宽表数据导出成功' }, { headers: corsHeaders });
+
+      if (data.length === 0) {
+        return Response.json({ success: false, error: '没有数据可导出' }, { status: 404, headers: corsHeaders });
+      }
+
+      // 生成Excel文件并返回
+      try {
+        const excelBuffer = arrayToExcelBuffer(data);
+        const headers = new Headers(corsHeaders);
+        headers.set('Content-Type', 'text/csv; charset=utf-8');
+        headers.set('Content-Disposition', 'attachment; filename="inventory-data.csv"');
+
+        return new Response(excelBuffer, { headers });
+      } catch (error) {
+        console.error('生成Excel文件失败:', error);
+        return Response.json({ success: false, error: '导出失败: ' + error.message }, { status: 500, headers: corsHeaders });
+      }
     }
     
     else if (path === '/api/localdb/wide/batch' && method === 'POST') {
@@ -994,14 +1161,24 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
             }
 
             wideTableCache = processedData;
-            // 计算销量并持久化到R2
+            // 计算销量并持久化到R2（JSON和Excel格式）
             wideTableCache = computeSalesForWideTableRows(wideTableCache);
             if (env.R2_BUCKET) {
               try {
+                // 保存JSON格式
                 await env.R2_BUCKET.put(WIDE_TABLE_R2_KEY, JSON.stringify(wideTableCache), {
                   httpMetadata: { contentType: 'application/json' },
                   customMetadata: { updatedAt: new Date().toISOString() }
                 });
+
+                // 保存Excel格式
+                if (wideTableCache.length > 0) {
+                  const excelBuffer = arrayToExcelBuffer(wideTableCache);
+                  await env.R2_BUCKET.put(WIDE_TABLE_EXCEL_R2_KEY, excelBuffer, {
+                    httpMetadata: { contentType: 'text/csv; charset=utf-8' },
+                    customMetadata: { updatedAt: new Date().toISOString() }
+                  });
+                }
               } catch (e) { console.warn('写入R2宽表失败:', e); }
             }
             // 不自动归档，保持列结构不变
