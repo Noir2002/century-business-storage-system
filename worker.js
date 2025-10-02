@@ -405,7 +405,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           // 优先尝试读取Excel格式
           let excelObj = await env.R2_BUCKET.get(WIDE_TABLE_EXCEL_R2_KEY);
           if (excelObj) {
-            const csvText = new TextDecoder('utf-8').decode(excelObj.body);
+            const csvText = await excelObj.text();
             data = parseCSVToArray(csvText);
             if (Array.isArray(data) && data.length > 0) {
               wideTableCache = data;
@@ -487,7 +487,7 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
           // 优先尝试读取Excel格式
           const excelObj = await env.R2_BUCKET.get(WIDE_TABLE_EXCEL_R2_KEY);
           if (excelObj) {
-            const csvText = new TextDecoder('utf-8').decode(excelObj.body);
+            const csvText = await excelObj.text();
             data = parseCSVToArray(csvText);
             console.log('✅ 从Excel文件导出宽表数据成功:', data.length, '条记录');
           } else {
@@ -630,7 +630,7 @@ async function handleTmallOrders(request, env, path, method, corsHeaders) {
           // 优先尝试读取Excel(CSV)格式
           const excelObj = await env.R2_BUCKET.get(TMALL_WIDE_EXCEL_R2_KEY);
           if (excelObj) {
-            const csvText = new TextDecoder('utf-8').decode(excelObj.body);
+            const csvText = await excelObj.text();
             data = parseCSVToArray(csvText);
             if (Array.isArray(data) && data.length > 0) {
               tmallWideCache = data;
@@ -733,7 +733,7 @@ async function handleTmallOrders(request, env, path, method, corsHeaders) {
         try {
           const excelObj = await env.R2_BUCKET.get(TMALL_WIDE_EXCEL_R2_KEY);
           if (excelObj) {
-            const csvText = new TextDecoder('utf-8').decode(excelObj.body);
+            const csvText = await excelObj.text();
             data = parseCSVToArray(csvText);
             console.log('✅ 从Excel文件导出天猫宽表数据成功:', data.length, '条记录');
           } else {
