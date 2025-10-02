@@ -888,7 +888,7 @@
                     <label for="databaseFile">选择 Excel 数据库文件：</label>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="file" id="databaseFile" accept=".xlsx,.xls" onchange="importDatabase()">
-                        <button onclick="importDatabase()" class="btn btn-primary">📥 导入数据库</button>
+                        <button onclick="openDatabasePicker()" class="btn btn-primary">📥 导入数据库</button>
                     </div>
                 </div>
 
@@ -1475,6 +1475,21 @@
             } catch (error) {
                 console.error('创建当日文件夹失败:', error);
                 showStatus('databaseStatus', `⚠️ 文件夹创建失败: ${error.message}`, 'warning');
+            }
+        }
+
+        // 打开文件选择并导入（无选中文件时先唤起文件选择）
+        function openDatabasePicker() {
+            try {
+                const input = document.getElementById('databaseFile');
+                if (!input) return;
+                if (!input.files || input.files.length === 0) {
+                    input.click();
+                    return;
+                }
+                importDatabase();
+            } catch (e) {
+                showStatus('databaseStatus', `❌ 无法打开文件选择：${e.message}`, 'error');
             }
         }
 
