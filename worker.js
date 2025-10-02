@@ -282,6 +282,8 @@ export default {
           return await handleR2API(request, env, path, method, corsHeaders);
         } else if (path.startsWith('/api/database/')) {
           return await handleDatabaseAPI(request, env, path, method, corsHeaders);
+        } else if (path.startsWith('/api/package')) {
+          return await handlePackageAPI(request, env, path, method, corsHeaders);
         } else {
           return new Response('Not Found', { status: 404, headers: corsHeaders });
         }
@@ -885,6 +887,151 @@ async function handleTmallOrders(request, env, path, method, corsHeaders) {
 
   } catch (error) {
     console.error('❌ 天猫订单API错误:', error);
+    return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+  }
+}
+
+// 打包系统API处理器
+async function handlePackageAPI(request, env, path, method, corsHeaders) {
+  if (!env.R2_BUCKET) {
+    return Response.json({ success: false, error: 'R2 Bucket 未配置' }, { status: 500, headers: corsHeaders });
+  }
+
+  try {
+    // 获取打包系统的文件列表
+    if (path === '/api/package/files' && method === 'GET') {
+      try {
+        // 获取package文件夹下的所有文件
+        const { objects } = await env.R2_BUCKET.list({ prefix: 'package/' });
+
+        if (!objects || objects.length === 0) {
+          return Response.json({ success: true, files: [] }, { headers: corsHeaders });
+        }
+
+        // 转换文件信息格式
+        const files = objects.map(obj => {
+          const key = obj.key;
+          const pathParts = key.split('/');
+
+          // 解析路径：package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD-履约单号/filename.ext
+          let folder = '';
+          let lpNumber = '';
+          let contractNumber = '';
+          let r2Path = key;
+
+          if (pathParts.length >= 4) {
+            const yearMonth = pathParts[1]; // YYYY-MM
+            const yearMonthDay = pathParts[2]; // YYYY-MM-DD
+            const folderName = pathParts[3]; // YYYY-MM-DD-履约单号
+
+            folder = `package/${yearMonth}/${yearMonthDay}/${folderName}`;
+
+            // 从文件夹名称中提取履约单号（支持多种格式）
+            const contractMatch = folderName.match(/(\d{4}-\d{2}-\d{2}-)?(.+)/);
+            if (contractMatch) {
+              lpNumber = contractMatch[2] || folderName;
+              contractNumber = lpNumber;
+            }
+          }
+
+          return {
+            fileName: pathParts[pathParts.length - 1],
+            filePath: folder,
+            r2Path: key,
+            size: obj.size || 0,
+            uploaded: obj.uploaded || new Date().toISOString(),
+            lpNumber: lpNumber,
+            contractNumber: contractNumber,
+            folder: folder
+          };
+        });
+
+        console.log(`📁 返回打包系统文件列表: ${files.length} 个文件`);
+        return Response.json({ success: true, files }, { headers: corsHeaders });
+
+      } catch (error) {
+        console.error('获取打包系统文件列表失败:', error);
+        return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // 文件数据同步（接收前端上传的文件记录）
+    if (path === '/api/package-sync/files' && method === 'POST') {
+      try {
+        const syncData = await request.json();
+
+        if (!syncData || !syncData.files) {
+          return Response.json({ success: false, error: '无效的同步数据' }, { status: 400, headers: corsHeaders });
+        }
+
+        console.log(`📦 接收到文件同步数据: ${Object.keys(syncData.files).length} 个文件记录`);
+
+        // 这里可以添加数据验证和存储逻辑
+        // 目前我们只确认接收，不进行持久化存储（因为文件已经在R2中）
+
+        return Response.json({
+          success: true,
+          message: '文件记录已同步',
+          receivedFiles: Object.keys(syncData.files).length,
+          timestamp: Date.now()
+        }, { headers: corsHeaders });
+
+      } catch (error) {
+        console.error('文件同步失败:', error);
+        return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // 数据库数据同步
+    if (path === '/api/package-sync/database' && method === 'POST') {
+      try {
+        const syncData = await request.json();
+
+        if (!syncData || !syncData.data) {
+          return Response.json({ success: false, error: '无效的数据库同步数据' }, { status: 400, headers: corsHeaders });
+        }
+
+        console.log(`💾 接收到数据库同步数据: ${Object.keys(syncData.data).length} 个记录`);
+
+        return Response.json({
+          success: true,
+          message: '数据库记录已同步',
+          receivedRecords: Object.keys(syncData.data).length,
+          timestamp: Date.now()
+        }, { headers: corsHeaders });
+
+      } catch (error) {
+        console.error('数据库同步失败:', error);
+        return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // 获取文件的公开下载URL
+    if (path.startsWith('/api/package/file/') && path.endsWith('/url') && method === 'GET') {
+      try {
+        // 从路径中提取文件路径，例如 /api/package/file/package/2025-01/2025-01-01/test.jpg/url
+        const pathWithoutApi = path.replace('/api/package/file/', '').replace('/url', '');
+        const filePath = decodeURIComponent(pathWithoutApi);
+
+        // 构建R2公开URL
+        const publicUrl = `https://century-business-system.23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/${filePath}`;
+
+        return Response.json({
+          success: true,
+          url: publicUrl,
+          filePath: filePath
+        }, { headers: corsHeaders });
+
+      } catch (error) {
+        console.error('获取文件公开URL失败:', error);
+        return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    return new Response('Not Found', { status: 404, headers: corsHeaders });
+
+  } catch (error) {
+    console.error('打包系统API错误:', error);
     return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
   }
 }

@@ -2163,8 +2163,11 @@
                 saveFilesToLocal();
                 console.log('📊 保存后文件记录数量:', uploadedFiles.size);
                 
-                // 同步文件注册表到服务器
-                syncFilesToServer().catch(error => {
+                // 同步文件注册表到服务器并刷新文件列表
+                Promise.all([
+                    syncFilesToServer(),
+                    loadServerFiles()  // 重新从R2加载最新文件列表
+                ]).catch(error => {
                     console.warn('文件注册表同步失败:', error);
                 });
                 
@@ -3924,18 +3927,30 @@
                             }
                         }
                         
+                        // 获取文件的公开URL
+                        let publicUrl = '';
+                        try {
+                            const urlResponse = await fetch(`${baseURL}/api/package/file/${encodeURIComponent(file.r2Path)}/url`);
+                            if (urlResponse.ok) {
+                                const urlResult = await urlResponse.json();
+                                if (urlResult.success) {
+                                    publicUrl = urlResult.url;
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('获取文件公开URL失败:', e);
+                        }
+
                         const fileRecord = {
-                            name: file.originalName || file.fileName,
+                            name: file.fileName,
                             fileName: file.fileName,
-                            folder: folder,
-                            lpNumber: '', // R2中没有LP号信息
-                            contractNumber: contractNumber,
+                            folder: file.folder || folder,
+                            lpNumber: file.lpNumber || '',
+                            contractNumber: file.contractNumber || contractNumber,
                             size: file.size,
-                            url: file.publicUrl || '',
-                            downloadUrl: `${baseURL}/api/package/${file.id}/download`,
-                            uploadTime: file.uploadTime,
-                            r2Path: file.r2Path,
-                            id: file.id
+                            url: publicUrl,
+                            uploadTime: file.uploaded,
+                            r2Path: file.r2Path
                         };
                         
                         console.log('📝 转换文件记录:', fileRecord);
