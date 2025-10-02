@@ -278,6 +278,8 @@ export default {
           return await handleLocalDB(request, env, path, method, corsHeaders);
         } else if (path.startsWith('/api/tmall-orders/')) {
           return await handleTmallOrders(request, env, path, method, corsHeaders);
+        } else if (path.startsWith('/api/r2/')) {
+          return await handleR2API(request, env, path, method, corsHeaders);
         } else {
           return new Response('Not Found', { status: 404, headers: corsHeaders });
         }
@@ -388,6 +390,75 @@ async function handleExcelUpload(request, env, corsHeaders) {
       status: 500,
       headers: corsHeaders
     });
+  }
+}
+
+// 处理打包系统用到的R2 API（目录/上传/列出/删除/公共URL）
+async function handleR2API(request, env, path, method, corsHeaders) {
+  if (!env.R2_BUCKET) {
+    return Response.json({ success: false, error: 'R2 Bucket 未配置' }, { status: 500, headers: corsHeaders });
+  }
+
+  try {
+    // 列出文件：/api/r2/list-files?folder=package&prefix=2025-10/02&limit=1000
+    if (path === '/api/r2/list-files' && method === 'GET') {
+      const url = new URL(request.url);
+      const folder = url.searchParams.get('folder') || '';
+      const prefix = url.searchParams.get('prefix') || '';
+      const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+      const realPrefix = folder ? `${folder}/${prefix}`.replace(/\/$/, '') : prefix;
+
+      const { objects } = await env.R2_BUCKET.list({ prefix: realPrefix || undefined, limit });
+      const files = (objects || []).map(obj => ({ key: obj.key, size: obj.size, uploaded: obj.uploaded ? new Date(obj.uploaded).toISOString() : null }));
+      return Response.json({ success: true, files }, { headers: corsHeaders });
+    }
+
+    // 删除文件：/api/r2/delete/:key
+    if (path.startsWith('/api/r2/delete/') && method === 'DELETE') {
+      const key = decodeURIComponent(path.replace('/api/r2/delete/', ''));
+      await env.R2_BUCKET.delete(key);
+      return Response.json({ success: true, message: `已删除 ${key}` }, { headers: corsHeaders });
+    }
+
+    // 获取公共URL：/api/r2/public-url/:key?folder=package
+    if (path.startsWith('/api/r2/public-url/') && method === 'GET') {
+      const url = new URL(request.url);
+      const folder = url.searchParams.get('folder') || '';
+      const keyPart = decodeURIComponent(path.replace('/api/r2/public-url/', ''));
+      const key = folder ? `${folder}/${keyPart}` : keyPart;
+      // 直接返回 R2 公共域的URL（需在 R2 侧配置公开访问或经CF代理）
+      const publicUrl = `https://century-business-system.23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/${key}`;
+      return Response.json({ success: true, url: publicUrl }, { headers: corsHeaders });
+    }
+
+    // 上传文件（multipart）：/api/r2/upload/package/:path
+    if (path.startsWith('/api/r2/upload/') && method === 'POST') {
+      const folderAndPath = decodeURIComponent(path.replace('/api/r2/upload/', '')); // e.g. package/2025-10/2025-10-02/file.ext
+      const formData = await request.formData();
+      const file = formData.get('file');
+      if (!file) {
+        return Response.json({ success: false, error: '缺少文件' }, { headers: corsHeaders });
+      }
+
+      await env.R2_BUCKET.put(folderAndPath, file.stream(), {
+        httpMetadata: { contentType: file.type || 'application/octet-stream' },
+        customMetadata: { uploadedAt: new Date().toISOString() }
+      });
+
+      return Response.json({ success: true, message: '上传成功', filePath: folderAndPath, size: file.size }, { headers: corsHeaders });
+    }
+
+    // 测试连接
+    if (path === '/api/r2/test-connection' && method === 'GET') {
+      const { objects } = await env.R2_BUCKET.list({ limit: 1 });
+      return Response.json({ success: true, message: 'R2 可用', sample: (objects && objects[0]) ? objects[0].key : null }, { headers: corsHeaders });
+    }
+
+    return new Response('Not Found', { status: 404, headers: corsHeaders });
+
+  } catch (error) {
+    console.error('R2 API 错误:', error);
+    return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
   }
 }
 

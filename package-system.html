@@ -2024,7 +2024,7 @@
                         formData.append('file', file);
                         formData.append('description', `LP号:${lpNumber} 文件夹:${fullFolderPath}`);
                         
-                        const baseURL = getBaseURL();
+                        const baseURL = getBaseURL ? getBaseURL() : '';
                         const uploadResponse = await fetch(`${baseURL}/api/r2/upload/package/${encodeURIComponent(fullFolderPath)}/${encodeURIComponent(fileName)}`, {
                             method: 'POST',
                             body: formData
@@ -2039,26 +2039,31 @@
                             throw new Error(uploadResult.error || '上传失败');
                         }
                         
+                        // 适配 /api/r2/upload 返回结构
+                        const filePath = uploadResult.filePath || `${fullFolderPath}/${fileName}`;
+                        const publicUrl = await window.r2PackageStorage.getPublicUrl(filePath);
+
                         // 生成文件记录
                         const fileRecord = {
                             name: file.name,
-                            fileName: uploadResult.file.fileName,
-                            folder: fullFolderPath, // 使用完整的文件夹路径
+                            fileName: fileName,
+                            folder: fullFolderPath,
                             lpNumber: lpNumber || '',
                             contractNumber: contractNumber || '',
                             size: file.size,
-                            url: uploadResult.file.publicUrl || '',
-                            downloadUrl: `${baseURL}/api/package/${uploadResult.file.id}/download`,
-                            uploadTime: uploadResult.file.uploadTime || new Date().toISOString(),
-                            r2Path: uploadResult.file.r2Path,
-                            id: uploadResult.file.id
+                            url: publicUrl || '',
+                            downloadUrl: '',
+                            uploadTime: new Date().toISOString(),
+                            r2Path: filePath,
+                            id: filePath
                         };
                         
                         console.log('📝 生成文件记录:', fileRecord);
                         
-                        uploadedFiles.set(uploadResult.file.fileName, fileRecord);
+                        // 使用 R2 对象完整key作为Map键值，便于后续删除
+                        uploadedFiles.set(filePath, fileRecord);
                         successCount++;
-                        console.log(`✅ 文件上传成功: ${file.name} -> ${uploadResult.file.fileName}`);
+                        console.log(`✅ 文件上传成功: ${file.name} -> ${filePath}`);
                         console.log(`📝 文件记录已保存:`, fileRecord);
                         
                         // 立即保存到本地存储，防止丢失
