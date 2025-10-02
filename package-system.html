@@ -1644,11 +1644,42 @@
                 databaseImportDate = new Date().toISOString();
                 localStorage.setItem(STORAGE_KEYS.DATABASE_DATE, databaseImportDate);
 
-                // 保存到本地存储并同步到服务器
+                // 保存到本地存储
                 saveDatabaseToLocal();
-                syncDatabaseToServer().catch(error => {
-                    console.warn('同步到服务器失败:', error);
-                });
+                // 同步到服务器R2（共享）：database/YYYY-MM/YYYY-MM-DD.xlsx 与 database/latest.json
+                try {
+                    const y = today.getFullYear();
+                    const m = String(today.getMonth() + 1).padStart(2, '0');
+                    const d = String(today.getDate()).padStart(2, '0');
+                    const ym = `${y}-${m}`;
+                    const ymd = `${y}-${m}-${d}`;
+
+                    // 1) 上传原始Excel到 database/YYYY-MM/YYYY-MM-DD.xlsx
+                    const excelName = `${ymd}.xlsx`;
+                    const excelFolder = `database/${ym}`;
+                    const excelForm = new FormData();
+                    excelForm.append('file', file);
+                    const baseURL = getBaseURL ? getBaseURL() : '';
+                    const upRes = await fetch(`${baseURL}/api/r2/upload/${encodeURIComponent(excelFolder)}/${encodeURIComponent(excelName)}`, { method: 'POST', body: excelForm });
+                    if (!upRes.ok) throw new Error(`Excel上传失败: ${upRes.status}`);
+                    const upJson = await upRes.json();
+                    if (!upJson.success) throw new Error(upJson.error || 'Excel上传失败');
+
+                    // 2) 写入最新JSON：database/latest.json（包含数据与时间）
+                    const latest = {
+                        updatedAt: new Date().toISOString(),
+                        records: Array.from(databaseData.entries())
+                    };
+                    const latestBlob = new Blob([JSON.stringify(latest)], { type: 'application/json' });
+                    const latestForm = new FormData();
+                    latestForm.append('file', latestBlob, 'latest.json');
+                    const upJsonRes = await fetch(`${baseURL}/api/r2/upload/${encodeURIComponent('database')}/${encodeURIComponent('latest.json')}`, { method: 'POST', body: latestForm });
+                    if (!upJsonRes.ok) throw new Error(`latest.json上传失败: ${upJsonRes.status}`);
+                    const upJsonData = await upJsonRes.json();
+                    if (!upJsonData.success) throw new Error(upJsonData.error || 'latest.json上传失败');
+                } catch (syncErr) {
+                    console.warn('共享数据库同步失败:', syncErr);
+                }
 
                 // 强制更新显示
                 updateDatabaseDisplay();
@@ -1693,6 +1724,30 @@
                 updatePackingInfo();
             }
         }
+        // 启动时尝试从共享R2加载最新数据库（若本地无数据）
+        async function tryLoadSharedDatabase() {
+            try {
+                if (databaseData.size > 0) return; // 本地已有数据则跳过
+                const baseURL = getBaseURL ? getBaseURL() : '';
+                const resp = await fetch(`${baseURL}/api/database/latest`, { method: 'GET' });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (!data.success || !Array.isArray(data.records)) return;
+                databaseData.clear();
+                for (const [lp, contract] of data.records) {
+                    databaseData.set(String(lp), String(contract || ''));
+                }
+                databaseImportDate = data.updatedAt || new Date().toISOString();
+                saveDatabaseToLocal();
+                updateDatabaseDisplay();
+                console.log('✅ 已从共享数据库加载最新数据');
+            } catch (e) {
+                console.warn('加载共享数据库失败:', e);
+            }
+        }
+        
+        // 页面初始化时尝试加载共享数据库
+        tryLoadSharedDatabase();
 
         // 删除数据库
         function deleteDatabase() {

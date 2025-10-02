@@ -280,6 +280,8 @@ export default {
           return await handleTmallOrders(request, env, path, method, corsHeaders);
         } else if (path.startsWith('/api/r2/')) {
           return await handleR2API(request, env, path, method, corsHeaders);
+        } else if (path.startsWith('/api/database/')) {
+          return await handleDatabaseAPI(request, env, path, method, corsHeaders);
         } else {
           return new Response('Not Found', { status: 404, headers: corsHeaders });
         }
@@ -458,6 +460,31 @@ async function handleR2API(request, env, path, method, corsHeaders) {
 
   } catch (error) {
     console.error('R2 API 错误:', error);
+    return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+  }
+}
+
+// 数据库（打包系统）共享接口
+async function handleDatabaseAPI(request, env, path, method, corsHeaders) {
+  if (!env.R2_BUCKET) {
+    return Response.json({ success: false, error: 'R2 Bucket 未配置' }, { status: 500, headers: corsHeaders });
+  }
+
+  try {
+    // 获取最新数据库 JSON
+    if (path === '/api/database/latest' && method === 'GET') {
+      const obj = await env.R2_BUCKET.get('database/latest.json');
+      if (!obj) {
+        return Response.json({ success: false, error: '暂无共享数据库' }, { status: 404, headers: corsHeaders });
+      }
+      const text = await obj.text();
+      const json = JSON.parse(text);
+      return Response.json({ success: true, ...json }, { headers: corsHeaders });
+    }
+
+    return new Response('Not Found', { status: 404, headers: corsHeaders });
+  } catch (error) {
+    console.error('Database API 错误:', error);
     return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
   }
 }
