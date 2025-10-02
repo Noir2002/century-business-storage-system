@@ -158,8 +158,7 @@
       <div class="action-buttons">
         <button class="layui-btn layui-btn-primary" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
         <button class="layui-btn layui-btn-danger" id="saveBtn"><i class="layui-icon layui-icon-ok"></i> 保存</button>
-        <button class="layui-btn layui-btn-lg" id="smartImportBtn"><i class="layui-icon layui-icon-magic"></i> 智能导入</button>
-        <button class="layui-btn" id="importBtn"><i class="layui-icon layui-icon-upload"></i> 导入Excel</button>
+        <button class="layui-btn" id="importBtn"><i class="layui-icon layui-icon-upload"></i> 导入Excel（智能）</button>
         <button class="layui-btn" id="exportBtn"><i class="layui-icon layui-icon-download-circle"></i> 导出Excel</button>
         <button class="layui-btn layui-btn-warm" id="downloadTemplateBtn"><i class="layui-icon layui-icon-template"></i> 下载模板</button>
         <button class="layui-btn layui-btn-danger" id="clearAllDataBtn"><i class="layui-icon layui-icon-close"></i> 清空所有数据</button>
@@ -285,88 +284,7 @@
           error: function(xhr) { layer.closeAll(); if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('保存失败', {icon:2}); } }
         });
       });
-      $('#smartImportBtn').on('click', function() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.xlsx,.xls,.csv';
-        input.onchange = async function(e) {
-          const file = e.target.files[0];
-          if (!file) return;
-          try {
-            layer.msg('正在解析Excel...', {icon: 16, time: 0});
-            const data = await parseExcelToWideJSON(file);
-
-            // 先上传原始Excel文件到服务器
-            layer.msg('正在上传文件...', {icon: 16, time: 0});
-
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const token = localStorage.getItem('token');
-            const headers = {};
-            if (token) headers['Authorization'] = 'Bearer ' + token;
-
-            // 上传文件
-            $.ajax({
-              url: window.apiConfig.baseURL + '/api/files/upload',
-              type: 'POST',
-              headers: headers,
-              data: formData,
-              processData: false,
-              contentType: false,
-              success: function(uploadRes) {
-                if(uploadRes.success) {
-                  console.log('✅ 文件上传成功:', uploadRes.file.fileName);
-
-                  // 文件上传成功后，提交解析后的数据
-                  layer.msg('正在提交数据...', {icon: 16, time: 0});
-                  $.ajax({
-                    url: window.apiConfig.baseURL + '/api/tmall-orders/wide/batch',
-                    type: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': token ? 'Bearer ' + token : ''
-                    },
-                    data: JSON.stringify({ data }),
-                    success: function(res) {
-                      layer.closeAll();
-                      if(res.success) {
-                        layer.msg('导入成功', {icon:1});
-                        initTmallTable();
-                      } else {
-                        layer.msg('数据提交失败: ' + (res.error||'未知错误'), {icon:2});
-                      }
-                    },
-                    error: function(xhr) {
-                      layer.closeAll();
-                      if (xhr.status === 401) {
-                        layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; });
-                      } else {
-                        layer.msg('数据提交失败', {icon:2});
-                      }
-                    }
-                  });
-                } else {
-                  layer.closeAll();
-                  layer.msg('文件上传失败: ' + (uploadRes.error||'未知错误'), {icon:2});
-                }
-              },
-              error: function(xhr) {
-                layer.closeAll();
-                if (xhr.status === 401) {
-                  layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; });
-                } else {
-                  layer.msg('文件上传失败', {icon:2});
-                }
-              }
-            });
-          } catch (err) {
-            layer.closeAll();
-            layer.msg('解析失败: ' + err.message, {icon:2});
-          }
-        };
-        input.click();
-      });
+      // 移除单独的“智能导入”按钮，统一到导入按钮
       $('#importBtn').on('click', function() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -378,59 +296,23 @@
             layer.msg('正在解析Excel...', {icon: 16, time: 0});
             const data = await parseExcelToWideJSON(file);
 
-            // 先上传原始Excel文件到服务器
-            layer.msg('正在上传文件...', {icon: 16, time: 0});
-
-            const formData = new FormData();
-            formData.append('file', file);
-
+            // 直接提交解析后的数据用于持久化
             const token = localStorage.getItem('token');
-            const headers = {};
+            const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = 'Bearer ' + token;
-
-            // 上传文件
+            layer.msg('正在提交数据...', {icon: 16, time: 0});
             $.ajax({
-              url: window.apiConfig.baseURL + '/api/files/upload',
+              url: window.apiConfig.baseURL + '/api/tmall-orders/wide/batch',
               type: 'POST',
               headers: headers,
-              data: formData,
-              processData: false,
-              contentType: false,
-              success: function(uploadRes) {
-                if(uploadRes.success) {
-                  console.log('✅ 文件上传成功:', uploadRes.file.fileName);
-
-                  // 文件上传成功后，提交解析后的数据
-                  layer.msg('正在提交数据...', {icon: 16, time: 0});
-                  $.ajax({
-                    url: window.apiConfig.baseURL + '/api/tmall-orders/wide/batch',
-                    type: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': token ? 'Bearer ' + token : ''
-                    },
-                    data: JSON.stringify({ data }),
-                    success: function(res) {
-                      layer.closeAll();
-                      if(res.success) {
-                        layer.msg('导入成功', {icon:1});
-                        initTmallTable();
-                      } else {
-                        layer.msg('数据提交失败: ' + (res.error||'未知错误'), {icon:2});
-                      }
-                    },
-                    error: function(xhr) {
-                      layer.closeAll();
-                      if (xhr.status === 401) {
-                        layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; });
-                      } else {
-                        layer.msg('数据提交失败', {icon:2});
-                      }
-                    }
-                  });
+              data: JSON.stringify({ data }),
+              success: function(res) {
+                layer.closeAll();
+                if(res.success) {
+                  layer.msg('导入成功', {icon:1});
+                  initTmallTable();
                 } else {
-                  layer.closeAll();
-                  layer.msg('文件上传失败: ' + (uploadRes.error||'未知错误'), {icon:2});
+                  layer.msg('数据提交失败: ' + (res.error||'未知错误'), {icon:2});
                 }
               },
               error: function(xhr) {
@@ -438,7 +320,7 @@
                 if (xhr.status === 401) {
                   layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; });
                 } else {
-                  layer.msg('文件上传失败', {icon:2});
+                  layer.msg('数据提交失败', {icon:2});
                 }
               }
             });
@@ -549,21 +431,7 @@
         if (!data.length) throw new Error('未识别到有效数据，请检查表头是否包含：店铺订单时间/SKU/商品数量等字段');
         return data;
       }
-      $('#clearOldDataBtn').on('click', function() {
-        layer.confirm('确定要清理5天前的数据吗？', function(index) {
-          var token = localStorage.getItem('token');
-          var headers = {};
-          if (token) headers['Authorization'] = 'Bearer ' + token;
-          $.ajax({
-            url: window.apiConfig.baseURL + '/api/tmall-orders/wide/clear',
-            type: 'POST',
-            headers: headers,
-            success: function(res) { if(res.success) { layer.msg('清理成功: ' + res.message, {icon:1}); initTmallTable(); } else { layer.msg('清理失败: ' + res.error, {icon:2}); } },
-            error: function(xhr) { if (xhr.status === 401) { layer.msg('请先登录', {icon:2}, function(){ window.location.href = 'login.html'; }); } else { layer.msg('清理失败', {icon:2}); } }
-          });
-          layer.close(index);
-        });
-      });
+      // 移除未使用的“清理旧数据”事件
       $('#clearAllDataBtn').on('click', function() {
         layer.confirm('⚠️ 警告：此操作将清空所有天猫订单数据，且无法恢复！确定要继续吗？', {
           icon: 3, title: '确认清空', btn: ['确定清空', '取消']

@@ -1219,12 +1219,13 @@
         }
         
         // 加载本地数据库数据进行分析
-        $.when(
-          $.ajax({url: '/api/localdb/wide', headers: headers})
-        ).done(function(wideRes) {
-          console.log('原始宽表数据:', wideRes[0]);
+        $.ajax({
+          url: window.apiConfig.baseURL + '/api/localdb/wide',
+          headers: headers
+        }).done(function(res) {
+          console.log('原始宽表数据:', res);
           
-          const wideData = wideRes[0].data || [];
+          const wideData = (res && res.data) ? res.data : [];
           const recordData = []; // 不再使用行记录
           
           console.log('处理后的宽表数据长度:', wideData.length);
@@ -1706,10 +1707,11 @@
         var headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
         
-        $.when(
-          $.ajax({url: '/api/localdb/wide', headers: headers})
-        ).done(function(wideRes) {
-          allWideData = wideRes[0].data || [];
+        $.ajax({
+          url: window.apiConfig.baseURL + '/api/localdb/wide',
+          headers: headers
+        }).done(function(res) {
+          allWideData = (res && res.data) ? res.data : [];
           allRecordData = [];
           processHotSlowData();
         }).fail(function() {
@@ -1842,7 +1844,7 @@
         if (token) headers['Authorization'] = 'Bearer ' + token;
         
         $.ajax({
-          url: '/api/tmall-orders/wide',
+          url: window.apiConfig.baseURL + '/api/tmall-orders/wide',
           type: 'GET',
           headers: headers,
           success: function(res) {
