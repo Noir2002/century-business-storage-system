@@ -1431,36 +1431,34 @@
                 }
                 
                 if (!folderExists) {
-                    // 创建空的标记文件来创建文件夹结构
-                    const markerFileName = `${yearMonthDay}-目录已创建.txt`;
+                    // 创建空的标记文件并实际上传到R2，确保云端存在该日期“目录”
+                    const markerFileName = `${yearMonthDay}_README.txt`;
                     const markerContent = `当日打包目录已创建\n创建时间: ${new Date().toLocaleString()}\n待完成打包数量: ${databaseData.size} 个履约单号`;
-                    
-                    // 使用blob创建文件
-                    const markerFile = new File([markerContent], markerFileName, { type: 'text/plain' });
-                    
-                    // 直接创建本地文件记录（不实际上传）
                     try {
-                        console.log('当日文件夹标记创建成功:', folderPath);
-                        
-                        // 更新本地文件记录
-                        const mockUrl = `mock://package/${folderPath}/${markerFileName}`;
+                        const markerBlob = new Blob([markerContent], { type: 'text/plain' });
+                        const formData = new FormData();
+                        formData.append('file', markerBlob, markerFileName);
+                        const baseURLmk = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+                        const upResMk = await fetch(`${baseURLmk}/api/r2/upload/${encodeURIComponent('package')}/${encodeURIComponent(folderPath)}/${encodeURIComponent(markerFileName)}`.replace(/%2F/g,'/'), { method: 'POST', body: formData });
+                        if (!upResMk.ok) throw new Error(`标记文件上传失败: ${upResMk.status}`);
+                        const upJsonMk = await upResMk.json();
+                        if (!upJsonMk.success) throw new Error(upJsonMk.error || '标记文件上传失败');
+
+                        // 更新本地文件记录（云端真实路径）
                         const fileRecord = {
                             fileName: markerFileName,
-                            folder: folderPath,
-                            size: markerFile.size,
+                            folder: `package/${folderPath}`,
+                            size: markerBlob.size,
                             uploadTime: new Date().toISOString(),
-                            url: mockUrl,
+                            url: await window.r2PackageStorage.getPublicUrl(`package/${folderPath}/${markerFileName}`),
                             filePath: `package/${folderPath}/${markerFileName}`,
-                            mockFile: true,
-                            isMarker: true // 标记为目录标记文件
+                            isMarker: true
                         };
-                        
-                        uploadedFiles.set(markerFileName, fileRecord);
+                        uploadedFiles.set(fileRecord.filePath, fileRecord);
                         saveFilesToLocal();
-                        
-                        // 更新显示
                         displayFileList();
                         updatePackingInfo();
+                        console.log('✅ 已在R2创建当日目录标记:', fileRecord.filePath);
                     } catch (error) {
                         console.error('创建文件夹标记失败:', error);
                         throw error;

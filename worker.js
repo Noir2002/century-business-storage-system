@@ -433,9 +433,9 @@ async function handleR2API(request, env, path, method, corsHeaders) {
       return Response.json({ success: true, url: publicUrl }, { headers: corsHeaders });
     }
 
-    // 上传文件（multipart）：/api/r2/upload/package/:path
+    // 上传文件（multipart）：/api/r2/upload/:folder/:subpath... (保持完整层级)
     if (path.startsWith('/api/r2/upload/') && method === 'POST') {
-      const folderAndPath = decodeURIComponent(path.replace('/api/r2/upload/', '')); // e.g. package/2025-10/2025-10-02/file.ext
+      const folderAndPath = decodeURIComponent(path.replace('/api/r2/upload/', '')); // e.g. package/2025-10/2025-10-02/file.ext 或 database/YYYY-MM/YYYY-MM-DD.xlsx
       const formData = await request.formData();
       const file = formData.get('file');
       if (!file) {
