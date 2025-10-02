@@ -1659,8 +1659,8 @@
                     const excelFolder = `database/${ym}`;
                     const excelForm = new FormData();
                     excelForm.append('file', file);
-                    const baseURL = getBaseURL ? getBaseURL() : '';
-                    const upRes = await fetch(`${baseURL}/api/r2/upload/${encodeURIComponent(excelFolder)}/${encodeURIComponent(excelName)}`, { method: 'POST', body: excelForm });
+                    const baseURL1 = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+                    const upRes = await fetch(`${baseURL1}/api/r2/upload/${encodeURIComponent(excelFolder)}/${encodeURIComponent(excelName)}`, { method: 'POST', body: excelForm });
                     if (!upRes.ok) throw new Error(`Excel上传失败: ${upRes.status}`);
                     const upJson = await upRes.json();
                     if (!upJson.success) throw new Error(upJson.error || 'Excel上传失败');
@@ -1673,7 +1673,8 @@
                     const latestBlob = new Blob([JSON.stringify(latest)], { type: 'application/json' });
                     const latestForm = new FormData();
                     latestForm.append('file', latestBlob, 'latest.json');
-                    const upJsonRes = await fetch(`${baseURL}/api/r2/upload/${encodeURIComponent('database')}/${encodeURIComponent('latest.json')}`, { method: 'POST', body: latestForm });
+                    const baseURL2 = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+                    const upJsonRes = await fetch(`${baseURL2}/api/r2/upload/${encodeURIComponent('database')}/${encodeURIComponent('latest.json')}`, { method: 'POST', body: latestForm });
                     if (!upJsonRes.ok) throw new Error(`latest.json上传失败: ${upJsonRes.status}`);
                     const upJsonData = await upJsonRes.json();
                     if (!upJsonData.success) throw new Error(upJsonData.error || 'latest.json上传失败');
@@ -1728,8 +1729,8 @@
         async function tryLoadSharedDatabase() {
             try {
                 if (databaseData.size > 0) return; // 本地已有数据则跳过
-                const baseURL = getBaseURL ? getBaseURL() : '';
-                const resp = await fetch(`${baseURL}/api/database/latest`, { method: 'GET' });
+                const baseURL3 = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+                const resp = await fetch(`${baseURL3}/api/database/latest`, { method: 'GET' });
                 if (!resp.ok) return;
                 const data = await resp.json();
                 if (!data.success || !Array.isArray(data.records)) return;
@@ -2079,7 +2080,7 @@
                         formData.append('file', file);
                         formData.append('description', `LP号:${lpNumber} 文件夹:${fullFolderPath}`);
                         
-                        const baseURL = getBaseURL ? getBaseURL() : '';
+                        const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
                         const uploadResponse = await fetch(`${baseURL}/api/r2/upload/package/${encodeURIComponent(fullFolderPath)}/${encodeURIComponent(fileName)}`, {
                             method: 'POST',
                             body: formData
@@ -3616,7 +3617,7 @@
                 };
                 
                 // 发送到服务器
-                const baseURL = getBaseURL();
+                const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
                 const response = await fetch(`${baseURL}/api/package-sync/database`, {
                     method: 'POST',
                     headers: {
@@ -3693,7 +3694,7 @@
         async function loadDatabaseFromServer() {
             try {
                 // 从服务器加载
-                const baseURL = getBaseURL();
+                const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
                 const response = await fetch(`${baseURL}/api/package-sync/database`);
                 
                 if (!response.ok) {
@@ -3809,7 +3810,7 @@
                 };
                 
                 // 发送到服务器
-                const baseURL = getBaseURL();
+                const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
                 const response = await fetch(`${baseURL}/api/package-sync/files`, {
                     method: 'POST',
                     headers: {
@@ -3874,7 +3875,7 @@
         // 从R2直接加载文件列表
         async function loadServerFiles() {
             try {
-                const baseURL = getBaseURL();
+                const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
                 const response = await fetch(`${baseURL}/api/package/files`);
                 
                 if (!response.ok) {
@@ -3967,7 +3968,7 @@
         async function loadFilesFromServer() {
             try {
                 // 从服务器加载
-                const baseURL = getBaseURL();
+                const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
                 const response = await fetch(`${baseURL}/api/package-sync/files`);
                 
                 if (!response.ok) {
