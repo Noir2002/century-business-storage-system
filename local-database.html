@@ -356,18 +356,15 @@
       </div>
     </div>
     
-    <!-- 模式切换 -->
+    <!-- 模式切换（仅保留宽表） -->
     <div class="mode-switch">
       <button class="layui-btn layui-btn-primary active" id="wideTableMode">
-        <i class="layui-icon layui-icon-table"></i> 宽表模式（最近5天）
-      </button>
-      <button class="layui-btn layui-btn-primary" id="recordMode">
-        <i class="layui-icon layui-icon-list"></i> 行记录模式（历史数据）
+        <i class="layui-icon layui-icon-table"></i> 宽表模式（全部数据）
       </button>
     </div>
     
     <div class="mode-description" id="modeDescription">
-      宽表模式：适合日常快速录入和查看最近5天的数据，支持批量编辑
+      宽表模式：适合管理全部历史数据，支持批量编辑
     </div>
 
     <!-- 宽表模式容器 -->
@@ -376,7 +373,7 @@
         <div class="table-header">
           <div class="table-stats">
             <span>宽表数据管理</span>
-            <span>最近5天库存数据</span>
+            <span>全部历史库存数据</span>
           </div>
         </div>
         <div class="action-buttons">
@@ -425,40 +422,7 @@
       </div>
     </div>
 
-    <!-- 行记录模式容器 -->
-    <div class="record-table-container" id="recordTableContainer">
-      <div class="table-container">
-        <div class="table-header">
-          <div class="table-stats">
-            <span>历史记录管理</span>
-            <span>历史数据查询</span>
-          </div>
-        </div>
-        <div class="action-buttons">
-          <button class="layui-btn" id="addRecordBtn">
-            <i class="layui-icon layui-icon-add-1"></i> 新增记录
-          </button>
-          <button class="layui-btn layui-btn-primary" id="refreshRecordBtn">
-            <i class="layui-icon layui-icon-refresh"></i> 刷新
-          </button>
-          <button class="layui-btn" id="importRecordBtn">
-            <i class="layui-icon layui-icon-upload"></i> 批量导入
-          </button>
-          <button class="layui-btn" id="exportRecordBtn">
-            <i class="layui-icon layui-icon-download-circle"></i> 导出数据
-          </button>
-          <button class="layui-btn layui-btn-warm" id="downloadRecordTemplateBtn">
-            <i class="layui-icon layui-icon-template"></i> 下载模板
-          </button>
-          <button class="layui-btn layui-btn-danger" id="clearAllRecordDataBtn">
-            <i class="layui-icon layui-icon-close"></i> 清空所有数据
-          </button>
-        </div>
-        <div style="padding: 20px;">
-          <table class="layui-hide" id="recordTable" lay-filter="recordTable"></table>
-        </div>
-      </div>
-    </div>
+    
   </div>
 
   <!-- 新增/编辑弹窗 -->
@@ -597,7 +561,7 @@
       var form = layui.form;
       var $ = layui.$;
 
-      var currentMode = 'wide'; // 当前模式：wide 或 record
+      var currentMode = 'wide'; // 仅宽表模式
       var modeVersion = 0; // 用于避免异步回调与销毁实例的竞态
       var hot = null; // Handsontable实例
       var isEditMode = false; // 编辑模式状态
@@ -617,38 +581,21 @@
       var cu = document.getElementById('currentUser');
       if (cu) cu.textContent = userInfo.realname || userInfo.username;
 
-      // 模式切换
+      // 模式切换（仅宽表）
       $('#wideTableMode').on('click', function() {
         switchMode('wide');
       });
 
-      $('#recordMode').on('click', function() {
-        switchMode('record');
-      });
-
       function switchMode(mode) {
-        currentMode = mode;
+        currentMode = 'wide';
         modeVersion++;
-        
-        // 更新按钮状态
+        // 更新按钮状态与描述
         $('.mode-switch .layui-btn').removeClass('active');
-        if (mode === 'wide') {
-          $('#wideTableMode').addClass('active');
-          $('#modeDescription').text('宽表模式：适合日常快速录入和查看最近5天的数据，支持批量编辑');
-        } else {
-          $('#recordMode').addClass('active');
-          $('#modeDescription').text('行记录模式：管理历史数据，支持单条记录操作和批量导入导出');
-        }
-
-        // 切换容器显示
-        $('.wide-table-container, .record-table-container').removeClass('active');
-        if (mode === 'wide') {
-          $('#wideTableContainer').addClass('active');
-          initWideTable();
-        } else {
-          $('#recordTableContainer').addClass('active');
-          initRecordTable();
-        }
+        $('#wideTableMode').addClass('active');
+        $('#modeDescription').text('宽表模式：适合管理全部历史数据，支持批量编辑');
+        // 只显示宽表容器
+        $('.wide-table-container').addClass('active');
+        initWideTable();
       }
 
       // 初始化宽表模式
@@ -658,8 +605,7 @@
           hot = null;
         }
 
-        // 字段定义 - 宽表模式，按日期分列
-        const today = new Date();
+        // 字段定义 - 宽表模式，按数据中出现的全部日期分列
         const columns = [
           {data: 'SKU', type: 'text'},
           {data: '产品中文名', type: 'text'},
@@ -667,23 +613,8 @@
           {data: '初始库存', type: 'numeric'}
         ];
         const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存'];
-        
-        // 生成最近5天的列（库存和销量）
-        for (let i = 4; i >= 0; i--) {
-          const date = new Date(today);
-          date.setDate(date.getDate() - i);
-          const dateStr = date.toISOString().split('T')[0];
-          
-          // 库存列
-          columns.push({data: dateStr, type: 'numeric'});
-          colHeaders.push(dateStr + '(库存)');
-          
-          // 销量列
-          columns.push({data: dateStr + '_销量', type: 'numeric'});
-          colHeaders.push(dateStr + '(销量)');
-        }
 
-        // 从后端加载宽表数据
+        // 从后端加载宽表数据后，动态补全所有日期列
         const requestVersion = modeVersion;
         loadWideTableData(columns, colHeaders, requestVersion);
       }
@@ -709,6 +640,21 @@
               // 保存原始数据
               originalData = JSON.parse(JSON.stringify(res.data));
               
+              // 根据数据动态补齐日期列（覆盖全部历史，不限最近5天）
+              const allDateKeys = new Set();
+              (res.data || []).forEach(row => {
+                Object.keys(row).forEach(k => { if (/^\d{4}-\d{2}-\d{2}$/.test(k)) allDateKeys.add(k); });
+              });
+              const sortedDates = Array.from(allDateKeys).sort();
+              sortedDates.forEach(dateStr => {
+                if (!columns.find(c => c.data === dateStr)) {
+                  columns.push({data: dateStr, type: 'numeric'});
+                  colHeaders.push(dateStr + '(库存)');
+                  columns.push({data: dateStr + '_销量', type: 'numeric'});
+                  colHeaders.push(dateStr + '(销量)');
+                }
+              });
+
               // 初始化Handsontable
               hot = new Handsontable(document.getElementById('wideTable'), {
                 data: res.data,
@@ -806,66 +752,9 @@
         });
       }
 
-      // 初始化行记录模式
-      function initRecordTable() {
-        renderRecordTable();
-      }
+      // 移除行记录模式相关实现（仅保留宽表）
 
-      // 渲染行记录表格
-      function renderRecordTable() {
-        var token = localStorage.getItem('token');
-        var headers = {};
-        if (token) {
-          headers['Authorization'] = 'Bearer ' + token;
-        }
-        
-        $.ajax({
-          url: window.apiConfig.baseURL + '/api/localdb/records',
-          type: 'GET',
-          headers: headers,
-          success: function(res) {
-            if(res.success) {
-              table.render({
-                elem: '#recordTable',
-                data: res.data,
-                page: true,
-                limit: 20,
-                cols: [[
-                  {field:'SKU', title:'SKU', width:150, sort:true},
-                  {field:'产品中文名', title:'产品中文名', width:180},
-                  {field:'网页链接', title:'网页链接', width:220, templet: function(d){ return d['网页链接'] ? '<a href="'+d['网页链接']+'" target="_blank">'+d['网页链接']+'</a>' : ''; }},
-                  {field:'初始库存', title:'初始库存', width:100, sort:true},
-                  {field:'日期', title:'日期', width:160, sort:true},
-                  {field:'库存', title:'库存', width:100, sort:true},
-                  {field:'销量', title:'销量', width:100, sort:true, templet: function(d){ 
-                    return '<span style="color: ' + (d['销量'] > 0 ? '#52c41a' : '#999') + ';">' + d['销量'] + '</span>'; 
-                  }},
-                  {title:'操作', width:180, align:'center', toolbar:'#rowBar'}
-                ]],
-                text: {none: '暂无数据'}
-              });
-            } else {
-              layer.msg('数据加载失败: ' + res.error, {icon:2});
-            }
-          },
-          error: function(xhr) {
-            if (xhr.status === 401) {
-              layer.msg('请先登录', {icon:2}, function(){
-                window.location.href = 'login.html';
-              });
-            } else {
-              layer.msg('数据加载失败', {icon:2});
-            }
-          }
-        });
-      }
-
-      // 工具条模板
-      var rowBarHtml = '<div class="layui-btn-group">'
-        +'<button class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>'
-        +'<button class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</button>'
-        +'</div>';
-      $(document.body).append('<script type="text/html" id="rowBar">'+rowBarHtml+'<\/script>');
+      // 移除行记录表格工具条模板
 
       // 编辑模式控制函数
       function enableEditMode() {
@@ -1377,108 +1266,7 @@
         });
       });
 
-      // 行记录模式按钮事件
-      $('#addRecordBtn').on('click', function(){
-        form.val('editForm', {sku:'', name:'', url:'', initialStock:'', date:'', stock:''});
-        layer.open({
-          type:1, title:'新增记录', area:['400px','480px'], content:$('#editFormModal'),
-          btn:[], shadeClose:true
-        });
-      });
-
-      $('#refreshRecordBtn').on('click', renderRecordTable);
-
-      $('#importRecordBtn').on('click', function() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.xlsx,.xls,.csv';
-        input.onchange = function(e) {
-          const file = e.target.files[0];
-          if (!file) return;
-          
-          var token = localStorage.getItem('token');
-          var formData = new FormData();
-          formData.append('file', file);
-          
-          var headers = {};
-          if (token) {
-            headers['Authorization'] = 'Bearer ' + token;
-          }
-          
-          $.ajax({
-            url: window.apiConfig.baseURL + '/api/localdb/records/batch',
-            type: 'POST',
-            headers: headers,
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(res) {
-              if(res.success) {
-                layer.msg('导入成功: ' + res.message, {icon:1});
-                renderRecordTable();
-              } else {
-                layer.msg('导入失败: ' + res.error, {icon:2});
-              }
-            },
-            error: function(xhr) {
-              if (xhr.status === 401) {
-                layer.msg('请先登录', {icon:2}, function(){
-                  window.location.href = 'login.html';
-                });
-              } else {
-                layer.msg('导入失败', {icon:2});
-              }
-            }
-          });
-        };
-        input.click();
-      });
-
-      $('#exportRecordBtn').on('click', function() {
-        var token = localStorage.getItem('token');
-        var headers = {};
-        if (token) {
-          headers['Authorization'] = 'Bearer ' + token;
-        }
-        
-        $.ajax({
-          url: window.apiConfig.baseURL + '/api/localdb/records/export',
-          type: 'GET',
-          headers: headers,
-          xhrFields: {
-            responseType: 'blob'
-          },
-          success: function(data) {
-            const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'records-export.xlsx';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            layer.msg('导出成功', {icon:1});
-          },
-          error: function(xhr) {
-            if (xhr.status === 401) {
-              layer.msg('请先登录', {icon:2}, function(){
-                window.location.href = 'login.html';
-              });
-            } else {
-              layer.msg('导出失败', {icon:2});
-            }
-          }
-        });
-      });
-
-      $('#downloadRecordTemplateBtn').on('click', function() {
-        const colHeaders = ['SKU', '产品中文名', '网页链接', '初始库存', '日期（YYYY-MM-DD HH:mm）', '库存'];
-        const ws = XLSX.utils.aoa_to_sheet([colHeaders]);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, '记录模板');
-        XLSX.writeFile(wb, 'records-template.xlsx');
-      });
+      // 移除行记录模式所有按钮事件与导入导出
 
       // 解析“本地数据库宽表”Excel → JSON
       async function parseExcelToLocalWideJSON(file) {
@@ -1551,110 +1339,11 @@
         });
       });
 
-      // 编辑/删除
-      table.on('tool(recordTable)', function(obj){
-        var data = obj.data;
-        if(obj.event === 'edit'){
-          form.val('editForm', {
-            sku: data.SKU,
-            name: data['产品中文名'],
-            url: data['网页链接'],
-            initialStock: data['初始库存'],
-            date: data['日期'],
-            stock: data['库存']
-          });
-          layer.open({
-            type:1, title:'编辑记录', area:['400px','480px'], content:$('#editFormModal'),
-            btn:[], shadeClose:true
-          });
-          $('#editFormModal').data('editId', data.id);
-        } else if(obj.event === 'del'){
-          layer.confirm('确定要删除该记录吗？', function(index){
-            var token = localStorage.getItem('token');
-            var headers = {};
-            if (token) {
-              headers['Authorization'] = 'Bearer ' + token;
-            }
-            
-            $.ajax({
-              url: window.apiConfig.baseURL + '/api/localdb/records/'+data.id,
-              type: 'DELETE',
-              headers: headers,
-              success: function(res){
-                if(res.success){
-                  layer.msg('删除成功', {icon:1});
-                  renderRecordTable();
-                }else{
-                  layer.msg('删除失败: '+res.error, {icon:2});
-                }
-              },
-              error: function(xhr) {
-                if (xhr.status === 401) {
-                  layer.msg('请先登录', {icon:2}, function(){
-                    window.location.href = 'login.html';
-                  });
-                } else {
-                  layer.msg('删除失败', {icon:2});
-                }
-              }
-            });
-            layer.close(index);
-          });
-        }
-      });
+      // 移除行记录的编辑/删除逻辑
 
-      // 表单提交
-      form.on('submit(submitEdit)', function(formObj){
-        var editId = $('#editFormModal').data('editId');
-        var method = editId ? 'PUT' : 'POST';
-        var url = window.apiConfig.baseURL + '/api/localdb/records' + (editId ? ('/'+editId) : '');
-        var data = {
-          SKU: formObj.field.sku,
-          '产品中文名': formObj.field.name,
-          '网页链接': formObj.field.url,
-          '初始库存': formObj.field.initialStock,
-          '日期': formObj.field.date,
-          '库存': formObj.field.stock
-        };
-        
-        var token = localStorage.getItem('token');
-        var headers = {
-          'Content-Type': 'application/json'
-        };
-        if (token) {
-          headers['Authorization'] = 'Bearer ' + token;
-        }
-        
-        $.ajax({
-          url: url,
-          type: method,
-          headers: headers,
-          data: JSON.stringify(data),
-          success: function(res){
-            if(res.success){
-              layer.msg('保存成功', {icon:1});
-              layer.closeAll();
-              if (currentMode === 'record') {
-                renderRecordTable();
-              }
-            }else{
-              layer.msg('保存失败: '+res.error, {icon:2});
-            }
-          },
-          error: function(xhr) {
-            if (xhr.status === 401) {
-              layer.msg('请先登录', {icon:2}, function(){
-                window.location.href = 'login.html';
-              });
-            } else {
-              layer.msg('保存失败', {icon:2});
-            }
-          }
-        });
-        return false;
-      });
+      // 移除行记录编辑表单提交
 
-      // 新产品表单提交
+      // 新产品表单提交（保持不变）
       form.on('submit(submitNewProduct)', function(formObj){
         var today = new Date();
         var dateStr = today.getFullYear() + '-' + 

@@ -115,6 +115,7 @@ let tmallWideCache = [];
 const WIDE_TABLE_R2_KEY = 'wide/latest.json';
 const WIDE_TABLE_EXCEL_R2_KEY = 'wide/latest.xlsx';
 const TMALL_WIDE_R2_KEY = 'tmall/wide.json';
+const TMALL_WIDE_EXCEL_R2_KEY = 'tmall/wide.xlsx';
 
 // 工具：获取日期键（YYYY-MM-DD）
 function getDateKeysFromRow(row) {
@@ -616,36 +617,176 @@ async function handleLocalDB(request, env, path, method, corsHeaders) {
   }
 }
 
-// 处理天猫订单API请求 - 只使用宽表模式
+// 处理天猫订单API请求 - 独立的天猫宽表数据存储
 async function handleTmallOrders(request, env, path, method, corsHeaders) {
   console.log('🔄 处理天猫订单请求:', path);
-  
+
   try {
-    // 只映射到宽表相关的路径
-    let mappedPath = path.replace('/api/tmall-orders/', '/api/localdb/');
-    
-    // 特殊路径映射（只保留宽表相关）
-    if (path.endsWith('/smart-import')) {
-      mappedPath = '/api/localdb/wide/batch';
-    } else if (path.endsWith('/wide/clear-all')) {
-      mappedPath = '/api/localdb/wide/clear-all';
-    } else if (path.endsWith('/wide/clear')) {
-      mappedPath = '/api/localdb/wide/clear-all';
+    // GET 天猫宽表
+    if (path === '/api/tmall-orders/wide' && method === 'GET') {
+      let data = Array.isArray(tmallWideCache) ? tmallWideCache : [];
+      if ((!data || data.length === 0) && env.R2_BUCKET) {
+        try {
+          // 优先尝试读取Excel(CSV)格式
+          const excelObj = await env.R2_BUCKET.get(TMALL_WIDE_EXCEL_R2_KEY);
+          if (excelObj) {
+            const csvText = new TextDecoder('utf-8').decode(excelObj.body);
+            data = parseCSVToArray(csvText);
+            if (Array.isArray(data) && data.length > 0) {
+              tmallWideCache = data;
+              console.log('✅ 从Excel文件加载天猫宽表数据成功:', data.length, '条记录');
+            }
+          } else {
+            // 回退到JSON格式
+            const jsonObj = await env.R2_BUCKET.get(TMALL_WIDE_R2_KEY);
+            if (jsonObj) {
+              const text = await jsonObj.text();
+              const parsed = JSON.parse(text);
+              if (Array.isArray(parsed)) {
+                tmallWideCache = parsed;
+                data = parsed;
+              }
+            }
+          }
+        } catch (e) { console.warn('读取R2天猫宽表失败:', e); }
+      }
+
+      data = Array.isArray(data) ? data : [];
+      tmallWideCache = data;
+      return Response.json({ success: true, data, total: data.length }, { headers: corsHeaders });
     }
-    
-    console.log(`📍 路径映射: ${path} → ${mappedPath}`);
-    
-    // 调用现有的localdb处理函数
-    return await handleLocalDB(request, env, mappedPath, method, corsHeaders);
-    
+
+    // POST 保存天猫宽表
+    else if (path === '/api/tmall-orders/wide' && method === 'POST') {
+      const requestData = await request.json();
+      console.log('💾 保存天猫宽表数据:', requestData);
+      if (requestData && Array.isArray(requestData.data)) {
+        tmallWideCache = requestData.data;
+
+        if (env.R2_BUCKET) {
+          try {
+            await env.R2_BUCKET.put(TMALL_WIDE_R2_KEY, JSON.stringify(tmallWideCache), {
+              httpMetadata: { contentType: 'application/json' },
+              customMetadata: { updatedAt: new Date().toISOString() }
+            });
+
+            if (tmallWideCache.length > 0) {
+              const excelBuffer = arrayToExcelBuffer(tmallWideCache);
+              await env.R2_BUCKET.put(TMALL_WIDE_EXCEL_R2_KEY, excelBuffer, {
+                httpMetadata: { contentType: 'text/csv; charset=utf-8' },
+                customMetadata: { updatedAt: new Date().toISOString() }
+              });
+            }
+            console.log('✅ 天猫宽表数据已持久化到R2:', tmallWideCache.length, '行');
+          } catch (e) { console.warn('写入R2天猫宽表失败:', e); }
+        }
+      }
+      return Response.json({ success: true, message: '天猫宽表数据保存成功', count: tmallWideCache.length }, { headers: corsHeaders });
+    }
+
+    // 批量上传天猫宽表
+    else if (path === '/api/tmall-orders/wide/batch' && method === 'POST') {
+      try {
+        const contentType = request.headers.get('content-type') || '';
+        if (contentType.includes('multipart/form-data')) {
+          const formData = await request.formData();
+          const file = formData.get('file');
+          if (!file) {
+            return Response.json({ success: false, error: '没有上传文件' }, { headers: corsHeaders });
+          }
+          console.log('📤 收到天猫Excel文件直传(不解析):', file.name);
+          return Response.json({ success: true, message: `文件 ${file.name} 已接收；请在前端解析后以JSON提交`, processed: 0, data: [] }, { headers: corsHeaders });
+        } else {
+          const requestData = await request.json();
+          console.log('📤 天猫批量JSON数据:', requestData);
+          if (requestData && Array.isArray(requestData.data)) {
+            tmallWideCache = requestData.data;
+            if (env.R2_BUCKET) {
+              try {
+                await env.R2_BUCKET.put(TMALL_WIDE_R2_KEY, JSON.stringify(tmallWideCache), {
+                  httpMetadata: { contentType: 'application/json' },
+                  customMetadata: { updatedAt: new Date().toISOString() }
+                });
+
+                if (tmallWideCache.length > 0) {
+                  const excelBuffer = arrayToExcelBuffer(tmallWideCache);
+                  await env.R2_BUCKET.put(TMALL_WIDE_EXCEL_R2_KEY, excelBuffer, {
+                    httpMetadata: { contentType: 'text/csv; charset=utf-8' },
+                    customMetadata: { updatedAt: new Date().toISOString() }
+                  });
+                }
+              } catch (e) { console.warn('写入R2天猫宽表失败:', e); }
+            }
+          }
+          return Response.json({ success: true, message: '天猫宽表数据上传成功', processed: requestData.data ? requestData.data.length : 0, data: Array.isArray(tmallWideCache) ? tmallWideCache : [] }, { headers: corsHeaders });
+        }
+      } catch (parseError) {
+        console.error('天猫批量上传解析错误:', parseError);
+        return Response.json({ success: false, error: `数据解析失败: ${parseError.message}` }, { status: 400, headers: corsHeaders });
+      }
+    }
+
+    // 导出天猫宽表
+    else if (path === '/api/tmall-orders/wide/export' && method === 'GET') {
+      let data = Array.isArray(tmallWideCache) ? tmallWideCache : [];
+      if ((!data || data.length === 0) && env.R2_BUCKET) {
+        try {
+          const excelObj = await env.R2_BUCKET.get(TMALL_WIDE_EXCEL_R2_KEY);
+          if (excelObj) {
+            const csvText = new TextDecoder('utf-8').decode(excelObj.body);
+            data = parseCSVToArray(csvText);
+            console.log('✅ 从Excel文件导出天猫宽表数据成功:', data.length, '条记录');
+          } else {
+            const jsonObj = await env.R2_BUCKET.get(TMALL_WIDE_R2_KEY);
+            if (jsonObj) {
+              const text = await jsonObj.text();
+              const parsed = JSON.parse(text);
+              if (Array.isArray(parsed)) {
+                data = parsed;
+              }
+            }
+          }
+        } catch (e) { console.warn('读取R2天猫宽表失败:', e); }
+      }
+
+      if (data.length === 0) {
+        return Response.json({ success: false, error: '没有数据可导出' }, { status: 404, headers: corsHeaders });
+      }
+
+      try {
+        const excelBuffer = arrayToExcelBuffer(data);
+        const headers = new Headers(corsHeaders);
+        headers.set('Content-Type', 'text/csv; charset=utf-8');
+        headers.set('Content-Disposition', 'attachment; filename="tmall-orders.csv"');
+        return new Response(excelBuffer, { headers });
+      } catch (error) {
+        console.error('生成天猫导出文件失败:', error);
+        return Response.json({ success: false, error: '导出失败: ' + error.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // 清空天猫宽表
+    else if (path === '/api/tmall-orders/wide/clear-all' && (method === 'POST' || method === 'GET')) {
+      tmallWideCache = [];
+      if (env.R2_BUCKET) {
+        try { await env.R2_BUCKET.delete(TMALL_WIDE_R2_KEY); } catch (e) { console.warn('删除R2天猫宽表失败:', e); }
+        try { await env.R2_BUCKET.delete(TMALL_WIDE_EXCEL_R2_KEY); } catch (e) { console.warn('删除R2天猫宽表Excel失败:', e); }
+      }
+      return Response.json({ success: true, message: '成功清空所有天猫宽表数据' }, { headers: corsHeaders });
+    }
+
+    // 智能导入别名
+    else if (path === '/api/tmall-orders/smart-import' && method === 'POST') {
+      // 与 batch 行为一致（前端已解析为JSON）
+      return await handleTmallOrders(new Request(new URL('/api/tmall-orders/wide/batch', request.url), { method: 'POST', headers: request.headers, body: request.body }), env, '/api/tmall-orders/wide/batch', 'POST', corsHeaders);
+    }
+
+    else {
+      return new Response('Not Found', { status: 404, headers: corsHeaders });
+    }
+
   } catch (error) {
     console.error('❌ 天猫订单API错误:', error);
-    return Response.json({
-      success: false,
-      error: error.message
-    }, { 
-      status: 500,
-      headers: corsHeaders 
-    });
+    return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
   }
 }
