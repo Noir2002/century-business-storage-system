@@ -955,7 +955,7 @@ async function handlePackageAPI(request, env, path, method, corsHeaders) {
       }
     }
 
-    // 文件数据同步（接收前端上传的文件记录）
+    // 文件数据同步 - POST（保存文件记录到R2）
     if (path === '/api/package-sync/files' && method === 'POST') {
       try {
         const syncData = await request.json();
@@ -966,14 +966,26 @@ async function handlePackageAPI(request, env, path, method, corsHeaders) {
 
         console.log(`📦 接收到文件同步数据: ${Object.keys(syncData.files).length} 个文件记录`);
 
-        // 这里可以添加数据验证和存储逻辑
-        // 目前我们只确认接收，不进行持久化存储（因为文件已经在R2中）
+        // 保存文件记录到R2（持久化）
+        const saveKey = 'package-sync/files.json';
+        const saveData = {
+          ...syncData,
+          lastSync: new Date().toISOString(),
+          timestamp: Date.now()
+        };
+
+        await env.R2_BUCKET.put(saveKey, JSON.stringify(saveData), {
+          httpMetadata: { contentType: 'application/json' },
+          customMetadata: { updatedAt: new Date().toISOString() }
+        });
+
+        console.log(`✅ 文件记录已保存到R2: ${saveKey}`);
 
         return Response.json({
           success: true,
-          message: '文件记录已同步',
+          message: '文件记录已同步并保存',
           receivedFiles: Object.keys(syncData.files).length,
-          timestamp: Date.now()
+          timestamp: saveData.timestamp
         }, { headers: corsHeaders });
 
       } catch (error) {
@@ -982,7 +994,35 @@ async function handlePackageAPI(request, env, path, method, corsHeaders) {
       }
     }
 
-    // 数据库数据同步
+    // 文件数据同步 - GET（从R2读取文件记录）
+    if (path === '/api/package-sync/files' && method === 'GET') {
+      try {
+        const loadKey = 'package-sync/files.json';
+        const obj = await env.R2_BUCKET.get(loadKey);
+
+        if (!obj) {
+          return Response.json({ 
+            success: false, 
+            data: null, 
+            message: '暂无文件同步数据' 
+          }, { headers: corsHeaders });
+        }
+
+        const data = JSON.parse(await obj.text());
+        console.log(`📥 从R2加载文件记录: ${Object.keys(data.files || {}).length} 个文件`);
+
+        return Response.json({
+          success: true,
+          data: data
+        }, { headers: corsHeaders });
+
+      } catch (error) {
+        console.error('读取文件同步数据失败:', error);
+        return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // 数据库数据同步 - POST（保存数据到R2）
     if (path === '/api/package-sync/database' && method === 'POST') {
       try {
         const syncData = await request.json();
@@ -993,15 +1033,58 @@ async function handlePackageAPI(request, env, path, method, corsHeaders) {
 
         console.log(`💾 接收到数据库同步数据: ${Object.keys(syncData.data).length} 个记录`);
 
+        // 保存到R2存储（持久化）
+        const saveKey = 'package-sync/database.json';
+        const saveData = {
+          ...syncData,
+          lastSync: new Date().toISOString(),
+          timestamp: Date.now()
+        };
+
+        await env.R2_BUCKET.put(saveKey, JSON.stringify(saveData), {
+          httpMetadata: { contentType: 'application/json' },
+          customMetadata: { updatedAt: new Date().toISOString() }
+        });
+
+        console.log(`✅ 数据库已保存到R2: ${saveKey}`);
+
         return Response.json({
           success: true,
-          message: '数据库记录已同步',
+          message: '数据库记录已同步并保存',
           receivedRecords: Object.keys(syncData.data).length,
-          timestamp: Date.now()
+          timestamp: saveData.timestamp
         }, { headers: corsHeaders });
 
       } catch (error) {
         console.error('数据库同步失败:', error);
+        return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // 数据库数据同步 - GET（从R2读取数据）
+    if (path === '/api/package-sync/database' && method === 'GET') {
+      try {
+        const loadKey = 'package-sync/database.json';
+        const obj = await env.R2_BUCKET.get(loadKey);
+
+        if (!obj) {
+          return Response.json({ 
+            success: false, 
+            data: null, 
+            message: '暂无同步数据' 
+          }, { headers: corsHeaders });
+        }
+
+        const data = JSON.parse(await obj.text());
+        console.log(`📥 从R2加载数据库: ${Object.keys(data.data || {}).length} 个记录`);
+
+        return Response.json({
+          success: true,
+          data: data
+        }, { headers: corsHeaders });
+
+      } catch (error) {
+        console.error('读取数据库同步数据失败:', error);
         return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
       }
     }
