@@ -1439,7 +1439,8 @@
                         const formData = new FormData();
                         formData.append('file', markerBlob, markerFileName);
                         const baseURLmk = (typeof getBaseURL === 'function') ? getBaseURL() : '';
-                        const upResMk = await fetch(`${baseURLmk}/api/r2/upload/${encodeURIComponent('package')}/${encodeURIComponent(folderPath)}/${encodeURIComponent(markerFileName)}`.replace(/%2F/g,'/'), { method: 'POST', body: formData });
+                        // folderPath 已经包含 package/ 前缀，不需要再添加
+                        const upResMk = await fetch(`${baseURLmk}/api/r2/upload/${encodeURIComponent(folderPath)}/${encodeURIComponent(markerFileName)}`.replace(/%2F/g,'/'), { method: 'POST', body: formData });
                         if (!upResMk.ok) throw new Error(`标记文件上传失败: ${upResMk.status}`);
                         const upJsonMk = await upResMk.json();
                         if (!upJsonMk.success) throw new Error(upJsonMk.error || '标记文件上传失败');
@@ -2094,7 +2095,8 @@
                         formData.append('description', `LP号:${lpNumber} 文件夹:${fullFolderPath}`);
                         
                         const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
-                        const uploadResponse = await fetch(`${baseURL}/api/r2/upload/package/${encodeURIComponent(fullFolderPath)}/${encodeURIComponent(fileName)}`, {
+                        // fullFolderPath 已经包含 package/ 前缀，不需要再添加
+                        const uploadResponse = await fetch(`${baseURL}/api/r2/upload/${encodeURIComponent(fullFolderPath)}/${encodeURIComponent(fileName)}`, {
                             method: 'POST',
                             body: formData
                         });
