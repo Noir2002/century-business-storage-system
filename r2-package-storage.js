@@ -291,7 +291,6 @@ function showSystemStatus() {
     background: #52c41a; color: white; padding: 8px 16px;
     border-radius: 4px; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   `;
-  statusMsg.innerHTML = '✅ 打包系统已就绪 (本地模式)';
   document.body.appendChild(statusMsg);
   
   setTimeout(() => {
