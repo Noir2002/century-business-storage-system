@@ -3902,8 +3902,8 @@
                 if (result.success && result.files) {
                     console.log('📁 从R2获取到文件列表:', result.files);
                     
-                    // 将R2文件转换为本地格式
-                    result.files.forEach(file => {
+                    // 将R2文件转换为本地格式（使用 for...of 循环支持 async/await）
+                    for (const file of result.files) {
                         // 从R2路径中提取文件夹信息
                         const r2Path = file.r2Path || '';
                         const pathParts = r2Path.split('/');
@@ -3927,19 +3927,8 @@
                             }
                         }
                         
-                        // 获取文件的公开URL
-                        let publicUrl = '';
-                        try {
-                            const urlResponse = await fetch(`${baseURL}/api/package/file/${encodeURIComponent(file.r2Path)}/url`);
-                            if (urlResponse.ok) {
-                                const urlResult = await urlResponse.json();
-                                if (urlResult.success) {
-                                    publicUrl = urlResult.url;
-                                }
-                            }
-                        } catch (e) {
-                            console.warn('获取文件公开URL失败:', e);
-                        }
+                        // 构建文件的公开URL（不需要额外请求）
+                        const publicUrl = `https://century-business-system.23441d4f7734b84186c4c20ddefef8e7.r2.cloudflarestorage.com/${file.r2Path}`;
 
                         const fileRecord = {
                             name: file.fileName,
@@ -3955,7 +3944,7 @@
                         
                         console.log('📝 转换文件记录:', fileRecord);
                         uploadedFiles.set(file.fileName, fileRecord);
-                    });
+                    }
                     
                     // 立即保存到本地存储
                     saveFilesToLocal();
