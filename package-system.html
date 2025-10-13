@@ -1433,7 +1433,7 @@
                 }
                 
                 if (!folderExists) {
-                    // 创建空的标记文件并实际上传到R2，确保云端存在该日期“目录”
+                    // 创建空的标记文件并实际上传到R2，确保云端存在该日期"目录"
                     const markerFileName = `${yearMonthDay}_README.txt`;
                     const markerContent = `当日打包目录已创建\n创建时间: ${new Date().toLocaleString()}\n待完成打包数量: ${databaseData.size} 个履约单号`;
                     try {
@@ -2125,7 +2125,7 @@
                             contractNumber: contractNumber || '',
                             size: file.size,
                             url: publicUrl || '',
-                            downloadUrl: '',
+                            downloadUrl: publicUrl || '',
                             uploadTime: new Date().toISOString(),
                             r2Path: filePath,
                             id: filePath
