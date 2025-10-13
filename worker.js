@@ -435,6 +435,21 @@ async function handleR2API(request, env, path, method, corsHeaders) {
       return Response.json({ success: true, url: publicUrl }, { headers: corsHeaders });
     }
 
+    // 文件直传下载（带CORS）：/api/r2/download/:key
+    if (path.startsWith('/api/r2/download/') && method === 'GET') {
+      const key = decodeURIComponent(path.replace('/api/r2/download/', ''));
+      const obj = await env.R2_BUCKET.get(key);
+      if (!obj) {
+        return Response.json({ success: false, error: `文件不存在: ${key}` }, { status: 404, headers: corsHeaders });
+      }
+      const headers = new Headers(corsHeaders);
+      const ct = (obj.httpMetadata && obj.httpMetadata.contentType) || 'application/octet-stream';
+      headers.set('Content-Type', ct);
+      // 允许浏览器获取二进制内容
+      headers.set('Cache-Control', 'public, max-age=86400');
+      return new Response(obj.body, { headers });
+    }
+
     // 上传文件（multipart）：/api/r2/upload/:folder/:subpath... (保持完整层级)
     if (path.startsWith('/api/r2/upload/') && method === 'POST') {
       const folderAndPath = decodeURIComponent(path.replace('/api/r2/upload/', '')); // e.g. package/2025-10/2025-10-02/file.ext 或 database/YYYY-MM/YYYY-MM-DD.xlsx

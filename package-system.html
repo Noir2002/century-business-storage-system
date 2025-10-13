@@ -2125,7 +2125,7 @@
                             contractNumber: contractNumber || '',
                             size: file.size,
                             url: publicUrl || '',
-                            downloadUrl: publicUrl || '',
+                            downloadUrl: `${(typeof getBaseURL === 'function') ? getBaseURL() : ''}/api/r2/download/${encodeURIComponent(filePath)}`.replace(/%2F/g,'/'),
                             uploadTime: new Date().toISOString(),
                             r2Path: filePath,
                             id: filePath
