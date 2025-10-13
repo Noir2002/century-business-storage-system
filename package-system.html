@@ -1050,14 +1050,16 @@
 
     <!-- 打包详情 模态框 -->
     <div id="packingModal" class="modal">
-        <div class="modal-content" style="max-width: 640px;">
+        <div class="modal-content" style="max-width: 720px;">
             <div class="modal-header">
                 <h2 id="packingModalTitle">打包详情</h2>
                 <button class="close" onclick="closePackingModal()">&times;</button>
             </div>
             <div id="packingModalSummary" style="color:#718096; margin-bottom:10px;"></div>
             <div id="packingModalList" class="db-table" style="max-height: 360px; overflow:auto;"></div>
-            <div style="text-align: center; margin-top: 20px;">
+            <div style="text-align: center; margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                <button id="selectAllPackedBtn" onclick="toggleSelectAllPacked()" class="btn btn-secondary" style="display: none;">全选</button>
+                <button id="exportSelectedPackedBtn" onclick="exportSelectedPackedFolders()" class="btn btn-success" style="display: none;">📦 导出选定文件夹</button>
                 <button onclick="closePackingModal()" class="btn btn-secondary">关闭</button>
             </div>
         </div>
@@ -3119,20 +3121,34 @@
                     seen.add(r.folder);
                     dedup.push(r);
                 }
-                summary.textContent = `共 ${dedup.length} 个文件夹。`;
+                summary.textContent = `共 ${dedup.length} 个文件夹。点击复选框选择要导出的文件夹。`;
                 const header = `
                     <div class="db-row db-header">
+                        <div class="db-cell" style="width: 50px;">选择</div>
                         <div class="db-cell">文件夹</div>
                         <div class="db-cell">履约单号</div>
                         <div class="db-cell">LP号</div>
                     </div>`;
-                const body = dedup.map(r => `
+                const body = dedup.map((r, index) => `
                     <div class="db-row">
+                        <div class="db-cell" style="width: 50px;">
+                            <input type="checkbox" class="packed-folder-checkbox" 
+                                   data-folder="${r.folder}" 
+                                   data-contract="${r.contract}"
+                                   data-lp="${r.lp}"
+                                   onchange="updatePackedExportButton()">
+                        </div>
                         <div class="db-cell">${r.folder}</div>
                         <div class="db-cell">${r.contract}</div>
                         <div class="db-cell">${r.lp}</div>
                     </div>`).join('');
                 list.innerHTML = header + body;
+                
+                // 显示全选和导出按钮
+                const selectAllBtn = document.getElementById('selectAllPackedBtn');
+                const exportBtn = document.getElementById('exportSelectedPackedBtn');
+                if (selectAllBtn) selectAllBtn.style.display = 'inline-block';
+                if (exportBtn) exportBtn.style.display = 'inline-block';
             } else if (type === 'unpacked') {
                 title.textContent = '待打包LP/履约单号列表';
                 const arr = Array.from(unpackedLPs);
@@ -3151,6 +3167,12 @@
                         </div>`;
                 }).join('');
                 list.innerHTML = header + body;
+                
+                // 隐藏导出按钮
+                const selectAllBtn = document.getElementById('selectAllPackedBtn');
+                const exportBtn = document.getElementById('exportSelectedPackedBtn');
+                if (selectAllBtn) selectAllBtn.style.display = 'none';
+                if (exportBtn) exportBtn.style.display = 'none';
             } else if (type === 'unmatched') {
                 title.textContent = '未匹配文件夹列表';
                 const items = unmatchedDetails || [];
@@ -3195,6 +3217,12 @@
                     </div>`;
                 }).join('');
                 list.innerHTML = header + body;
+                
+                // 隐藏导出按钮
+                const selectAllBtn = document.getElementById('selectAllPackedBtn');
+                const exportBtn = document.getElementById('exportSelectedPackedBtn');
+                if (selectAllBtn) selectAllBtn.style.display = 'none';
+                if (exportBtn) exportBtn.style.display = 'none';
             }
 
             modal.style.display = 'block';
@@ -3203,6 +3231,149 @@
         function closePackingModal() {
             const modal = document.getElementById('packingModal');
             if (modal) modal.style.display = 'none';
+            
+            // 隐藏导出按钮
+            const selectAllBtn = document.getElementById('selectAllPackedBtn');
+            const exportBtn = document.getElementById('exportSelectedPackedBtn');
+            if (selectAllBtn) selectAllBtn.style.display = 'none';
+            if (exportBtn) exportBtn.style.display = 'none';
+        }
+
+        // 全选/取消全选已打包文件夹
+        function toggleSelectAllPacked() {
+            const checkboxes = document.querySelectorAll('.packed-folder-checkbox');
+            if (!checkboxes || checkboxes.length === 0) return;
+            
+            // 检查是否所有复选框都已选中
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            
+            // 如果全选则取消全选，否则全选
+            checkboxes.forEach(cb => {
+                cb.checked = !allChecked;
+            });
+            
+            updatePackedExportButton();
+        }
+
+        // 更新导出按钮的文本和状态
+        function updatePackedExportButton() {
+            const checkboxes = document.querySelectorAll('.packed-folder-checkbox:checked');
+            const exportBtn = document.getElementById('exportSelectedPackedBtn');
+            const selectAllBtn = document.getElementById('selectAllPackedBtn');
+            
+            if (exportBtn) {
+                const count = checkboxes.length;
+                if (count > 0) {
+                    exportBtn.textContent = `📦 导出选定文件夹 (${count})`;
+                    exportBtn.disabled = false;
+                } else {
+                    exportBtn.textContent = '📦 导出选定文件夹';
+                    exportBtn.disabled = false;
+                }
+            }
+            
+            // 更新全选按钮文本
+            if (selectAllBtn) {
+                const allCheckboxes = document.querySelectorAll('.packed-folder-checkbox');
+                const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+                selectAllBtn.textContent = allChecked ? '取消全选' : '全选';
+            }
+        }
+
+        // 导出选定的已打包文件夹
+        async function exportSelectedPackedFolders() {
+            const checkboxes = document.querySelectorAll('.packed-folder-checkbox:checked');
+            
+            if (checkboxes.length === 0) {
+                alert('请至少选择一个文件夹');
+                return;
+            }
+            
+            try {
+                showStatus('fileManageStatus', `正在打包 ${checkboxes.length} 个文件夹...`, 'info');
+                
+                const zip = new JSZip();
+                const grouped = buildGroupedData();
+                let totalFiles = 0;
+                let processedFiles = 0;
+                
+                // 收集选中的文件夹
+                const selectedFolders = new Set();
+                checkboxes.forEach(cb => {
+                    const folder = cb.getAttribute('data-folder');
+                    if (folder) selectedFolders.add(folder);
+                });
+                
+                console.log('📦 选中的文件夹:', Array.from(selectedFolders));
+                
+                // 遍历所有文件夹，只处理选中的
+                for (const folder of selectedFolders) {
+                    const files = grouped.filesByFolder.get(folder) || [];
+                    console.log(`📁 处理文件夹 ${folder}:`, files.length, '个文件');
+                    
+                    for (const { file } of files) {
+                        if (!file.downloadUrl) {
+                            console.warn('文件缺少下载URL:', file);
+                            continue;
+                        }
+                        
+                        try {
+                            console.log('📥 下载文件:', file.downloadUrl);
+                            const resp = await fetch(file.downloadUrl);
+                            if (!resp.ok) {
+                                console.error(`下载失败 ${resp.status}:`, file.fileName);
+                                continue;
+                            }
+                            
+                            const blob = await resp.blob();
+                            
+                            // 从文件夹路径中提取日期和文件夹名称
+                            // folder格式: package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD_履约单号
+                            const pathParts = folder.split('/');
+                            let zipPath;
+                            
+                            if (pathParts.length >= 4) {
+                                // 提取日期部分 (YYYY-MM-DD)
+                                const yearMonthDay = pathParts[2];
+                                const folderName = pathParts[3];
+                                // 压缩包内路径: YYYYMMDD/YYYY-MM-DD_履约单号/文件名
+                                const dateStr = yearMonthDay.replace(/-/g, '');
+                                zipPath = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
+                            } else {
+                                // 兜底方案
+                                zipPath = `${folder}/${file.fileName || ('file_' + Date.now())}`;
+                            }
+                            
+                            console.log('📦 添加到压缩包:', zipPath);
+                            zip.file(zipPath, blob);
+                            processedFiles++;
+                        } catch (e) {
+                            console.warn('拉取文件失败:', file.fileName, e.message);
+                        }
+                    }
+                }
+                
+                console.log(`✅ 成功处理 ${processedFiles} 个文件`);
+                
+                if (processedFiles === 0) {
+                    showStatus('fileManageStatus', '❌ 没有找到可导出的文件', 'error');
+                    return;
+                }
+                
+                // 生成并下载压缩包
+                showStatus('fileManageStatus', '正在生成压缩包...', 'info');
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const outName = `packed_folders_${new Date().toISOString().split('T')[0]}.zip`;
+                saveAs(zipBlob, outName);
+                
+                showStatus('fileManageStatus', `✅ 成功导出 ${checkboxes.length} 个文件夹，共 ${processedFiles} 个文件`, 'success');
+                
+                // 关闭模态框
+                closePackingModal();
+            } catch (error) {
+                console.error('导出失败:', error);
+                showStatus('fileManageStatus', `❌ 导出失败：${error.message}`, 'error');
+            }
         }
 
         // —— 修正未匹配文件夹 ——
@@ -3920,12 +4091,23 @@
                             folder = `package/${yearMonth}/${yearMonthDay}/${folderName}`;
                         }
                         
-                        // 从文件夹名称中提取履约单号（使用下划线格式）
+                        // 从文件夹名称中提取履约单号（支持下划线和连字符两种格式）
                         let contractNumber = '';
                         if (folder) {
-                            const folderMatch = folder.match(/(\d{4}-\d{2}-\d{2})_(.+)$/);
+                            // 从完整路径中提取最后一个部分
+                            const pathParts = folder.split('/');
+                            const folderName = pathParts[pathParts.length - 1];
+                            
+                            // 格式1: YYYY-MM-DD_履约单号（优先匹配）
+                            let folderMatch = folderName.match(/^\d{4}-\d{2}-\d{2}_(.+)$/);
                             if (folderMatch) {
-                                contractNumber = folderMatch[2];
+                                contractNumber = folderMatch[1];
+                            } else {
+                                // 格式2: YYYY-MM-DD-履约单号（兼容旧格式）
+                                folderMatch = folderName.match(/^\d{4}-\d{2}-\d{2}-(.+)$/);
+                                if (folderMatch) {
+                                    contractNumber = folderMatch[1];
+                                }
                             }
                         }
                         

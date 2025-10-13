@@ -922,15 +922,23 @@ async function handlePackageAPI(request, env, path, method, corsHeaders) {
           if (pathParts.length >= 4) {
             const yearMonth = pathParts[1]; // YYYY-MM
             const yearMonthDay = pathParts[2]; // YYYY-MM-DD
-            const folderName = pathParts[3]; // YYYY-MM-DD-履约单号
+            const folderName = pathParts[3]; // YYYY-MM-DD_履约单号 或 YYYY-MM-DD-履约单号
 
             folder = `package/${yearMonth}/${yearMonthDay}/${folderName}`;
 
-            // 从文件夹名称中提取履约单号（支持多种格式）
-            const contractMatch = folderName.match(/(\d{4}-\d{2}-\d{2}-)?(.+)/);
+            // 从文件夹名称中提取履约单号（支持下划线和连字符两种格式）
+            // 格式1: YYYY-MM-DD_履约单号（优先匹配）
+            let contractMatch = folderName.match(/^\d{4}-\d{2}-\d{2}_(.+)$/);
             if (contractMatch) {
-              lpNumber = contractMatch[2] || folderName;
-              contractNumber = lpNumber;
+              contractNumber = contractMatch[1];
+              lpNumber = contractMatch[1];
+            } else {
+              // 格式2: YYYY-MM-DD-履约单号（兼容旧格式）
+              contractMatch = folderName.match(/^\d{4}-\d{2}-\d{2}-(.+)$/);
+              if (contractMatch) {
+                contractNumber = contractMatch[1];
+                lpNumber = contractMatch[1];
+              }
             }
           }
 
