@@ -2064,6 +2064,55 @@
         // 简单延时工具
         function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+        // 带超时的fetch请求
+        function fetchWithTimeout(url, options = {}, timeout = 300000) {
+            return Promise.race([
+                fetch(url, options),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('上传超时，请检查网络连接或文件大小')), timeout)
+                )
+            ]);
+        }
+
+        // 带重试机制的上传函数
+        async function uploadWithRetry(url, formData, maxRetries = 3, timeout = 300000) {
+            let lastError;
+            
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    console.log(`📤 上传尝试 ${attempt}/${maxRetries}...`);
+                    
+                    const response = await fetchWithTimeout(url, {
+                        method: 'POST',
+                        body: formData
+                    }, timeout);
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success) {
+                            console.log(`✅ 上传成功 (尝试${attempt}次)`);
+                            return result;
+                        }
+                        throw new Error(result.error || '上传失败');
+                    }
+                    
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    
+                } catch (error) {
+                    lastError = error;
+                    console.warn(`⚠️ 第${attempt}次尝试失败: ${error.message}`);
+                    
+                    if (attempt < maxRetries) {
+                        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 指数退避，最多5秒
+                        console.log(`⏳ 等待 ${waitTime}ms 后重试...`);
+                        await sleep(waitTime);
+                    }
+                }
+            }
+            
+            throw new Error(`上传失败（已重试${maxRetries}次）: ${lastError.message}`);
+        }
+
         // 上传文件到R2存储
         async function uploadFilesToR2(files, folderName, lpNumber, contractNumber) {
             console.log('📤 开始上传文件到R2存储...');
@@ -2090,27 +2139,26 @@
                     const uniqueSuffix = `${i}_${Math.random().toString(36).slice(2, 6)}`;
                     const fileName = `${Date.now()}_${uniqueSuffix}_${cleanName}`;
 
-                    // 真正上传到 R2 存储
+                    // 检查文件大小（500MB限制）
+                    const MAX_FILE_SIZE = 500 * 1024 * 1024;
+                    if (file.size > MAX_FILE_SIZE) {
+                        throw new Error(`文件过大 (${formatFileSize(file.size)})，超过500MB限制`);
+                    }
+                    
+                    // 真正上传到 R2 存储（带重试机制）
                     try {
                         const formData = new FormData();
                         formData.append('file', file);
                         formData.append('description', `LP号:${lpNumber} 文件夹:${fullFolderPath}`);
                         
                         const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
-                        // fullFolderPath 已经包含 package/ 前缀，不需要再添加
-                        const uploadResponse = await fetch(`${baseURL}/api/r2/upload/${encodeURIComponent(fullFolderPath)}/${encodeURIComponent(fileName)}`, {
-                            method: 'POST',
-                            body: formData
-                        });
+                        const uploadUrl = `${baseURL}/api/r2/upload/${encodeURIComponent(fullFolderPath)}/${encodeURIComponent(fileName)}`;
                         
-                        if (!uploadResponse.ok) {
-                            throw new Error(`上传失败: ${uploadResponse.status} ${uploadResponse.statusText}`);
-                        }
+                        // 根据文件大小动态调整超时时间
+                        const timeout = Math.max(300000, Math.ceil(file.size / 1024 / 1024 * 10000)); // 每MB约10秒，最少5分钟
+                        console.log(`⏱️ 文件大小: ${formatFileSize(file.size)}, 超时设置: ${Math.round(timeout/1000)}秒`);
                         
-                        const uploadResult = await uploadResponse.json();
-                        if (!uploadResult.success) {
-                            throw new Error(uploadResult.error || '上传失败');
-                        }
+                        const uploadResult = await uploadWithRetry(uploadUrl, formData, 3, timeout);
                         
                         // 适配 /api/r2/upload 返回结构
                         const filePath = uploadResult.filePath || `${fullFolderPath}/${fileName}`;
@@ -3294,8 +3342,11 @@
                 
                 const zip = new JSZip();
                 const grouped = buildGroupedData();
-                let totalFiles = 0;
-                let processedFiles = 0;
+                
+                let successCount = 0;
+                let failedCount = 0;
+                let missingUrlCount = 0;
+                let totalExpectedFiles = 0;
                 
                 // 收集选中的文件夹
                 const selectedFolders = new Set();
@@ -3309,54 +3360,58 @@
                 // 遍历所有文件夹，只处理选中的
                 for (const folder of selectedFolders) {
                     const files = grouped.filesByFolder.get(folder) || [];
+                    totalExpectedFiles += files.length;
                     console.log(`📁 处理文件夹 ${folder}:`, files.length, '个文件');
                     
                     for (const { file } of files) {
                         if (!file.downloadUrl) {
-                            console.warn('文件缺少下载URL:', file);
+                            console.warn('⚠️ 文件缺少下载URL，跳过:', file.fileName || file.name);
+                            missingUrlCount++;
                             continue;
                         }
                         
                         try {
-                            console.log('📥 下载文件:', file.downloadUrl);
                             const resp = await fetch(file.downloadUrl);
                             if (!resp.ok) {
-                                console.error(`下载失败 ${resp.status}:`, file.fileName);
-                                continue;
+                                throw new Error(`HTTP ${resp.status}`);
                             }
                             
                             const blob = await resp.blob();
                             
                             // 从文件夹路径中提取日期和文件夹名称
-                            // folder格式: package/YYYY-MM/YYYY-MM-DD/YYYY-MM-DD_履约单号
                             const pathParts = folder.split('/');
+                            const folderName = pathParts[pathParts.length - 1];
                             let zipPath;
                             
-                            if (pathParts.length >= 4) {
+                            if (pathParts.length >= 3) {
                                 // 提取日期部分 (YYYY-MM-DD)
                                 const yearMonthDay = pathParts[2];
-                                const folderName = pathParts[3];
-                                // 压缩包内路径: YYYYMMDD/YYYY-MM-DD_履约单号/文件名
-                                const dateStr = yearMonthDay.replace(/-/g, '');
-                                zipPath = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
+                                const dateMatch = yearMonthDay.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                                if (dateMatch) {
+                                    const dateStr = `${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}`;
+                                    zipPath = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
+                                } else {
+                                    zipPath = `${folderName}/${file.fileName || ('file_' + Date.now())}`;
+                                }
                             } else {
                                 // 兜底方案
-                                zipPath = `${folder}/${file.fileName || ('file_' + Date.now())}`;
+                                zipPath = `${folderName}/${file.fileName || ('file_' + Date.now())}`;
                             }
                             
-                            console.log('📦 添加到压缩包:', zipPath);
                             zip.file(zipPath, blob);
-                            processedFiles++;
+                            successCount++;
+                            console.log(`✅ [${successCount}/${totalExpectedFiles}] 已下载: ${file.fileName}`);
                         } catch (e) {
-                            console.warn('拉取文件失败:', file.fileName, e.message);
+                            failedCount++;
+                            console.warn(`❌ [失败${failedCount}] 拉取文件失败: ${file.fileName} - ${e.message}`);
                         }
                     }
                 }
                 
-                console.log(`✅ 成功处理 ${processedFiles} 个文件`);
+                console.log(`📊 批量导出统计: 成功${successCount}个, 失败${failedCount}个, 缺少URL${missingUrlCount}个, 总计${totalExpectedFiles}个`);
                 
-                if (processedFiles === 0) {
-                    showStatus('fileManageStatus', '❌ 没有找到可导出的文件', 'error');
+                if (successCount === 0) {
+                    showStatus('fileManageStatus', `❌ 没有成功下载任何文件 (失败${failedCount}个, 缺少URL${missingUrlCount}个)`, 'error');
                     return;
                 }
                 
@@ -3366,12 +3421,16 @@
                 const outName = `packed_folders_${new Date().toISOString().split('T')[0]}.zip`;
                 saveAs(zipBlob, outName);
                 
-                showStatus('fileManageStatus', `✅ 成功导出 ${checkboxes.length} 个文件夹，共 ${processedFiles} 个文件`, 'success');
+                if (failedCount === 0 && missingUrlCount === 0) {
+                    showStatus('fileManageStatus', `✅ 导出完成！${checkboxes.length}个文件夹，共${successCount}个文件`, 'success');
+                } else {
+                    showStatus('fileManageStatus', `⚠️ 导出完成：成功${successCount}个, 失败${failedCount}个, 跳过${missingUrlCount}个`, 'warning');
+                }
                 
                 // 关闭模态框
                 closePackingModal();
             } catch (error) {
-                console.error('导出失败:', error);
+                console.error('❌ 批量导出失败:', error);
                 showStatus('fileManageStatus', `❌ 导出失败：${error.message}`, 'error');
             }
         }
@@ -3625,27 +3684,57 @@
                 showStatus('fileManageStatus', `正在打包 ${dateStr} 的文件...`, 'info');
                 const zip = new JSZip();
                 const filesByFolder = grouped.filesByFolder;
+                
+                let successCount = 0;
+                let failedCount = 0;
+                let missingUrlCount = 0;
+                
                 for (const folder of folderSet) {
                     const files = filesByFolder.get(folder) || [];
                     for (const { file } of files) {
-                        if (!file.downloadUrl) continue;
+                        if (!file.downloadUrl) {
+                            console.warn('⚠️ 文件缺少下载URL，跳过:', file.fileName || file.name);
+                            missingUrlCount++;
+                            continue;
+                        }
                         try {
                             const resp = await fetch(file.downloadUrl);
                             if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                             const blob = await resp.blob();
-                            const path = `${dateStr}/${folder}/${file.fileName || ('file_' + Date.now())}`;
+                            
+                            // 从folder路径中提取最后的文件夹名（避免路径重复）
+                            const pathParts = folder.split('/');
+                            const folderName = pathParts[pathParts.length - 1];
+                            const path = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
+                            
                             zip.file(path, blob);
+                            successCount++;
+                            console.log(`✅ [${successCount}] 已下载: ${file.fileName}`);
                         } catch (e) {
-                            console.warn('拉取文件失败:', file.fileName, e.message);
+                            failedCount++;
+                            console.warn(`❌ [失败${failedCount}] 拉取文件失败: ${file.fileName} - ${e.message}`);
                         }
                     }
+                }
+
+                console.log(`📊 导出统计: 成功${successCount}个, 失败${failedCount}个, 缺少URL${missingUrlCount}个`);
+                
+                if (successCount === 0) {
+                    showStatus('fileManageStatus', `❌ 没有成功下载任何文件 (失败${failedCount}个, 缺少URL${missingUrlCount}个)`, 'error');
+                    return;
                 }
 
                 const zipBlob = await zip.generateAsync({ type: 'blob' });
                 const outName = `files_${dateStr}.zip`;
                 saveAs(zipBlob, outName);
-                showStatus('fileManageStatus', '✅ 导出完成', 'success');
+                
+                if (failedCount === 0 && missingUrlCount === 0) {
+                    showStatus('fileManageStatus', `✅ 导出完成！成功打包 ${successCount} 个文件`, 'success');
+                } else {
+                    showStatus('fileManageStatus', `⚠️ 导出完成：成功${successCount}个, 失败${failedCount}个, 跳过${missingUrlCount}个`, 'warning');
+                }
             } catch (error) {
+                console.error('❌ 导出过程出错:', error);
                 showStatus('fileManageStatus', `❌ 导出失败：${error.message}`, 'error');
             }
         }
@@ -3661,27 +3750,67 @@
 
                 showStatus('fileManageStatus', `正在打包 ${folder} 的文件...`, 'info');
                 const zip = new JSZip();
-                // 解析日期前缀
-                const dateStr = /^[0-9]{8}/.test(folder) ? folder.slice(0, 8) : 'unknown';
+                
+                // 从folder路径中提取日期和文件夹名
+                const pathParts = folder.split('/');
+                const folderName = pathParts[pathParts.length - 1];
+                let dateStr = 'unknown';
+                
+                // 尝试从路径中提取日期 (YYYY-MM-DD格式)
+                if (pathParts.length >= 3) {
+                    const yearMonthDay = pathParts[2];
+                    const dateMatch = yearMonthDay.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    if (dateMatch) {
+                        dateStr = `${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}`;
+                    }
+                } else if (/^[0-9]{8}/.test(folderName)) {
+                    // 兼容旧格式: YYYYMMDD_...
+                    dateStr = folderName.slice(0, 8);
+                }
+                
+                let successCount = 0;
+                let failedCount = 0;
+                let missingUrlCount = 0;
+                
                 for (const { file } of files) {
-                    if (!file.downloadUrl) continue;
+                    if (!file.downloadUrl) {
+                        console.warn('⚠️ 文件缺少下载URL，跳过:', file.fileName || file.name);
+                        missingUrlCount++;
+                        continue;
+                    }
                     try {
                         const resp = await fetch(file.downloadUrl);
                         if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                         const blob = await resp.blob();
-                        const path = `${dateStr}/${folder}/${file.fileName || ('file_' + Date.now())}`;
+                        const path = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
                         zip.file(path, blob);
+                        successCount++;
+                        console.log(`✅ [${successCount}] 已下载: ${file.fileName}`);
                     } catch (e) {
-                        console.warn('拉取文件失败:', file.fileName, e.message);
+                        failedCount++;
+                        console.warn(`❌ [失败${failedCount}] 拉取文件失败: ${file.fileName} - ${e.message}`);
                     }
                 }
 
+                console.log(`📊 导出统计: 成功${successCount}个, 失败${failedCount}个, 缺少URL${missingUrlCount}个`);
+                
+                if (successCount === 0) {
+                    showStatus('fileManageStatus', `❌ 没有成功下载任何文件 (失败${failedCount}个, 缺少URL${missingUrlCount}个)`, 'error');
+                    return;
+                }
+
                 const zipBlob = await zip.generateAsync({ type: 'blob' });
-                const safeFolderName = folder.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+                const safeFolderName = folderName.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
                 const outName = `folder_${safeFolderName}.zip`;
                 saveAs(zipBlob, outName);
-                showStatus('fileManageStatus', '✅ 导出完成', 'success');
+                
+                if (failedCount === 0 && missingUrlCount === 0) {
+                    showStatus('fileManageStatus', `✅ 导出完成！成功打包 ${successCount} 个文件`, 'success');
+                } else {
+                    showStatus('fileManageStatus', `⚠️ 导出完成：成功${successCount}个, 失败${failedCount}个, 跳过${missingUrlCount}个`, 'warning');
+                }
             } catch (error) {
+                console.error('❌ 导出过程出错:', error);
                 showStatus('fileManageStatus', `❌ 导出失败：${error.message}`, 'error');
             }
         }
@@ -4122,6 +4251,7 @@
                             contractNumber: file.contractNumber || contractNumber,
                             size: file.size,
                             url: publicUrl,
+                            downloadUrl: `${baseURL}/api/r2/download/${encodeURIComponent(file.r2Path)}`.replace(/%2F/g, '/'),
                             uploadTime: file.uploaded,
                             r2Path: file.r2Path
                         };

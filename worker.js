@@ -459,11 +459,24 @@ async function handleR2API(request, env, path, method, corsHeaders) {
         return Response.json({ success: false, error: '缺少文件' }, { headers: corsHeaders });
       }
 
+      // 文件大小检查（500MB限制）
+      const MAX_FILE_SIZE = 500 * 1024 * 1024;
+      if (file.size > MAX_FILE_SIZE) {
+        console.warn(`⚠️ 文件过大: ${file.size} bytes (限制: ${MAX_FILE_SIZE} bytes)`);
+        return Response.json({ 
+          success: false, 
+          error: `文件过大 (${Math.round(file.size / 1024 / 1024)}MB)，超过500MB限制` 
+        }, { headers: corsHeaders });
+      }
+
+      console.log(`📤 正在上传文件: ${folderAndPath}, 大小: ${file.size} bytes (${Math.round(file.size / 1024 / 1024)}MB)`);
+
       await env.R2_BUCKET.put(folderAndPath, file.stream(), {
         httpMetadata: { contentType: file.type || 'application/octet-stream' },
         customMetadata: { uploadedAt: new Date().toISOString() }
       });
 
+      console.log(`✅ 文件上传成功: ${folderAndPath}`);
       return Response.json({ success: true, message: '上传成功', filePath: folderAndPath, size: file.size }, { headers: corsHeaders });
     }
 
