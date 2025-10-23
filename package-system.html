@@ -3410,7 +3410,9 @@
                         }
                         
                         try {
-                            const resp = await fetch(file.downloadUrl);
+                            // ⚠️ 强制使用HTTPS，避免混合内容错误
+                            const secureUrl = file.downloadUrl.replace('http://', 'https://');
+                            const resp = await fetch(secureUrl);
                             if (!resp.ok) {
                                 throw new Error(`HTTP ${resp.status}`);
                             }
@@ -4008,7 +4010,9 @@
                         for (const { file } of files) {
                             if (!file.downloadUrl) continue;
                             try {
-                                const resp = await fetch(file.downloadUrl);
+                                // ⚠️ 强制使用HTTPS，避免混合内容错误
+                                const secureUrl = file.downloadUrl.replace('http://', 'https://');
+                                const resp = await fetch(secureUrl);
                                 if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                                 const blob = await resp.blob();
                                 // 路径: 日期/完整文件夹名/存储文件名
@@ -4074,7 +4078,9 @@
                             continue;
                         }
                         try {
-                            const resp = await fetch(file.downloadUrl);
+                            // ⚠️ 强制使用HTTPS，避免混合内容错误
+                            const secureUrl = file.downloadUrl.replace('http://', 'https://');
+                            const resp = await fetch(secureUrl);
                             if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                             const blob = await resp.blob();
                             
@@ -4155,7 +4161,9 @@
                         continue;
                     }
                     try {
-                        const resp = await fetch(file.downloadUrl);
+                        // ⚠️ 强制使用HTTPS，避免混合内容错误
+                        const secureUrl = file.downloadUrl.replace('http://', 'https://');
+                        const resp = await fetch(secureUrl);
                         if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                         const blob = await resp.blob();
                         const path = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
@@ -4267,10 +4275,24 @@
                     
                     if (parsed.data) {
                         uploadedFiles.clear();
+                        let fixedCount = 0;
                         Object.entries(parsed.data).forEach(([key, value]) => {
+                            // ⚠️ 自动修复HTTP URL为HTTPS
+                            if (value && value.downloadUrl && value.downloadUrl.startsWith('http://')) {
+                                value.downloadUrl = value.downloadUrl.replace('http://', 'https://');
+                                fixedCount++;
+                            }
+                            if (value && value.url && value.url.startsWith('http://')) {
+                                value.url = value.url.replace('http://', 'https://');
+                            }
                             uploadedFiles.set(key, value);
                         });
-                        console.log('✅ 已加载文件记录数量:', uploadedFiles.size);
+                        console.log(`✅ 已加载文件记录数量: ${uploadedFiles.size}${fixedCount > 0 ? `, 修复${fixedCount}个HTTP URL` : ''}`);
+                        
+                        // 如果修复了URL，保存到本地存储
+                        if (fixedCount > 0) {
+                            saveFilesToLocal();
+                        }
                     }
                 }
             } catch (error) {
@@ -4708,6 +4730,13 @@
                         if (serverFileCount > 0) {
                             uploadedFiles.clear();
                             Object.entries(serverFiles).forEach(([key, value]) => {
+                                // ⚠️ 自动修复HTTP URL为HTTPS
+                                if (value && value.downloadUrl && value.downloadUrl.startsWith('http://')) {
+                                    value.downloadUrl = value.downloadUrl.replace('http://', 'https://');
+                                }
+                                if (value && value.url && value.url.startsWith('http://')) {
+                                    value.url = value.url.replace('http://', 'https://');
+                                }
                                 uploadedFiles.set(key, value);
                             });
                             
@@ -4744,6 +4773,13 @@
                         if (localFileCount > 0) {
                             uploadedFiles.clear();
                             Object.entries(localFiles).forEach(([key, value]) => {
+                                // ⚠️ 自动修复HTTP URL为HTTPS
+                                if (value && value.downloadUrl && value.downloadUrl.startsWith('http://')) {
+                                    value.downloadUrl = value.downloadUrl.replace('http://', 'https://');
+                                }
+                                if (value && value.url && value.url.startsWith('http://')) {
+                                    value.url = value.url.replace('http://', 'https://');
+                                }
                                 uploadedFiles.set(key, value);
                             });
                             
@@ -4780,6 +4816,13 @@
                             if (localFileCount > 0) {
                                 uploadedFiles.clear();
                                 Object.entries(localFiles).forEach(([key, value]) => {
+                                    // ⚠️ 自动修复HTTP URL为HTTPS
+                                    if (value && value.downloadUrl && value.downloadUrl.startsWith('http://')) {
+                                        value.downloadUrl = value.downloadUrl.replace('http://', 'https://');
+                                    }
+                                    if (value && value.url && value.url.startsWith('http://')) {
+                                        value.url = value.url.replace('http://', 'https://');
+                                    }
                                     uploadedFiles.set(key, value);
                                 });
                                 
