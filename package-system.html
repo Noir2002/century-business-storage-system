@@ -3409,10 +3409,11 @@
                             continue;
                         }
                         
+                        // ✅ 修复文件URL
+                        fixFileDownloadUrl(file);
+                        
                         try {
-                            // ⚠️ 强制使用HTTPS，避免混合内容错误
-                            const secureUrl = file.downloadUrl.replace('http://', 'https://');
-                            const resp = await fetch(secureUrl);
+                            const resp = await fetch(file.downloadUrl);
                             if (!resp.ok) {
                                 throw new Error(`HTTP ${resp.status}`);
                             }
@@ -4008,11 +4009,12 @@
                     for (const folder of folderSet) {
                         const files = grouped.filesByFolder.get(folder) || [];
                         for (const { file } of files) {
+                            // ✅ 修复文件URL
+                            fixFileDownloadUrl(file);
+                            
                             if (!file.downloadUrl) continue;
                             try {
-                                // ⚠️ 强制使用HTTPS，避免混合内容错误
-                                const secureUrl = file.downloadUrl.replace('http://', 'https://');
-                                const resp = await fetch(secureUrl);
+                                const resp = await fetch(file.downloadUrl);
                                 if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                                 const blob = await resp.blob();
                                 // 路径: 日期/完整文件夹名/存储文件名
@@ -4072,15 +4074,16 @@
                 for (const folder of folderSet) {
                     const files = filesByFolder.get(folder) || [];
                     for (const { file } of files) {
+                        // ✅ 修复文件URL
+                        fixFileDownloadUrl(file);
+                        
                         if (!file.downloadUrl) {
                             console.warn('⚠️ 文件缺少下载URL，跳过:', file.fileName || file.name);
                             missingUrlCount++;
                             continue;
                         }
                         try {
-                            // ⚠️ 强制使用HTTPS，避免混合内容错误
-                            const secureUrl = file.downloadUrl.replace('http://', 'https://');
-                            const resp = await fetch(secureUrl);
+                            const resp = await fetch(file.downloadUrl);
                             if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                             const blob = await resp.blob();
                             
@@ -4155,15 +4158,16 @@
                 let missingUrlCount = 0;
                 
                 for (const { file } of files) {
+                    // ✅ 修复文件URL
+                    fixFileDownloadUrl(file);
+                    
                     if (!file.downloadUrl) {
                         console.warn('⚠️ 文件缺少下载URL，跳过:', file.fileName || file.name);
                         missingUrlCount++;
                         continue;
                     }
                     try {
-                        // ⚠️ 强制使用HTTPS，避免混合内容错误
-                        const secureUrl = file.downloadUrl.replace('http://', 'https://');
-                        const resp = await fetch(secureUrl);
+                        const resp = await fetch(file.downloadUrl);
                         if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                         const blob = await resp.blob();
                         const path = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
@@ -4277,20 +4281,19 @@
                         uploadedFiles.clear();
                         let fixedCount = 0;
                         Object.entries(parsed.data).forEach(([key, value]) => {
-                            // ⚠️ 自动修复HTTP URL为HTTPS
-                            if (value && value.downloadUrl && value.downloadUrl.startsWith('http://')) {
-                                value.downloadUrl = value.downloadUrl.replace('http://', 'https://');
+                            // ⚠️ 使用统一的修复函数
+                            const oldUrl = value.downloadUrl;
+                            fixFileDownloadUrl(value);
+                            if (oldUrl !== value.downloadUrl) {
                                 fixedCount++;
-                            }
-                            if (value && value.url && value.url.startsWith('http://')) {
-                                value.url = value.url.replace('http://', 'https://');
                             }
                             uploadedFiles.set(key, value);
                         });
-                        console.log(`✅ 已加载文件记录数量: ${uploadedFiles.size}${fixedCount > 0 ? `, 修复${fixedCount}个HTTP URL` : ''}`);
+                        console.log(`✅ 已加载文件记录数量: ${uploadedFiles.size}${fixedCount > 0 ? `, 修复${fixedCount}个URL` : ''}`);
                         
                         // 如果修复了URL，保存到本地存储
                         if (fixedCount > 0) {
+                            console.log('💾 保存修复后的文件URL到本地存储');
                             saveFilesToLocal();
                         }
                     }
@@ -4316,6 +4319,35 @@
             const cloudflareWorkerUrl = 'https://century-business-system.anthonin815.workers.dev';
             
             return customDomain;
+        }
+        
+        // 修复并规范化文件的downloadUrl
+        function fixFileDownloadUrl(file) {
+            if (!file) return file;
+            
+            const baseURL = getBaseURL();
+            
+            // 如果没有downloadUrl，尝试从r2Path生成
+            if (!file.downloadUrl && file.r2Path) {
+                file.downloadUrl = `${baseURL}/api/r2/download/${encodeURIComponent(file.r2Path)}`.replace(/%2F/g, '/');
+                console.log(`🔧 为文件生成downloadUrl: ${file.fileName}`);
+            }
+            
+            // 修复旧格式的URL：/api/package/{timestamp}/download -> /api/r2/download/{r2Path}
+            if (file.downloadUrl && file.downloadUrl.includes('/api/package/') && file.r2Path) {
+                file.downloadUrl = `${baseURL}/api/r2/download/${encodeURIComponent(file.r2Path)}`.replace(/%2F/g, '/');
+                console.log(`🔧 修复旧格式URL: ${file.fileName}`);
+            }
+            
+            // 强制使用HTTPS
+            if (file.downloadUrl && file.downloadUrl.startsWith('http://')) {
+                file.downloadUrl = file.downloadUrl.replace('http://', 'https://');
+            }
+            if (file.url && file.url.startsWith('http://')) {
+                file.url = file.url.replace('http://', 'https://');
+            }
+            
+            return file;
         }
 
         // 数据同步功能（临时使用LocalStorage跨域同步）
@@ -4730,13 +4762,8 @@
                         if (serverFileCount > 0) {
                             uploadedFiles.clear();
                             Object.entries(serverFiles).forEach(([key, value]) => {
-                                // ⚠️ 自动修复HTTP URL为HTTPS
-                                if (value && value.downloadUrl && value.downloadUrl.startsWith('http://')) {
-                                    value.downloadUrl = value.downloadUrl.replace('http://', 'https://');
-                                }
-                                if (value && value.url && value.url.startsWith('http://')) {
-                                    value.url = value.url.replace('http://', 'https://');
-                                }
+                                // ⚠️ 使用统一的修复函数
+                                fixFileDownloadUrl(value);
                                 uploadedFiles.set(key, value);
                             });
                             
@@ -4773,13 +4800,8 @@
                         if (localFileCount > 0) {
                             uploadedFiles.clear();
                             Object.entries(localFiles).forEach(([key, value]) => {
-                                // ⚠️ 自动修复HTTP URL为HTTPS
-                                if (value && value.downloadUrl && value.downloadUrl.startsWith('http://')) {
-                                    value.downloadUrl = value.downloadUrl.replace('http://', 'https://');
-                                }
-                                if (value && value.url && value.url.startsWith('http://')) {
-                                    value.url = value.url.replace('http://', 'https://');
-                                }
+                                // ⚠️ 使用统一的修复函数
+                                fixFileDownloadUrl(value);
                                 uploadedFiles.set(key, value);
                             });
                             
@@ -4816,13 +4838,8 @@
                             if (localFileCount > 0) {
                                 uploadedFiles.clear();
                                 Object.entries(localFiles).forEach(([key, value]) => {
-                                    // ⚠️ 自动修复HTTP URL为HTTPS
-                                    if (value && value.downloadUrl && value.downloadUrl.startsWith('http://')) {
-                                        value.downloadUrl = value.downloadUrl.replace('http://', 'https://');
-                                    }
-                                    if (value && value.url && value.url.startsWith('http://')) {
-                                        value.url = value.url.replace('http://', 'https://');
-                                    }
+                                    // ⚠️ 使用统一的修复函数
+                                    fixFileDownloadUrl(value);
                                     uploadedFiles.set(key, value);
                                 });
                                 
