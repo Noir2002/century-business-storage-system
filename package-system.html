@@ -973,6 +973,7 @@
                     <button onclick="refreshFileList()" class="btn">🔄 刷新列表</button>
                     <button onclick="debugFileRecords()" class="btn btn-info">🔍 调试文件记录</button>
                     <button onclick="exportAllFiles()" class="btn btn-success">📦 导出所有文件</button>
+                    <button onclick="openBatchFixModal()" class="btn btn-warning">📝 批量修正今日未匹配</button>
                     <button onclick="openDeleteByFolderModal()" class="btn btn-danger">🗑️ 删除文件</button>
                     <!-- GitHub重建功能已移除 -->
                 </div>
@@ -1089,6 +1090,35 @@
                 <button class="btn btn-secondary" onclick="closeFixUnmatchedModal()">取消</button>
             </div>
             <div id="fixStatus" style="margin-top:12px;"></div>
+        </div>
+    </div>
+
+    <!-- 批量修正未匹配文件夹 模态框 -->
+    <div id="batchFixModal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2>📝 批量修正今日未匹配文件夹</h2>
+                <button class="close" onclick="closeBatchFixModal()">&times;</button>
+            </div>
+            <div style="color:#718096; margin-bottom:15px; line-height:1.6;">
+                <p>✨ <strong>智能修正功能</strong>：根据今日导入的数据库，自动匹配文件夹名称。</p>
+                <p>📋 系统会扫描所有未匹配的文件夹（使用随机4位数的），您只需输入正确的LP号后4位即可自动修正。</p>
+            </div>
+            
+            <div id="batchFixSummary" style="padding:12px; background:#f0f9ff; border-left:4px solid #3b82f6; margin-bottom:15px; border-radius:4px;">
+                正在扫描未匹配文件夹...
+            </div>
+            
+            <div id="batchFixList" style="max-height:400px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; padding:10px; background:#fafafa;">
+                <!-- 动态填充 -->
+            </div>
+            
+            <div style="text-align:center; margin-top:20px; display:flex; gap:10px; justify-content:center;">
+                <button class="btn btn-success" onclick="confirmBatchFix()">✅ 批量修正</button>
+                <button class="btn btn-secondary" onclick="closeBatchFixModal()">取消</button>
+            </div>
+            
+            <div id="batchFixStatus" style="margin-top:15px;"></div>
         </div>
     </div>
 
@@ -1706,7 +1736,10 @@
                 // 自动创建当日文件夹和设置待完成打包数量
                 await createTodayFolderAndSetPackingTargets();
                 
-                showStatus('databaseStatus', `✅ 数据库导入成功！共导入 ${validRecords} 条有效记录，已创建当日文件夹`, 'success');
+                // 同步数据库到服务器（重要：让其他设备能够加载数据）
+                await syncDatabaseToServer();
+                
+                showStatus('databaseStatus', `✅ 数据库导入成功！共导入 ${validRecords} 条有效记录，已同步到服务器`, 'success');
                 
             } catch (error) {
                 showStatus('databaseStatus', `❌ 数据库导入失败：${error.message}`, 'error');
@@ -2074,13 +2107,27 @@
             ]);
         }
 
-        // 带重试机制的上传函数
-        async function uploadWithRetry(url, formData, maxRetries = 3, timeout = 300000) {
+        // 带重试机制的上传函数（改进版：每次重试重新创建FormData）
+        async function uploadWithRetry(url, fileToUpload, lpNumber, fullFolderPath, maxRetries = 3, timeout = 300000) {
             let lastError;
+            
+            // 定义不可重试的错误类型
+            const NON_RETRYABLE_ERRORS = [
+                '文件过大',
+                '文件格式不支持',
+                '缺少文件',
+                'LP号无效',
+                '超过500MB限制'
+            ];
             
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
                     console.log(`📤 上传尝试 ${attempt}/${maxRetries}...`);
+                    
+                    // ✅ 每次重试都重新创建FormData（解决FormData重用问题）
+                    const formData = new FormData();
+                    formData.append('file', fileToUpload);
+                    formData.append('description', `LP号:${lpNumber} 文件夹:${fullFolderPath}`);
                     
                     const response = await fetchWithTimeout(url, {
                         method: 'POST',
@@ -2101,6 +2148,16 @@
                 } catch (error) {
                     lastError = error;
                     console.warn(`⚠️ 第${attempt}次尝试失败: ${error.message}`);
+                    
+                    // ✅ 检查是否为不可重试错误
+                    const isNonRetryable = NON_RETRYABLE_ERRORS.some(msg => 
+                        error.message.includes(msg)
+                    );
+                    
+                    if (isNonRetryable) {
+                        console.error(`❌ 不可重试错误，停止重试: ${error.message}`);
+                        throw error;  // 直接抛出，不再重试
+                    }
                     
                     if (attempt < maxRetries) {
                         const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 指数退避，最多5秒
@@ -2147,10 +2204,6 @@
                     
                     // 真正上传到 R2 存储（带重试机制）
                     try {
-                        const formData = new FormData();
-                        formData.append('file', file);
-                        formData.append('description', `LP号:${lpNumber} 文件夹:${fullFolderPath}`);
-                        
                         const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
                         const uploadUrl = `${baseURL}/api/r2/upload/${encodeURIComponent(fullFolderPath)}/${encodeURIComponent(fileName)}`;
                         
@@ -2158,7 +2211,8 @@
                         const timeout = Math.max(300000, Math.ceil(file.size / 1024 / 1024 * 10000)); // 每MB约10秒，最少5分钟
                         console.log(`⏱️ 文件大小: ${formatFileSize(file.size)}, 超时设置: ${Math.round(timeout/1000)}秒`);
                         
-                        const uploadResult = await uploadWithRetry(uploadUrl, formData, 3, timeout);
+                        // ✅ 使用改进的重试函数（传入file对象，而非FormData）
+                        const uploadResult = await uploadWithRetry(uploadUrl, file, lpNumber, fullFolderPath, 3, timeout);
                         
                         // 适配 /api/r2/upload 返回结构
                         const filePath = uploadResult.filePath || `${fullFolderPath}/${fileName}`;
@@ -2193,14 +2247,16 @@
                         console.error(`❌ 上传失败 ${file.name}:`, error);
                         failedFiles.push({
                             name: file.name,
-                            error: error.message
+                            error: error.message,
+                            size: formatFileSize(file.size)
                         });
                     }
                 } catch (error) {
                     console.error(`❌ 文件处理失败 ${file.name}:`, error);
                     failedFiles.push({
                         name: file.name,
-                        error: error.message
+                        error: error.message,
+                        size: formatFileSize(file.size)
                     });
                 }
 
@@ -2227,12 +2283,17 @@
                 displayFileList();
             }
 
+            // ✅ 改进的提示信息，显示详细失败原因
             if (failedFiles.length === 0) {
                 showStatus('uploadStatus', `🎉 所有文件上传成功！共上传 ${successCount} 个文件`, 'success');
             } else if (successCount > 0) {
-                showStatus('uploadStatus', `⚠️ 部分文件上传成功：${successCount}个成功，${failedFiles.length}个失败`, 'warning');
+                const failedList = failedFiles.map(f => `• ${f.name} (${f.size}): ${f.error}`).join('\n');
+                showStatus('uploadStatus', `⚠️ 部分文件上传成功：${successCount}个成功，${failedFiles.length}个失败\n\n失败详情：\n${failedList}`, 'warning');
+                console.error('❌ 失败文件详情:', failedFiles);
             } else {
-                showStatus('uploadStatus', '❌ 所有文件上传失败，请检查网络连接', 'error');
+                const failedList = failedFiles.map(f => `• ${f.name} (${f.size}): ${f.error}`).join('\n');
+                showStatus('uploadStatus', `❌ 所有文件上传失败\n\n失败详情：\n${failedList}`, 'error');
+                console.error('❌ 失败文件详情:', failedFiles);
             }
 
             // 只在成功上传后才清空文件列表
@@ -3435,7 +3496,298 @@
             }
         }
 
-        // —— 修正未匹配文件夹 ——
+        // —— 批量修正未匹配文件夹（重要功能）——
+        let batchFixData = [];  // 存储待修正的文件夹信息
+        
+        function openBatchFixModal() {
+            if (databaseData.size === 0) {
+                alert('请先导入数据库！');
+                return;
+            }
+            
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const todayStr = `${year}${month}${day}`;
+            const yearMonth = `${year}-${month}`;
+            const yearMonthDay = `${year}-${month}-${day}`;
+            
+            console.log('📝 开始扫描今日未匹配文件夹...');
+            console.log('📅 今日日期:', todayStr);
+            
+            // 扫描所有今日上传的文件夹
+            const folderStats = new Map();  // folder -> {fileCount, suffix, files}
+            
+            for (const [key, file] of uploadedFiles.entries()) {
+                if (!file || !file.folder) continue;
+                
+                // 检查是否是今日的文件夹
+                const pathParts = file.folder.split('/');
+                if (pathParts.length >= 3) {
+                    const folderYMD = pathParts[2];  // 例如: 2025-10-23
+                    const folderYMDStr = folderYMD.replace(/-/g, '');
+                    
+                    if (folderYMDStr === todayStr) {
+                        const folder = file.folder;
+                        if (!folderStats.has(folder)) {
+                            folderStats.set(folder, {
+                                fileCount: 0,
+                                suffix: '',
+                                files: [],
+                                folderName: pathParts[pathParts.length - 1]
+                            });
+                        }
+                        const stats = folderStats.get(folder);
+                        stats.fileCount++;
+                        stats.files.push(file);
+                        
+                        // 提取后缀（从文件夹名称中）
+                        const folderName = pathParts[pathParts.length - 1];
+                        const suffixMatch = folderName.match(/_(\d{4})$/);
+                        if (suffixMatch) {
+                            stats.suffix = suffixMatch[1];
+                        }
+                    }
+                }
+            }
+            
+            console.log('📊 找到今日文件夹:', folderStats.size);
+            
+            // 识别未匹配的文件夹
+            batchFixData = [];
+            for (const [folder, stats] of folderStats.entries()) {
+                // 检查是否已经匹配（有contractNumber）
+                const firstFile = stats.files[0];
+                const contractNumber = firstFile.contractNumber || '';
+                
+                // 判断是否为未匹配：contractNumber为空，或者是4位数字（随机生成的）
+                const isUnmatched = !contractNumber || /^\d{4}$/.test(contractNumber);
+                
+                if (isUnmatched) {
+                    batchFixData.push({
+                        folder: folder,
+                        folderName: stats.folderName,
+                        suffix: stats.suffix,
+                        fileCount: stats.fileCount,
+                        contractNumber: contractNumber,
+                        lpInput: ''  // 用户输入的LP号后4位
+                    });
+                }
+            }
+            
+            console.log('🔍 识别到未匹配文件夹:', batchFixData.length);
+            
+            // 显示结果
+            const modal = document.getElementById('batchFixModal');
+            const summary = document.getElementById('batchFixSummary');
+            const list = document.getElementById('batchFixList');
+            
+            if (batchFixData.length === 0) {
+                summary.innerHTML = '✅ 太棒了！所有今日文件夹都已正确匹配，无需修正。';
+                list.innerHTML = '<div style="text-align:center; padding:30px; color:#10b981; font-size:16px;">✨ 所有文件夹已完美匹配！</div>';
+            } else {
+                summary.innerHTML = `
+                    📋 扫描完成：找到 <strong>${batchFixData.length}</strong> 个未匹配的文件夹，共 <strong>${batchFixData.reduce((sum, item) => sum + item.fileCount, 0)}</strong> 个文件需要修正。
+                `;
+                
+                // 生成输入列表
+                list.innerHTML = batchFixData.map((item, index) => `
+                    <div style="padding:15px; margin-bottom:10px; background:white; border-radius:6px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <div style="flex:1;">
+                                <div style="font-weight:600; color:#1e40af; margin-bottom:5px;">
+                                    📁 ${item.folderName}
+                                </div>
+                                <div style="color:#64748b; font-size:13px;">
+                                    📂 完整路径: ${item.folder}
+                                </div>
+                                <div style="color:#64748b; font-size:13px; margin-top:3px;">
+                                    📦 包含 ${item.fileCount} 个文件 ${item.suffix ? `| 后缀: ${item.suffix}` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <label style="flex-shrink:0; font-weight:500; color:#374151;">
+                                输入LP号后4位：
+                            </label>
+                            <input type="text" 
+                                   id="lpInput_${index}" 
+                                   placeholder="${item.suffix || '请输入4位数字'}" 
+                                   value="${item.suffix || ''}"
+                                   maxlength="4"
+                                   oninput="this.value=this.value.replace(/[^0-9]/g,''); updateBatchFixInput(${index}, this.value)"
+                                   style="flex:1; padding:8px 12px; border:1px solid #d1d5db; border-radius:4px; font-size:14px; max-width:200px;">
+                            <div id="lpMatch_${index}" style="flex:1; color:#10b981; font-size:13px; min-height:20px;">
+                                ${item.suffix ? '💡 已自动填充文件夹后缀' : ''}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                // 自动填充已知的后缀
+                setTimeout(() => {
+                    batchFixData.forEach((item, index) => {
+                        if (item.suffix) {
+                            item.lpInput = item.suffix;
+                            checkLPMatch(index, item.suffix);
+                        }
+                    });
+                }, 100);
+            }
+            
+            modal.style.display = 'block';
+        }
+        
+        function closeBatchFixModal() {
+            document.getElementById('batchFixModal').style.display = 'none';
+            batchFixData = [];
+        }
+        
+        function updateBatchFixInput(index, value) {
+            if (index >= 0 && index < batchFixData.length) {
+                batchFixData[index].lpInput = value;
+                if (value.length === 4) {
+                    checkLPMatch(index, value);
+                } else {
+                    document.getElementById(`lpMatch_${index}`).innerHTML = '';
+                }
+            }
+        }
+        
+        function checkLPMatch(index, suffix) {
+            const matchDiv = document.getElementById(`lpMatch_${index}`);
+            if (!matchDiv) return;
+            
+            // 查找以该后缀结尾的LP号
+            const matches = [];
+            for (const [lp, contract] of databaseData.entries()) {
+                const lpStr = String(lp);
+                if (lpStr.endsWith(suffix)) {
+                    matches.push({ lp: lpStr, contract: contract });
+                }
+            }
+            
+            if (matches.length === 0) {
+                matchDiv.innerHTML = '❌ 数据库中未找到以此结尾的LP号';
+                matchDiv.style.color = '#ef4444';
+            } else if (matches.length === 1) {
+                matchDiv.innerHTML = `✅ 匹配到: LP${matches[0].lp} → ${matches[0].contract}`;
+                matchDiv.style.color = '#10b981';
+            } else {
+                matchDiv.innerHTML = `⚠️ 找到${matches.length}个匹配，请确认LP号正确`;
+                matchDiv.style.color = '#f59e0b';
+            }
+        }
+        
+        async function confirmBatchFix() {
+            if (batchFixData.length === 0) {
+                alert('没有需要修正的文件夹');
+                return;
+            }
+            
+            console.log('🚀 开始批量修正...');
+            
+            const statusDiv = document.getElementById('batchFixStatus');
+            statusDiv.innerHTML = '';
+            
+            let successCount = 0;
+            let failCount = 0;
+            const errors = [];
+            
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const yearMonth = `${year}-${month}`;
+            const yearMonthDay = `${year}-${month}-${day}`;
+            
+            for (let i = 0; i < batchFixData.length; i++) {
+                const item = batchFixData[i];
+                
+                if (!item.lpInput || item.lpInput.length !== 4) {
+                    errors.push(`${item.folderName}: 未输入有效的LP号后4位`);
+                    failCount++;
+                    continue;
+                }
+                
+                // 在数据库中查找匹配的LP号
+                const matches = [];
+                for (const [lp, contract] of databaseData.entries()) {
+                    if (String(lp).endsWith(item.lpInput)) {
+                        matches.push({ lp: String(lp), contract: contract });
+                    }
+                }
+                
+                if (matches.length === 0) {
+                    errors.push(`${item.folderName}: 数据库中未找到以 ${item.lpInput} 结尾的LP号`);
+                    failCount++;
+                    continue;
+                }
+                
+                if (matches.length > 1) {
+                    errors.push(`${item.folderName}: 找到${matches.length}个匹配的LP号，请使用完整LP号修正`);
+                    failCount++;
+                    continue;
+                }
+                
+                const lpFull = matches[0].lp;
+                const contract = matches[0].contract;
+                
+                // 创建新文件夹路径
+                const newFolder = `package/${yearMonth}/${yearMonthDay}/${yearMonthDay}_${contract}`;
+                
+                console.log(`📝 修正: ${item.folder} -> ${newFolder}`);
+                
+                // 更新所有该文件夹下的文件记录
+                let fileUpdated = 0;
+                for (const [key, file] of uploadedFiles.entries()) {
+                    if (file && file.folder === item.folder) {
+                        file.folder = newFolder;
+                        file.lpNumber = lpFull;
+                        file.contractNumber = contract;
+                        uploadedFiles.set(key, file);
+                        fileUpdated++;
+                    }
+                }
+                
+                console.log(`✅ 已更新 ${fileUpdated} 个文件记录`);
+                successCount++;
+            }
+            
+            // 保存修改
+            if (successCount > 0) {
+                saveFilesToLocal();
+                await syncFilesToServer();
+                displayFileList();
+                updatePackingInfo();
+            }
+            
+            // 显示结果
+            let resultHtml = '';
+            if (successCount > 0) {
+                resultHtml += `<div style="color:#10b981; padding:10px; background:#f0fdf4; border-radius:4px; margin-bottom:10px;">
+                    ✅ 成功修正 ${successCount} 个文件夹
+                </div>`;
+            }
+            if (errors.length > 0) {
+                resultHtml += `<div style="color:#ef4444; padding:10px; background:#fef2f2; border-radius:4px;">
+                    ❌ ${failCount} 个文件夹修正失败：<br>
+                    ${errors.map(e => `• ${e}`).join('<br>')}
+                </div>`;
+            }
+            
+            statusDiv.innerHTML = resultHtml;
+            
+            if (failCount === 0) {
+                showStatus('batchFixStatus', `🎉 批量修正完成！成功修正 ${successCount} 个文件夹`, 'success');
+                setTimeout(() => {
+                    closeBatchFixModal();
+                }, 2000);
+            }
+        }
+        
+        // —— 修正未匹配文件夹（单个）——
         function openFixUnmatchedFolderModal(folder, suffix) {
             const modal = document.getElementById('fixUnmatchedModal');
             if (!modal) return;
@@ -4565,6 +4917,10 @@
             const fixModal = document.getElementById('fixUnmatchedModal');
             if (event.target === fixModal) {
                 closeFixUnmatchedModal();
+            }
+            const batchFixModal = document.getElementById('batchFixModal');
+            if (event.target === batchFixModal) {
+                closeBatchFixModal();
             }
             const autoFix = document.getElementById('autoFixModal');
             if (event.target === autoFix) {
