@@ -2213,10 +2213,10 @@
                         
                         console.log('📝 生成文件记录:', fileRecord);
                         
-                        // 使用 R2 对象完整key作为Map键值，便于后续删除
-                        uploadedFiles.set(filePath, fileRecord);
+                        // ✅ 使用fileName作为Map键值，保持与loadServerFiles()一致
+                        uploadedFiles.set(fileName, fileRecord);
                         successCount++;
-                        console.log(`✅ 文件上传成功: ${file.name} -> ${filePath}`);
+                        console.log(`✅ 文件上传成功: ${file.name} -> ${filePath} (key: ${fileName})`);
                         console.log(`📝 文件记录已保存:`, fileRecord);
                         
                         // 立即保存到本地存储，防止丢失
@@ -2249,16 +2249,15 @@
                 saveFilesToLocal();
                 console.log('📊 保存后文件记录数量:', uploadedFiles.size);
                 
-                // 同步文件注册表到服务器并刷新文件列表
-                Promise.all([
-                    syncFilesToServer(),
-                    loadServerFiles()  // 重新从R2加载最新文件列表
-                ]).catch(error => {
+                // ✅ 仅同步到服务器，不立即重新加载（避免竞态条件）
+                syncFilesToServer().catch(error => {
                     console.warn('文件注册表同步失败:', error);
                 });
                 
-                // 刷新文件列表显示
+                // ✅ 直接刷新文件列表显示（使用已有数据）
                 displayFileList();
+                
+                console.log('✅ 文件上传完成，列表已更新');
             }
 
             // ✅ 改进的提示信息，显示详细失败原因
@@ -4758,14 +4757,27 @@
                         
                         console.log(`🔄 服务器文件记录数量: ${serverFileCount}, 本地文件记录数量: ${uploadedFiles.size}`);
                         
-                        // 只有当服务器有文件记录时才覆盖本地数据
+                        // 只有当服务器有文件记录时才同步
                         if (serverFileCount > 0) {
-                            uploadedFiles.clear();
+                            // ✅ 合并数据，而非直接覆盖（保留本地新增的文件）
+                            let mergedCount = 0;
+                            let newCount = 0;
+                            
                             Object.entries(serverFiles).forEach(([key, value]) => {
-                                // ⚠️ 使用统一的修复函数
                                 fixFileDownloadUrl(value);
-                                uploadedFiles.set(key, value);
+                                const localFile = uploadedFiles.get(key);
+                                
+                                if (!localFile) {
+                                    // 服务器有，本地没有：添加到本地
+                                    uploadedFiles.set(key, value);
+                                    newCount++;
+                                } else {
+                                    // 都有：保留本地的（可能是刚上传的）
+                                    mergedCount++;
+                                }
                             });
+                            
+                            console.log(`🔄 数据合并：新增${newCount}个，已存在${mergedCount}个`);
                             
                             saveFilesToLocal();
                             localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', serverTimestamp);
@@ -4796,16 +4808,22 @@
                         
                         console.log(`🔄 本地存储文件记录数量: ${localFileCount}, 当前文件记录数量: ${uploadedFiles.size}`);
                         
-                        // 只有当本地存储有文件记录时才覆盖当前数据
+                        // 只有当本地存储有文件记录时才合并
                         if (localFileCount > 0) {
-                            uploadedFiles.clear();
+                            // ✅ 合并数据，保留当前的新增文件
+                            let newCount = 0;
                             Object.entries(localFiles).forEach(([key, value]) => {
-                                // ⚠️ 使用统一的修复函数
-                                fixFileDownloadUrl(value);
-                                uploadedFiles.set(key, value);
+                                if (!uploadedFiles.has(key)) {
+                                    fixFileDownloadUrl(value);
+                                    uploadedFiles.set(key, value);
+                                    newCount++;
+                                }
                             });
                             
-                            saveFilesToLocal();
+                            if (newCount > 0) {
+                                console.log(`🔄 从本地存储合并了${newCount}个文件`);
+                                saveFilesToLocal();
+                            }
                             localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', localTimestamp);
                             
                             console.log('✅ 文件注册表已从本地存储同步加载');
@@ -4834,19 +4852,24 @@
                             
                             console.log(`🔄 错误恢复：本地存储文件记录数量: ${localFileCount}, 当前文件记录数量: ${uploadedFiles.size}`);
                             
-                            // 只有当本地存储有文件记录时才覆盖当前数据
+                            // 只有当本地存储有文件记录时才合并
                             if (localFileCount > 0) {
-                                uploadedFiles.clear();
+                                // ✅ 合并数据，保留当前的新增文件
+                                let newCount = 0;
                                 Object.entries(localFiles).forEach(([key, value]) => {
-                                    // ⚠️ 使用统一的修复函数
-                                    fixFileDownloadUrl(value);
-                                    uploadedFiles.set(key, value);
+                                    if (!uploadedFiles.has(key)) {
+                                        fixFileDownloadUrl(value);
+                                        uploadedFiles.set(key, value);
+                                        newCount++;
+                                    }
                                 });
                                 
-                                saveFilesToLocal();
+                                if (newCount > 0) {
+                                    console.log(`⚠️ 服务器加载失败，从本地存储恢复了${newCount}个文件`);
+                                    saveFilesToLocal();
+                                }
                                 localStorage.setItem(STORAGE_KEYS.FILES + '_timestamp', localTimestamp);
                                 
-                                console.log('⚠️ 服务器加载失败，已从本地存储加载');
                                 return true;
                             } else {
                                 console.log('⚠️ 本地存储文件记录为空，保持当前数据不变');
