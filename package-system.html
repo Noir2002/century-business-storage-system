@@ -3683,6 +3683,11 @@
             for (let i = 0; i < batchFixData.length; i++) {
                 const item = batchFixData[i];
                 
+                // 显示进度
+                statusDiv.innerHTML = `<div style="color:#3b82f6; padding:10px; background:#eff6ff; border-radius:4px;">
+                    ⏳ 正在处理第 ${i + 1}/${batchFixData.length} 个文件夹...
+                </div>`;
+                
                 if (!item.lpInput || item.lpInput.length !== 4) {
                     errors.push(`${item.folderName}: 未输入有效的LP号后4位`);
                     failCount++;
@@ -3717,19 +3722,60 @@
                 
                 console.log(`📝 修正: ${item.folder} -> ${newFolder}`);
                 
-                // 更新所有该文件夹下的文件记录
+                // 收集需要移动的R2文件
+                const filesToMove = [];
                 let fileUpdated = 0;
+                
                 for (const [key, file] of uploadedFiles.entries()) {
                     if (file && file.folder === item.folder) {
+                        // 构建R2文件的旧路径和新路径
+                        const oldR2Path = file.r2Path || `${item.folder}/${file.fileName || file.name}`;
+                        const newR2Path = `${newFolder}/${file.fileName || file.name}`;
+                        
+                        filesToMove.push({
+                            oldPath: oldR2Path,
+                            newPath: newR2Path
+                        });
+                        
+                        // 更新文件记录
                         file.folder = newFolder;
                         file.lpNumber = lpFull;
                         file.contractNumber = contract;
+                        file.r2Path = newR2Path;
                         uploadedFiles.set(key, file);
                         fileUpdated++;
                     }
                 }
                 
-                console.log(`✅ 已更新 ${fileUpdated} 个文件记录`);
+                // 调用R2 API批量移动文件
+                if (filesToMove.length > 0) {
+                    try {
+                        const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+                        const moveResponse = await fetch(`${baseURL}/api/r2/batch-move`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ moves: filesToMove })
+                        });
+                        
+                        const moveResult = await moveResponse.json();
+                        
+                        if (moveResult.success) {
+                            console.log(`✅ R2文件移动成功: ${filesToMove.length} 个文件`);
+                        } else {
+                            console.warn(`⚠️ R2文件移动部分失败:`, moveResult);
+                            if (moveResult.results && moveResult.results.failed.length > 0) {
+                                errors.push(`${item.folderName}: R2移动失败${moveResult.results.failed.length}个文件`);
+                            }
+                        }
+                    } catch (moveError) {
+                        console.error(`❌ R2文件移动失败:`, moveError);
+                        errors.push(`${item.folderName}: R2文件移动异常 - ${moveError.message}`);
+                    }
+                }
+                
+                console.log(`✅ 已更新 ${fileUpdated} 个文件记录并移动R2文件`);
                 successCount++;
             }
             
@@ -4236,7 +4282,8 @@
         function getBaseURL() {
             // 优先使用当前域名（Cloudflare Worker 域名）
             if (window.location.protocol !== 'file:') {
-                return window.location.origin;
+                // ⚠️ 强制使用HTTPS，避免混合内容错误
+                return window.location.origin.replace('http://', 'https://');
             }
             
             // 如果是file://协议，优先尝试自定义域名

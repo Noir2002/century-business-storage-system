@@ -480,6 +480,68 @@ async function handleR2API(request, env, path, method, corsHeaders) {
       return Response.json({ success: true, message: '上传成功', filePath: folderAndPath, size: file.size }, { headers: corsHeaders });
     }
 
+    // 批量移动文件（用于修正文件夹名称）
+    if (path === '/api/r2/batch-move' && method === 'POST') {
+      try {
+        const { moves } = await request.json(); // moves: [{ oldPath, newPath }, ...]
+        
+        if (!Array.isArray(moves) || moves.length === 0) {
+          return Response.json({ success: false, error: '无效的移动请求' }, { headers: corsHeaders });
+        }
+
+        console.log(`🔄 开始批量移动 ${moves.length} 个文件...`);
+        
+        const results = {
+          success: [],
+          failed: []
+        };
+
+        for (const move of moves) {
+          const { oldPath, newPath } = move;
+          
+          try {
+            // 1. 检查源文件是否存在
+            const sourceObj = await env.R2_BUCKET.get(oldPath);
+            if (!sourceObj) {
+              results.failed.push({ oldPath, newPath, error: '源文件不存在' });
+              continue;
+            }
+
+            // 2. 复制到新位置
+            await env.R2_BUCKET.put(newPath, sourceObj.body, {
+              httpMetadata: sourceObj.httpMetadata,
+              customMetadata: {
+                ...sourceObj.customMetadata,
+                movedFrom: oldPath,
+                movedAt: new Date().toISOString()
+              }
+            });
+
+            // 3. 删除旧文件
+            await env.R2_BUCKET.delete(oldPath);
+
+            results.success.push({ oldPath, newPath });
+            console.log(`✅ 成功移动: ${oldPath} -> ${newPath}`);
+          } catch (err) {
+            results.failed.push({ oldPath, newPath, error: err.message });
+            console.error(`❌ 移动失败: ${oldPath}:`, err);
+          }
+        }
+
+        console.log(`📊 批量移动完成: 成功${results.success.length}个, 失败${results.failed.length}个`);
+
+        return Response.json({
+          success: results.failed.length === 0,
+          message: `成功移动${results.success.length}个文件${results.failed.length > 0 ? `，失败${results.failed.length}个` : ''}`,
+          results: results
+        }, { headers: corsHeaders });
+
+      } catch (error) {
+        console.error('批量移动文件错误:', error);
+        return Response.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
     // 测试连接
     if (path === '/api/r2/test-connection' && method === 'GET') {
       const { objects } = await env.R2_BUCKET.list({ limit: 1 });
