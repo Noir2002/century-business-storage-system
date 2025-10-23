@@ -1774,30 +1774,8 @@
                 updatePackingInfo();
             }
         }
-        // 启动时尝试从共享R2加载最新数据库（若本地无数据）
-        async function tryLoadSharedDatabase() {
-            try {
-                if (databaseData.size > 0) return; // 本地已有数据则跳过
-                const baseURL3 = (typeof getBaseURL === 'function') ? getBaseURL() : '';
-                const resp = await fetch(`${baseURL3}/api/database/latest`, { method: 'GET' });
-                if (!resp.ok) return;
-                const data = await resp.json();
-                if (!data.success || !Array.isArray(data.records)) return;
-                databaseData.clear();
-                for (const [lp, contract] of data.records) {
-                    databaseData.set(String(lp), String(contract || ''));
-                }
-                databaseImportDate = data.updatedAt || new Date().toISOString();
-                saveDatabaseToLocal();
-                updateDatabaseDisplay();
-                console.log('✅ 已从共享数据库加载最新数据');
-            } catch (e) {
-                console.warn('加载共享数据库失败:', e);
-            }
-        }
-        
-        // 页面初始化时尝试加载共享数据库
-        tryLoadSharedDatabase();
+        // ✅ 已移除旧的tryLoadSharedDatabase()机制
+        // 现在统一使用 loadDatabaseFromServer() 从 /api/package-sync/database 加载
 
         // 删除数据库
         function deleteDatabase() {
@@ -4377,8 +4355,10 @@
                     const serverData = result.data;
                     const serverTimestamp = serverData.timestamp || 0;
                     
-                    // 检查本地时间戳
-                    const localTimestamp = localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || 0;
+                    // 检查本地时间戳（⚠️ 必须转换为数字进行比较）
+                    const localTimestamp = parseInt(localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || '0', 10);
+                    
+                    console.log(`🔍 时间戳比较: 服务器=${serverTimestamp}, 本地=${localTimestamp}, 需要更新=${serverTimestamp > localTimestamp}`);
                     
                     // 如果服务器数据更新，则同步到本地
                     if (serverTimestamp > localTimestamp) {
@@ -4409,7 +4389,7 @@
                 if (globalData) {
                     const localData = JSON.parse(globalData);
                     const localTimestamp = localData.timestamp || 0;
-                    const currentTimestamp = localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || 0;
+                    const currentTimestamp = parseInt(localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || '0', 10);
                     
                     if (localTimestamp > currentTimestamp) {
                         databaseData.clear();
@@ -4439,7 +4419,7 @@
                     if (globalData) {
                         const localData = JSON.parse(globalData);
                         const localTimestamp = localData.timestamp || 0;
-                        const currentTimestamp = localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || 0;
+                        const currentTimestamp = parseInt(localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || '0', 10);
                         
                         if (localTimestamp > currentTimestamp) {
                             databaseData.clear();
@@ -4664,8 +4644,10 @@
                     const serverData = result.data;
                     const serverTimestamp = serverData.timestamp || 0;
                     
-                    // 检查本地时间戳
-                    const localTimestamp = localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || 0;
+                    // 检查本地时间戳（⚠️ 必须转换为数字进行比较）
+                    const localTimestamp = parseInt(localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || '0', 10);
+                    
+                    console.log(`🔍 文件时间戳比较: 服务器=${serverTimestamp}, 本地=${localTimestamp}, 需要更新=${serverTimestamp > localTimestamp}`);
                     
                     // 如果服务器数据更新，则同步到本地
                     if (serverTimestamp > localTimestamp) {
@@ -4702,7 +4684,7 @@
                 if (globalData) {
                     const localData = JSON.parse(globalData);
                     const localTimestamp = localData.timestamp || 0;
-                    const currentTimestamp = localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || 0;
+                    const currentTimestamp = parseInt(localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || '0', 10);
                     
                     if (localTimestamp > currentTimestamp) {
                         // 检查本地存储数据是否为空
@@ -4738,7 +4720,7 @@
                     if (globalData) {
                         const localData = JSON.parse(globalData);
                         const localTimestamp = localData.timestamp || 0;
-                        const currentTimestamp = localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || 0;
+                        const currentTimestamp = parseInt(localStorage.getItem(STORAGE_KEYS.FILES + '_timestamp') || '0', 10);
                         
                         if (localTimestamp > currentTimestamp) {
                             // 检查本地存储数据是否为空
