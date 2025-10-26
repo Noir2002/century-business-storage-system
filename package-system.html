@@ -1141,6 +1141,27 @@
         </div>
     </div>
 
+    <!-- 经手人输入模态框 -->
+    <div id="operatorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>👤 开始今日操作</h2>
+            </div>
+            <div style="color:#718096; margin-bottom:20px;">
+                请输入您的名字，用于记录今日上传的文件经手人信息。
+            </div>
+            <div class="form-group">
+                <label for="operatorInput">经手人姓名：</label>
+                <input type="text" id="operatorInput" placeholder="请输入您的姓名" maxlength="20" style="width:100%;">
+            </div>
+            <div id="operatorStatus" style="margin-top:12px;"></div>
+            <div style="text-align:center; margin-top:20px;">
+                <button class="btn btn-success" onclick="confirmOperator()">✅ 确认</button>
+                <button class="btn btn-secondary" onclick="skipOperator()">跳过</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 全局变量
         let databaseData = new Map();
@@ -1151,6 +1172,7 @@
         let desktopSelectedFiles = [];
         let previewObjectUrls = [];
         let lastPackingComputation = null;
+        let currentOperator = ''; // 当前经手人
 
         // R2存储配置（无需额外配置，使用环境变量）
 
@@ -1208,6 +1230,72 @@
             try {
                 localStorage.setItem(STORAGE_KEYS.LAST_PAGE, pageId);
             } catch (e) {}
+            
+            // 如果是视频上传页面且没有设置经手人，弹出经手人输入框
+            if (pageId === 'upload' && !currentOperator) {
+                checkAndShowOperatorModal();
+            }
+        }
+        
+        // 检查并显示经手人输入框
+        function checkAndShowOperatorModal() {
+            // 检查今天是否已经设置过经手人
+            const today = new Date().toISOString().split('T')[0];
+            const savedOperator = localStorage.getItem(`operator_${today}`);
+            
+            if (savedOperator) {
+                currentOperator = savedOperator;
+                console.log('✅ 已加载今日经手人:', currentOperator);
+            } else {
+                // 显示经手人输入模态框
+                const modal = document.getElementById('operatorModal');
+                if (modal) {
+                    modal.style.display = 'block';
+                }
+            }
+        }
+        
+        // 确认经手人
+        function confirmOperator() {
+            const input = document.getElementById('operatorInput');
+            const name = input.value.trim();
+            const statusDiv = document.getElementById('operatorStatus');
+            
+            if (!name) {
+                statusDiv.innerHTML = '<div class="alert alert-error">请输入经手人姓名</div>';
+                return;
+            }
+            
+            if (name.length > 20) {
+                statusDiv.innerHTML = '<div class="alert alert-error">姓名长度不能超过20个字符</div>';
+                return;
+            }
+            
+            // 保存经手人（今日有效）
+            const today = new Date().toISOString().split('T')[0];
+            currentOperator = name;
+            localStorage.setItem(`operator_${today}`, name);
+            
+            console.log('✅ 经手人已设置:', currentOperator);
+            
+            // 关闭模态框
+            const modal = document.getElementById('operatorModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+            
+            // 显示成功提示
+            showStatus('uploadStatus', `✅ 欢迎 ${currentOperator}，开始今日工作！`, 'success');
+        }
+        
+        // 跳过经手人设置
+        function skipOperator() {
+            const modal = document.getElementById('operatorModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+            currentOperator = '未设置';
+            showStatus('uploadStatus', '⚠️ 提示：未设置经手人，建议在上传前设置经手人信息', 'warning');
         }
 
         // 移动端菜单切换
@@ -2208,7 +2296,8 @@
                             downloadUrl: `${(typeof getBaseURL === 'function') ? getBaseURL() : ''}/api/r2/download/${encodeURIComponent(filePath)}`.replace(/%2F/g,'/'),
                             uploadTime: new Date().toISOString(),
                             r2Path: filePath,
-                            id: filePath
+                            id: filePath,
+                            operator: currentOperator || '' // 添加经手人信息
                         };
                         
                         console.log('📝 生成文件记录:', fileRecord);
@@ -2653,11 +2742,13 @@
                 const toolbar = `<div style=\"padding: 10px 15px; display:flex; gap:8px; flex-wrap:wrap;\"><button class=\"btn btn-small btn-secondary\" onclick=\"setManageLevel('root')\">⬅️ 返回上一级</button><button class=\"btn btn-small btn-success\" onclick=\"exportFilesByDate('${date}')\">导出当天</button></div>`;
                 fileList.innerHTML = breadcrumb + toolbar + folders.map(folder => {
                     const files = grouped.filesByFolder.get(folder) || [];
+                    // 获取文件夹中第一个文件的经手人（所有文件应该是同一个经手人上传的）
+                    const operator = files.length > 0 && files[0].file.operator ? files[0].file.operator : '未知';
                     return `
                         <div class="file-item" style="cursor: pointer;" onclick="setManageLevel('folder', {date: '${date}', folder: '${folder}'})">
                             <div class="file-info">
                                 <div class="file-name">📁 ${folder}</div>
-                                <div class="file-details">文件: ${files.length}</div>
+                                <div class="file-details">文件: ${files.length} 个 | 经手人: 👤 ${operator}</div>
                             </div>
                             <div class="file-actions">
                                 <button class="btn btn-small" onclick="event.stopPropagation(); setManageLevel('folder', {date: '${date}', folder: '${folder}'})">进入</button>
@@ -2682,6 +2773,7 @@
                                 上传时间: ${file.uploadTime ? new Date(file.uploadTime).toLocaleString('zh-CN') : '-'}
                                 ${file.lpNumber ? ` | LP: ${file.lpNumber}` : ''}
                                 ${file.contractNumber ? ` | 履约单: ${file.contractNumber}` : ''}
+                                ${file.operator ? ` | 经手人: 👤 ${file.operator}` : ''}
                             </div>
                         </div>
                         <div class="file-actions">
@@ -5037,6 +5129,11 @@
             const autoFix = document.getElementById('autoFixModal');
             if (event.target === autoFix) {
                 closeAutoFixModal();
+            }
+            const operatorModal = document.getElementById('operatorModal');
+            if (event.target === operatorModal) {
+                // 经手人输入框不允许点击外部关闭，必须输入或跳过
+                // do nothing
             }
         }
 
