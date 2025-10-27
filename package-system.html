@@ -4083,59 +4083,196 @@
             const name = checkbox.value;
             if (checkbox.checked) deleteFolderSelected.add(name); else deleteFolderSelected.delete(name);
         }
-        function confirmDeleteByFolder() {
+        // ✅ 确认批量删除文件夹（改进版：同步删除R2文件）
+        async function confirmDeleteByFolder() {
             if (deleteFolderSelected.size === 0) {
                 alert('请先选择要删除的文件夹');
                 return;
             }
             if (!confirm('确定要删除所选文件夹内的所有文件记录吗？此操作不可恢复。')) return;
-            let changed = false;
-            for (const [key, file] of Array.from(uploadedFiles.entries())) {
-                if (file && deleteFolderSelected.has(file.folder)) {
-                    uploadedFiles.delete(key);
-                    changed = true;
+            
+            try {
+                // 收集要删除的文件
+                const filesToDelete = [];
+                for (const [key, file] of Array.from(uploadedFiles.entries())) {
+                    if (file && deleteFolderSelected.has(file.folder)) {
+                        filesToDelete.push({ key, file, r2Path: file.r2Path });
+                    }
                 }
-            }
-            if (changed) {
+                
+                if (filesToDelete.length === 0) {
+                    showStatus('fileManageStatus', '⚠️ 没有找到需要删除的文件', 'warning');
+                    closeDeleteByFolderModal();
+                    return;
+                }
+                
+                // ✅ 显示删除进度
+                showStatus('fileManageStatus', `🗑️ 正在删除 ${filesToDelete.length} 个文件...`, 'info');
+                
+                // ✅ 从R2删除文件
+                let deletedCount = 0;
+                const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+                
+                for (const { file, r2Path } of filesToDelete) {
+                    if (!r2Path) continue;
+                    
+                    try {
+                        const response = await fetch(`${baseURL}/api/r2/delete/${encodeURIComponent(r2Path)}`.replace(/%2F/g, '/'), {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            deletedCount++;
+                        } else {
+                            console.warn(`删除R2文件失败: ${r2Path}`);
+                        }
+                    } catch (error) {
+                        console.error(`删除R2文件出错: ${r2Path}`, error);
+                    }
+                }
+                
+                // 从本地记录中删除
+                for (const { key } of filesToDelete) {
+                    uploadedFiles.delete(key);
+                }
+                
+                // ✅ 保存到本地并同步到服务器
                 saveFilesToLocal();
+                await syncFilesToServer();
+                
+                // 关闭模态框并刷新显示
+                closeDeleteByFolderModal();
+                displayFileList();
+                showStatus('fileManageStatus', `✅ 已删除所选文件夹 (${deletedCount}/${filesToDelete.length} 个文件)`, 'success');
+                
+            } catch (error) {
+                console.error('批量删除文件夹失败:', error);
+                showStatus('fileManageStatus', `❌ 删除失败：${error.message}`, 'error');
             }
-            closeDeleteByFolderModal();
-            displayFileList();
-            showStatus('fileManageStatus', '✅ 已删除所选文件夹内的文件记录', 'success');
         }
 
-        // 删除某天的所有文件夹
-        function deleteDateFolders(dateStr) {
+        // ✅ 删除某天的所有文件夹（改进版：同步删除R2文件）
+        async function deleteDateFolders(dateStr) {
             if (!confirm(`确定要删除 ${dateStr} 的所有文件夹吗？此操作不可恢复。`)) return;
-            let changed = false;
-            for (const [key, file] of Array.from(uploadedFiles.entries())) {
-                if (file && String(file.folder || '').startsWith(dateStr + '_')) {
-                    uploadedFiles.delete(key);
-                    changed = true;
+            
+            try {
+                // 收集该日期下的所有文件
+                const filesToDelete = [];
+                for (const [key, file] of Array.from(uploadedFiles.entries())) {
+                    if (file && String(file.folder || '').startsWith(dateStr + '_')) {
+                        filesToDelete.push({ key, file, r2Path: file.r2Path });
+                    }
                 }
-            }
-            if (changed) {
+                
+                if (filesToDelete.length === 0) {
+                    showStatus('fileManageStatus', `⚠️ ${dateStr} 没有文件`, 'warning');
+                    return;
+                }
+                
+                // ✅ 显示删除进度
+                showStatus('fileManageStatus', `🗑️ 正在删除 ${filesToDelete.length} 个文件...`, 'info');
+                
+                // ✅ 从R2删除文件
+                let deletedCount = 0;
+                const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+                
+                for (const { file, r2Path } of filesToDelete) {
+                    if (!r2Path) continue;
+                    
+                    try {
+                        const response = await fetch(`${baseURL}/api/r2/delete/${encodeURIComponent(r2Path)}`.replace(/%2F/g, '/'), {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            deletedCount++;
+                        } else {
+                            console.warn(`删除R2文件失败: ${r2Path}`);
+                        }
+                    } catch (error) {
+                        console.error(`删除R2文件出错: ${r2Path}`, error);
+                    }
+                }
+                
+                // 从本地记录中删除
+                for (const { key } of filesToDelete) {
+                    uploadedFiles.delete(key);
+                }
+                
+                // ✅ 保存到本地并同步到服务器
                 saveFilesToLocal();
+                await syncFilesToServer();
+                
+                // 刷新显示
+                displayFileList();
+                showStatus('fileManageStatus', `✅ 已删除 ${dateStr} 的所有文件夹 (${deletedCount}/${filesToDelete.length} 个文件)`, 'success');
+                
+            } catch (error) {
+                console.error('删除日期文件夹失败:', error);
+                showStatus('fileManageStatus', `❌ 删除失败：${error.message}`, 'error');
             }
-            displayFileList();
-            showStatus('fileManageStatus', `✅ 已删除 ${dateStr} 的所有文件夹记录`, 'success');
         }
 
-        // 删除单个文件夹
-        function deleteFolder(folder) {
+        // ✅ 删除单个文件夹（改进版：同步删除R2文件）
+        async function deleteFolder(folder) {
             if (!confirm(`确定要删除文件夹 ${folder} 吗？此操作不可恢复。`)) return;
-            let changed = false;
-            for (const [key, file] of Array.from(uploadedFiles.entries())) {
-                if (file && String(file.folder) === folder) {
-                    uploadedFiles.delete(key);
-                    changed = true;
+            
+            try {
+                // 收集该文件夹下的所有文件
+                const filesToDelete = [];
+                for (const [key, file] of Array.from(uploadedFiles.entries())) {
+                    if (file && String(file.folder) === folder) {
+                        filesToDelete.push({ key, file, r2Path: file.r2Path });
+                    }
                 }
-            }
-            if (changed) {
+                
+                if (filesToDelete.length === 0) {
+                    showStatus('fileManageStatus', '⚠️ 该文件夹下没有文件', 'warning');
+                    return;
+                }
+                
+                // ✅ 显示删除进度
+                showStatus('fileManageStatus', `🗑️ 正在删除 ${filesToDelete.length} 个文件...`, 'info');
+                
+                // ✅ 从R2删除文件
+                let deletedCount = 0;
+                const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+                
+                for (const { file, r2Path } of filesToDelete) {
+                    if (!r2Path) continue;
+                    
+                    try {
+                        const response = await fetch(`${baseURL}/api/r2/delete/${encodeURIComponent(r2Path)}`.replace(/%2F/g, '/'), {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            deletedCount++;
+                        } else {
+                            console.warn(`删除R2文件失败: ${r2Path}`);
+                        }
+                    } catch (error) {
+                        console.error(`删除R2文件出错: ${r2Path}`, error);
+                    }
+                }
+                
+                // 从本地记录中删除
+                for (const { key } of filesToDelete) {
+                    uploadedFiles.delete(key);
+                }
+                
+                // ✅ 保存到本地并同步到服务器
                 saveFilesToLocal();
+                await syncFilesToServer();
+                
+                // 刷新显示
+                displayFileList();
+                showStatus('fileManageStatus', `✅ 已删除文件夹 ${folder} (${deletedCount}/${filesToDelete.length} 个文件)`, 'success');
+                
+            } catch (error) {
+                console.error('删除文件夹失败:', error);
+                showStatus('fileManageStatus', `❌ 删除失败：${error.message}`, 'error');
             }
-            displayFileList();
-            showStatus('fileManageStatus', `✅ 已删除文件夹 ${folder} 的记录`, 'success');
         }
 
         function deleteFile(fileName) {
