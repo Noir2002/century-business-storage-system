@@ -4140,6 +4140,10 @@
                 saveFilesToLocal();
                 await syncFilesToServer();
                 
+                // ✅ 强制从服务器重新加载文件列表
+                console.log('🔄 删除完成，从服务器重新加载文件列表...');
+                await loadFilesFromServer();
+                
                 // 关闭模态框并刷新显示
                 closeDeleteByFolderModal();
                 displayFileList();
@@ -4202,6 +4206,10 @@
                 // ✅ 保存到本地并同步到服务器
                 saveFilesToLocal();
                 await syncFilesToServer();
+                
+                // ✅ 强制从服务器重新加载文件列表
+                console.log('🔄 删除完成，从服务器重新加载文件列表...');
+                await loadFilesFromServer();
                 
                 // 刷新显示
                 displayFileList();
@@ -4272,6 +4280,10 @@
                 // ✅ 保存到本地并同步到服务器
                 saveFilesToLocal();
                 await syncFilesToServer();
+                
+                // ✅ 强制从服务器重新加载文件列表
+                console.log('🔄 删除完成，从服务器重新加载文件列表...');
+                await loadFilesFromServer();
                 
                 // 刷新显示
                 displayFileList();
