@@ -975,8 +975,8 @@
                     <button onclick="exportAllFiles()" class="btn btn-success">📦 导出所有文件</button>
                     <button onclick="openBatchFixModal()" class="btn btn-warning">📝 批量修正今日未匹配</button>
                     <button onclick="openDeleteByFolderModal()" class="btn btn-danger">🗑️ 删除文件</button>
-                    <button onclick="cleanupOldFiles()" class="btn btn-danger" style="background: linear-gradient(135deg, #f59e0b, #d97706);">🧹 自动清理45天前文件</button>
                     <!-- GitHub重建功能已移除 -->
+                    <!-- 自动清理功能已移至后端定时任务（每天凌晨2点自动执行） -->
                 </div>
 
                 <div id="packingInfo" class="database-info" style="display:none;">
@@ -4082,7 +4082,9 @@
             showStatus('fileManageStatus', '✅ 文件已从列表中删除', 'success');
         }
 
-        // 自动清理45天之前的文件
+        // 清理功能已移至后端定时任务（通过 Cloudflare Cron Trigger）
+        // 每天凌晨2点（UTC）自动执行，无需手动操作
+        /*
         async function cleanupOldFiles() {
             // 计算45天前的日期
             const cutoffDate = new Date();
@@ -4142,6 +4144,7 @@
                 showStatus('fileManageStatus', `❌ 清理失败：${error.message}`, 'error');
             }
         }
+        */
 
         async function exportAllFiles() {
             if (uploadedFiles.size === 0) {

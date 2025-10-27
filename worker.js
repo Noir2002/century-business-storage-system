@@ -247,6 +247,7 @@ function isExcelFile(file) {
 }
 
 export default {
+  // HTTP请求处理器
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -311,8 +312,96 @@ export default {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+  },
+
+  // Cron Trigger定时任务处理器
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(handleScheduledCleanup(env));
   }
 };
+
+// 处理定时清理任务
+async function handleScheduledCleanup(env) {
+  try {
+    console.log('⏰ Cron Trigger 触发：开始自动清理45天前的文件');
+    
+    // 计算截止日期（45天前）
+    const DAYS_TO_KEEP = 45;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - DAYS_TO_KEEP);
+    const cutoffTimestamp = cutoffDate.getTime();
+    
+    console.log(`📅 清理截止日期：${cutoffDate.toISOString()}`);
+    
+    // 获取所有 package 文件夹下的文件
+    const { objects } = await env.R2_BUCKET.list({ prefix: 'package/' });
+    
+    if (!objects || objects.length === 0) {
+      console.log('ℹ️ 没有需要清理的文件');
+      return;
+    }
+    
+    console.log(`📊 总共找到 ${objects.length} 个文件`);
+    
+    // 按日期分组文件
+    const foldersByDate = new Map();
+    
+    for (const obj of objects) {
+      const key = obj.key;
+      const pathParts = key.split('/');
+      
+      if (pathParts.length >= 4) {
+        const yearMonthDay = pathParts[2]; // YYYY-MM-DD
+        
+        if (!foldersByDate.has(yearMonthDay)) {
+          foldersByDate.set(yearMonthDay, []);
+        }
+        foldersByDate.get(yearMonthDay).push(obj);
+      }
+    }
+    
+    console.log(`📁 识别到 ${foldersByDate.size} 个不同的日期`);
+    
+    // 找出需要删除的日期文件夹
+    const foldersToDelete = [];
+    
+    for (const [date, files] of foldersByDate.entries()) {
+      const [year, month, day] = date.split('-').map(Number);
+      const folderDate = new Date(year, month - 1, day);
+      
+      if (folderDate.getTime() < cutoffTimestamp) {
+        foldersToDelete.push({ date, files });
+      }
+    }
+    
+    console.log(`🗑️ 需要删除 ${foldersToDelete.length} 个日期文件夹`);
+    
+    // 批量删除文件
+    let totalDeleted = 0;
+    const deletedFolders = [];
+    
+    for (const { date, files } of foldersToDelete) {
+      console.log(`🗂️ 删除日期文件夹: ${date} (${files.length} 个文件)`);
+      
+      for (const file of files) {
+        try {
+          await env.R2_BUCKET.delete(file.key);
+          totalDeleted++;
+        } catch (error) {
+          console.error(`❌ 删除文件失败 ${file.key}:`, error);
+        }
+      }
+      
+      deletedFolders.push(date);
+    }
+    
+    console.log(`✅ 自动清理完成：删除了 ${totalDeleted} 个文件，涉及 ${foldersToDelete.length} 个日期文件夹`);
+    console.log(`📋 删除的日期：${deletedFolders.join(', ')}`);
+    
+  } catch (error) {
+    console.error('❌ 自动清理失败:', error);
+  }
+}
 
 // 处理Excel文件上传
 async function handleExcelUpload(request, env, corsHeaders) {
