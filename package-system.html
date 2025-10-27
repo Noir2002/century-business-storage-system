@@ -911,6 +911,7 @@
                         <button onclick="toggleDatabasePreview()" id="databasePreviewBtn" class="btn btn-secondary">👁️ 预览数据库</button>
                         <button onclick="debugDatabase()" class="btn btn-info">🔍 调试数据库</button>
                         <button onclick="testExcelParsing()" class="btn btn-warning">🧪 测试Excel解析</button>
+                        <button onclick="forceRefreshDatabase()" class="btn btn-success">🔄 强制刷新数据库</button>
                     </div>
 
                     <div id="databasePreview" style="display: none; margin-top: 15px;">
@@ -1189,7 +1190,8 @@
 
 
         // 自动同步设置
-        const AUTO_SYNC_INTERVAL = 60000; // 60秒
+        const AUTO_SYNC_INTERVAL = 30000; // 30秒（改为30秒，提高实时性）
+        const DATABASE_SYNC_INTERVAL = 30000; // 数据库每30秒自动检查更新
         let autoSyncTimer = null;
 
         // 页面导航
@@ -1975,6 +1977,39 @@
             alert(`数据库调试信息已输出到控制台\n\n记录数: ${databaseData.size}\n导入日期: ${databaseImportDate || '未知'}\n\n请按F12查看详细日志`);
         }
 
+        // 强制刷新数据库（清除缓存并重新加载）
+        async function forceRefreshDatabase() {
+            if (!confirm('确定要强制刷新数据库吗？将清除本地缓存并从服务器重新加载数据。')) {
+                return;
+            }
+            
+            try {
+                showStatus('databaseStatus', '🔄 正在强制刷新数据库...', 'info');
+                
+                // 清除本地缓存
+                localStorage.removeItem('SYNC_DATABASE_GLOBAL');
+                localStorage.removeItem('SYNC_DATABASE_TIMESTAMP');
+                localStorage.removeItem(STORAGE_KEYS.DATABASE + '_timestamp');
+                
+                console.log('🗑️ 已清除数据库本地缓存');
+                
+                // 重新加载
+                const success = await loadDatabaseFromServer();
+                
+                if (success) {
+                    updateDatabaseDisplay();
+                    showStatus('databaseStatus', '✅ 数据库已强制刷新完成', 'success');
+                    console.log('✅ 强制刷新成功：', databaseData.size, '条记录');
+                } else {
+                    throw new Error('从服务器加载失败');
+                }
+                
+            } catch (error) {
+                console.error('强制刷新失败:', error);
+                showStatus('databaseStatus', `❌ 强制刷新失败：${error.message}`, 'error');
+            }
+        }
+
         // 调试文件记录
         function debugFileRecords() {
             console.log('🔍 文件记录调试信息:');
@@ -2265,8 +2300,15 @@
 
                     // 检查文件大小（500MB限制）
                     const MAX_FILE_SIZE = 500 * 1024 * 1024;
+                    const WARNING_SIZE = 100 * 1024 * 1024; // 100MB
+                    
                     if (file.size > MAX_FILE_SIZE) {
                         throw new Error(`文件过大 (${formatFileSize(file.size)})，超过500MB限制`);
+                    }
+                    
+                    // ✅ 对大于100MB的文件给出警告提示
+                    if (file.size > WARNING_SIZE) {
+                        console.warn(`⚠️ 大文件警告: ${file.name} (${formatFileSize(file.size)})，上传可能需要较长时间`);
                     }
                     
                     // 真正上传到 R2 存储（带重试机制）
@@ -3106,17 +3148,21 @@
                 if (!lastPackingComputation || !dateStr) return [];
                 const { unmatchedDetails } = lastPackingComputation;
                 if (!unmatchedDetails || unmatchedDetails.length === 0) return [];
-                // 依据后缀匹配数据库中 LP，以 LP 找到履约单号
+                // 依据后缀匹配数据库中 LP，以 LP 找到履约单号（改进匹配逻辑）
                 const res = [];
                 const seenFolder = new Set();
                 for (const it of unmatchedDetails) {
                     const suffix = String(it.suffix || '');
                     if (!/^\d{4}$/.test(suffix)) continue;
-                    // 找出所有以该后缀结尾的 LP
+                    // 找出所有以该后缀结尾的 LP（提取纯数字后4位匹配）
                     const matches = [];
                     for (const [lp, contract] of databaseData.entries()) {
-                        if (String(lp).endsWith(suffix)) {
-                            matches.push({ lp: String(lp), contract: String(contract || '') });
+                        const lpStr = String(lp);
+                        const lpDigits = lpStr.replace(/^LP/gi, '').replace(/[^0-9]/g, '');
+                        const last4 = lpDigits.slice(-4);
+                        
+                        if (last4 === suffix) {
+                            matches.push({ lp: lpStr, contract: String(contract || '') });
                         }
                     }
                     if (matches.length === 1) {
@@ -3505,7 +3551,8 @@
                         fixFileDownloadUrl(file);
                         
                         try {
-                            const resp = await fetch(file.downloadUrl);
+                            // ✅ 使用带超时的重试机制
+                            const resp = await fetchWithTimeout(file.downloadUrl, 30000); // 30秒超时
                             if (!resp.ok) {
                                 throw new Error(`HTTP ${resp.status}`);
                             }
@@ -3532,7 +3579,20 @@
                                 zipPath = `${folderName}/${file.fileName || ('file_' + Date.now())}`;
                             }
                             
-                            zip.file(zipPath, blob);
+                            // ✅ 处理文件名冲突（避免覆盖）
+                            let finalZipPath = zipPath;
+                            let counter = 1;
+                            while (zip.file(finalZipPath)) {
+                                const ext = zipPath.lastIndexOf('.');
+                                if (ext > 0) {
+                                    finalZipPath = zipPath.substring(0, ext) + `_${counter}` + zipPath.substring(ext);
+                                } else {
+                                    finalZipPath = `${zipPath}_${counter}`;
+                                }
+                                counter++;
+                            }
+                            
+                            zip.file(finalZipPath, blob);
                             successCount++;
                             console.log(`✅ [${successCount}/${totalExpectedFiles}] 已下载: ${file.fileName}`);
                         } catch (e) {
@@ -3732,12 +3792,18 @@
             const matchDiv = document.getElementById(`lpMatch_${index}`);
             if (!matchDiv) return;
             
-            // 查找以该后缀结尾的LP号
+            // 查找以该后缀结尾的LP号（改进匹配逻辑）
             const matches = [];
             for (const [lp, contract] of databaseData.entries()) {
                 const lpStr = String(lp);
-                if (lpStr.endsWith(suffix)) {
-                    matches.push({ lp: lpStr, contract: contract });
+                
+                // 提取LP号中的纯数字部分
+                const lpDigits = lpStr.replace(/^LP/gi, '').replace(/[^0-9]/g, '');
+                const last4 = lpDigits.slice(-4); // 获取后4位
+                
+                // 如果后4位匹配，则认为是匹配的
+                if (last4 === suffix) {
+                    matches.push({ lp: lpStr, contract: contract, digits: lpDigits });
                 }
             }
             
@@ -3745,7 +3811,7 @@
                 matchDiv.innerHTML = '❌ 数据库中未找到以此结尾的LP号';
                 matchDiv.style.color = '#ef4444';
             } else if (matches.length === 1) {
-                matchDiv.innerHTML = `✅ 匹配到: LP${matches[0].lp} → ${matches[0].contract}`;
+                matchDiv.innerHTML = `✅ 匹配到: ${matches[0].lp} → ${matches[0].contract}`;
                 matchDiv.style.color = '#10b981';
             } else {
                 matchDiv.innerHTML = `⚠️ 找到${matches.length}个匹配，请确认LP号正确`;
@@ -4239,16 +4305,30 @@
                             continue;
                         }
                         try {
-                            const resp = await fetch(file.downloadUrl);
+                            // ✅ 使用带超时的重试机制
+                            const resp = await fetchWithTimeout(file.downloadUrl, 30000); // 30秒超时
                             if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                             const blob = await resp.blob();
                             
                             // 从folder路径中提取最后的文件夹名（避免路径重复）
                             const pathParts = folder.split('/');
                             const folderName = pathParts[pathParts.length - 1];
-                            const path = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
+                            let path = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
                             
-                            zip.file(path, blob);
+                            // ✅ 处理文件名冲突（避免覆盖）
+                            let finalPath = path;
+                            let counter = 1;
+                            while (zip.file(finalPath)) {
+                                const ext = path.lastIndexOf('.');
+                                if (ext > 0) {
+                                    finalPath = path.substring(0, ext) + `_${counter}` + path.substring(ext);
+                                } else {
+                                    finalPath = `${path}_${counter}`;
+                                }
+                                counter++;
+                            }
+                            
+                            zip.file(finalPath, blob);
                             successCount++;
                             console.log(`✅ [${successCount}] 已下载: ${file.fileName}`);
                         } catch (e) {
@@ -4323,11 +4403,26 @@
                         continue;
                     }
                     try {
-                        const resp = await fetch(file.downloadUrl);
+                        // ✅ 使用带超时的重试机制
+                        const resp = await fetchWithTimeout(file.downloadUrl, 30000); // 30秒超时
                         if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                         const blob = await resp.blob();
-                        const path = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
-                        zip.file(path, blob);
+                        let path = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
+                        
+                        // ✅ 处理文件名冲突（避免覆盖）
+                        let finalPath = path;
+                        let counter = 1;
+                        while (zip.file(finalPath)) {
+                            const ext = path.lastIndexOf('.');
+                            if (ext > 0) {
+                                finalPath = path.substring(0, ext) + `_${counter}` + path.substring(ext);
+                            } else {
+                                finalPath = `${path}_${counter}`;
+                            }
+                            counter++;
+                        }
+                        
+                        zip.file(finalPath, blob);
                         successCount++;
                         console.log(`✅ [${successCount}] 已下载: ${file.fileName}`);
                     } catch (e) {
@@ -4617,8 +4712,9 @@
                     
                     console.log(`🔍 时间戳比较: 服务器=${serverTimestamp}, 本地=${localTimestamp}, 需要更新=${serverTimestamp > localTimestamp}`);
                     
-                    // 如果服务器数据更新，则同步到本地
-                    if (serverTimestamp > localTimestamp) {
+                    // 如果服务器数据更新，则同步到本地（或服务器数据更新）
+                    if (serverTimestamp > localTimestamp || serverData.data && Object.keys(serverData.data).length > 0) {
+                        console.log('🔄 从服务器同步数据库数据');
                         databaseData.clear();
                         Object.entries(serverData.data || {}).forEach(([key, value]) => {
                             databaseData.set(key, value);
@@ -4636,8 +4732,10 @@
                         localStorage.setItem('SYNC_DATABASE_GLOBAL', JSON.stringify(serverData));
                         localStorage.setItem('SYNC_DATABASE_TIMESTAMP', serverTimestamp.toString());
                         
-                        console.log('✅ 数据库已从服务器同步加载');
+                        console.log('✅ 数据库已从服务器同步加载：', databaseData.size, '条记录');
                         return true;
+                    } else {
+                        console.log('ℹ️ 服务器数据未更新或为空，保持本地数据不变');
                     }
                 }
                 
@@ -5127,8 +5225,38 @@
                 }
             } catch (e) {}
             
-            // 设置定期数据同步（每60秒）
+            // 设置定期数据同步（每30秒）
             setInterval(performDataSync, AUTO_SYNC_INTERVAL);
+            
+            // 额外设置数据库定期检查更新（每30秒）
+            setInterval(async () => {
+                try {
+                    const localTimestamp = parseInt(localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || '0', 10);
+                    const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+                    const response = await fetch(`${baseURL}/api/package-sync/database`);
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success && result.data) {
+                            const serverTimestamp = result.data.timestamp || 0;
+                            
+                            if (serverTimestamp > localTimestamp) {
+                                console.log('🔄 检测到服务器数据库有更新，自动同步...');
+                                const success = await loadDatabaseFromServer();
+                                if (success) {
+                                    updateDatabaseDisplay();
+                                    updatePackingInfo();
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    // 静默失败，避免干扰用户体验
+                    if (error.message.includes('Failed to fetch')) {
+                        console.debug('⏸️ 数据库同步检查跳过（网络不可用）');
+                    }
+                }
+            }, DATABASE_SYNC_INTERVAL);
             
             // 监听跨窗口同步事件
             window.addEventListener('database-sync', (event) => {
