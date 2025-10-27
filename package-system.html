@@ -4215,19 +4215,27 @@
 
         // ✅ 删除单个文件夹（改进版：同步删除R2文件）
         async function deleteFolder(folder) {
+            console.log('🗑️ 开始删除文件夹:', folder);
             if (!confirm(`确定要删除文件夹 ${folder} 吗？此操作不可恢复。`)) return;
             
             try {
                 // 收集该文件夹下的所有文件
                 const filesToDelete = [];
+                console.log('📋 遍历本地文件记录，查找匹配的文件...');
+                
                 for (const [key, file] of Array.from(uploadedFiles.entries())) {
+                    console.log(`  检查: key=${key}, file.folder=${file?.folder}, 匹配=${String(file?.folder) === folder}`);
                     if (file && String(file.folder) === folder) {
                         filesToDelete.push({ key, file, r2Path: file.r2Path });
+                        console.log(`  ✅ 找到匹配文件: ${key}, r2Path=${file.r2Path}`);
                     }
                 }
                 
+                console.log(`📊 找到 ${filesToDelete.length} 个文件`);
+                
                 if (filesToDelete.length === 0) {
                     showStatus('fileManageStatus', '⚠️ 该文件夹下没有文件', 'warning');
+                    console.error('❌ 未找到任何文件！可能原因：1) file.folder 格式不匹配 2) uploadedFiles 为空');
                     return;
                 }
                 
