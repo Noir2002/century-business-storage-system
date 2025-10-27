@@ -975,6 +975,7 @@
                     <button onclick="exportAllFiles()" class="btn btn-success">📦 导出所有文件</button>
                     <button onclick="openBatchFixModal()" class="btn btn-warning">📝 批量修正今日未匹配</button>
                     <button onclick="openDeleteByFolderModal()" class="btn btn-danger">🗑️ 删除文件</button>
+                    <button onclick="cleanupOldFiles()" class="btn btn-danger" style="background: linear-gradient(135deg, #f59e0b, #d97706);">🧹 自动清理45天前文件</button>
                     <!-- GitHub重建功能已移除 -->
                 </div>
 
@@ -4079,6 +4080,67 @@
             
             displayFileList();
             showStatus('fileManageStatus', '✅ 文件已从列表中删除', 'success');
+        }
+
+        // 自动清理45天之前的文件
+        async function cleanupOldFiles() {
+            // 计算45天前的日期
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - 45);
+            const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
+            
+            // 确认提示
+            if (!confirm(`⚠️ 确定要删除45天之前（${cutoffDateStr}之前）的所有文件吗？\n\n此操作将永久删除文件且无法恢复！`)) {
+                return;
+            }
+            
+            // 再次确认
+            if (!confirm('⚠️ 最后确认：此操作不可恢复，确定继续吗？')) {
+                return;
+            }
+            
+            try {
+                showStatus('fileManageStatus', '⏳ 正在清理45天之前的文件，请稍候...', 'info');
+                
+                const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+                const response = await fetch(`${baseURL}/api/package/cleanup-old-files`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const deletedCount = result.deletedCount || 0;
+                    const deletedFolders = result.deletedFolders || [];
+                    const cutoffDate = result.cutoffDate || '';
+                    
+                    if (deletedCount > 0) {
+                        showStatus('fileManageStatus', 
+                            `✅ 清理完成！\n` +
+                            `删除了 ${deletedCount} 个文件\n` +
+                            `涉及 ${deletedFolders.length} 个日期文件夹：\n${deletedFolders.slice(0, 10).join(', ')}${deletedFolders.length > 10 ? '...' : ''}`, 
+                            'success');
+                        
+                        console.log('🗑️ 已删除的文件日期:', deletedFolders);
+                        
+                        // 刷新文件列表
+                        setTimeout(() => {
+                            refreshFileList();
+                        }, 1000);
+                    } else {
+                        showStatus('fileManageStatus', 'ℹ️ 没有需要清理的文件', 'info');
+                    }
+                } else {
+                    throw new Error(result.error || '清理失败');
+                }
+                
+            } catch (error) {
+                console.error('清理文件失败:', error);
+                showStatus('fileManageStatus', `❌ 清理失败：${error.message}`, 'error');
+            }
         }
 
         async function exportAllFiles() {
