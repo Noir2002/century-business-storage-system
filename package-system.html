@@ -3552,7 +3552,7 @@
                         
                         try {
                             // ✅ 使用带超时的重试机制
-                            const resp = await fetchWithTimeout(file.downloadUrl, 30000); // 30秒超时
+                            const resp = await fetchWithTimeout(file.downloadUrl, {}, 30000); // 30秒超时
                             if (!resp.ok) {
                                 throw new Error(`HTTP ${resp.status}`);
                             }
@@ -4463,7 +4463,7 @@
                         }
                         try {
                             // ✅ 使用带超时的重试机制
-                            const resp = await fetchWithTimeout(file.downloadUrl, 30000); // 30秒超时
+                            const resp = await fetchWithTimeout(file.downloadUrl, {}, 30000); // 30秒超时
                             if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                             const blob = await resp.blob();
                             
@@ -4561,7 +4561,7 @@
                     }
                     try {
                         // ✅ 使用带超时的重试机制
-                        const resp = await fetchWithTimeout(file.downloadUrl, 30000); // 30秒超时
+                        const resp = await fetchWithTimeout(file.downloadUrl, {}, 30000); // 30秒超时
                         if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
                         const blob = await resp.blob();
                         let path = `${dateStr}/${folderName}/${file.fileName || ('file_' + Date.now())}`;
