@@ -1783,6 +1783,8 @@
 
                 // 保存到本地存储
                 saveDatabaseToLocal();
+                const importTimestamp = Date.now();
+                localStorage.setItem(STORAGE_KEYS.DATABASE + '_timestamp', importTimestamp);
                 // 同步到服务器R2（共享）：database/YYYY-MM/YYYY-MM-DD.xlsx 与 database/latest.json
                 try {
                     const y = today.getFullYear();
@@ -1830,7 +1832,8 @@
                 // 同步数据库到服务器（重要：让其他设备能够加载数据）
                 await syncDatabaseToServer();
                 
-                showStatus('databaseStatus', `✅ 数据库导入成功！共导入 ${validRecords} 条有效记录，已同步到服务器`, 'success');
+                const finalRecordCount = databaseData.size;
+                showStatus('databaseStatus', `✅ 数据库导入成功！共导入 ${finalRecordCount} 条有效记录，已同步到服务器`, 'success');
                 
             } catch (error) {
                 showStatus('databaseStatus', `❌ 数据库导入失败：${error.message}`, 'error');
@@ -4866,11 +4869,15 @@
                     
                     // 检查本地时间戳（⚠️ 必须转换为数字进行比较）
                     const localTimestamp = parseInt(localStorage.getItem(STORAGE_KEYS.DATABASE + '_timestamp') || '0', 10);
+                    const serverDataCount = Object.keys(serverData.data || {}).length;
                     
-                    console.log(`🔍 时间戳比较: 服务器=${serverTimestamp}, 本地=${localTimestamp}, 需要更新=${serverTimestamp > localTimestamp}`);
+                    const shouldUpdate = (serverTimestamp && serverTimestamp > localTimestamp) ||
+                        (databaseData.size === 0 && serverDataCount > 0);
+                    
+                    console.log(`🔍 时间戳比较: 服务器=${serverTimestamp}, 本地=${localTimestamp}, 数据量=${serverDataCount}, 需要更新=${shouldUpdate}`);
                     
                     // 如果服务器数据更新，则同步到本地（或服务器数据更新）
-                    if (serverTimestamp > localTimestamp || serverData.data && Object.keys(serverData.data).length > 0) {
+                    if (shouldUpdate) {
                         console.log('🔄 从服务器同步数据库数据');
                         databaseData.clear();
                         Object.entries(serverData.data || {}).forEach(([key, value]) => {
@@ -4883,11 +4890,13 @@
                         }
                         
                         saveDatabaseToLocal();
-                        localStorage.setItem(STORAGE_KEYS.DATABASE + '_timestamp', serverTimestamp);
+                        const appliedTimestamp = serverTimestamp || Date.now();
+                        localStorage.setItem(STORAGE_KEYS.DATABASE + '_timestamp', appliedTimestamp);
                         
                         // 同时保存到本地存储作为备份
-                        localStorage.setItem('SYNC_DATABASE_GLOBAL', JSON.stringify(serverData));
-                        localStorage.setItem('SYNC_DATABASE_TIMESTAMP', serverTimestamp.toString());
+                        const syncedPayload = { ...serverData, timestamp: appliedTimestamp };
+                        localStorage.setItem('SYNC_DATABASE_GLOBAL', JSON.stringify(syncedPayload));
+                        localStorage.setItem('SYNC_DATABASE_TIMESTAMP', appliedTimestamp.toString());
                         
                         console.log('✅ 数据库已从服务器同步加载：', databaseData.size, '条记录');
                         return true;
