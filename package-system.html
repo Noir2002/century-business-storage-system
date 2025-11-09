@@ -2220,6 +2220,76 @@
             ]);
         }
 
+        async function fetchFileBlobWithFallback(file, timeout = 30000) {
+            if (!file) {
+                throw new Error('无效的文件记录');
+            }
+            
+            const candidateUrls = [];
+            const seen = new Set();
+            
+            const addCandidate = (url) => {
+                if (url && !seen.has(url)) {
+                    candidateUrls.push(url);
+                    seen.add(url);
+                }
+            };
+            
+            if (file.downloadUrl) {
+                addCandidate(file.downloadUrl);
+            }
+            
+            const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
+            const buildDownloadUrl = (path) => {
+                if (!path) return null;
+                return `${baseURL}/api/r2/download/${encodeURIComponent(path)}`.replace(/%2F/g, '/');
+            };
+            
+            if (file.r2Path) {
+                addCandidate(buildDownloadUrl(file.r2Path));
+            }
+            
+            if (Array.isArray(file.legacyR2Paths)) {
+                for (const legacyPath of file.legacyR2Paths) {
+                    if (!legacyPath) continue;
+                    addCandidate(buildDownloadUrl(legacyPath));
+                }
+            }
+            
+            if (candidateUrls.length === 0) {
+                throw new Error('缺少文件下载地址');
+            }
+            
+            let lastError = null;
+            
+            for (const url of candidateUrls) {
+                try {
+                    const resp = await fetchWithTimeout(url, {}, timeout);
+                    if (!resp.ok) {
+                        lastError = new Error(`下载失败 ${resp.status}`);
+                        continue;
+                    }
+                    const blob = await resp.blob();
+                    
+                    if (url !== file.downloadUrl) {
+                        console.log(`ℹ️ 使用备用下载地址: ${url}`);
+                        file.downloadUrl = url;
+                        const pathPart = url.split('/api/r2/download/')[1];
+                        if (pathPart) {
+                            const decodedPath = decodeURIComponent(pathPart);
+                            file.r2Path = decodedPath;
+                        }
+                    }
+                    
+                    return blob;
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+            
+            throw lastError || new Error('下载失败');
+        }
+
         // 带重试机制的上传函数（改进版：每次重试重新创建FormData）
         async function uploadWithRetry(url, fileToUpload, lpNumber, fullFolderPath, maxRetries = 3, timeout = 300000) {
             let lastError;
@@ -3990,7 +4060,8 @@
                         file,
                         newFolder,
                         newR2Path,
-                        fileName
+                        fileName,
+                        oldR2Path
                     });
                 }
                 
@@ -4011,6 +4082,7 @@
                     });
                     
                     const moveResult = await moveResponse.json();
+                    console.log('📦 批量移动响应:', moveResult);
                     
                     if (!moveResponse.ok || !moveResult.success) {
                         moveSucceeded = false;
@@ -4033,6 +4105,12 @@
                 let fileUpdated = 0;
                 for (const info of filesToUpdate) {
                     const record = info.file;
+                    if (!Array.isArray(record.legacyR2Paths)) {
+                        record.legacyR2Paths = [];
+                    }
+                    if (info.oldR2Path && !record.legacyR2Paths.includes(info.oldR2Path)) {
+                        record.legacyR2Paths.push(info.oldR2Path);
+                    }
                     record.folder = newFolder;
                     record.lpNumber = lpFull;
                     record.contractNumber = contract;
@@ -4052,6 +4130,8 @@
                         record.url = downloadUrl;
                     }
                     
+                    fixFileDownloadUrl(record);
+                    
                     uploadedFiles.set(info.key, record);
                     fileUpdated++;
                 }
@@ -4064,6 +4144,7 @@
             if (successCount > 0) {
                 saveFilesToLocal();
                 await syncFilesToServer();
+                await loadServerFiles();
                 displayFileList();
                 updatePackingInfo();
             }
@@ -4513,9 +4594,7 @@
                             
                             if (!file.downloadUrl) continue;
                             try {
-                                const resp = await fetch(file.downloadUrl);
-                                if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
-                                const blob = await resp.blob();
+                                const blob = await fetchFileBlobWithFallback(file, 30000);
                                 // 路径: 日期/完整文件夹名/存储文件名
                                 const path = `${date}/${folder}/${file.fileName || ('file_' + Date.now())}`;
                                 zip.file(path, blob);
@@ -4582,10 +4661,8 @@
                             continue;
                         }
                         try {
-                            // ✅ 使用带超时的重试机制
-                            const resp = await fetchWithTimeout(file.downloadUrl, {}, 30000); // 30秒超时
-                            if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
-                            const blob = await resp.blob();
+                            // ✅ 使用带超时的重试机制（含备用路径）
+                            const blob = await fetchFileBlobWithFallback(file, 30000); // 30秒超时
                             
                             // 从folder路径中提取最后的文件夹名（避免路径重复）
                             const pathParts = folder.split('/');
