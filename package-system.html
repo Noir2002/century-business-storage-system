@@ -1099,16 +1099,24 @@
     <div id="batchFixModal" class="modal">
         <div class="modal-content" style="max-width: 900px;">
             <div class="modal-header">
-                <h2>📝 批量修正今日未匹配文件夹</h2>
+                <h2>📝 批量修正未匹配文件夹</h2>
                 <button class="close" onclick="closeBatchFixModal()">&times;</button>
             </div>
             <div style="color:#718096; margin-bottom:15px; line-height:1.6;">
-                <p>✨ <strong>智能修正功能</strong>：根据今日导入的数据库，自动匹配文件夹名称。</p>
-                <p>📋 系统会扫描所有未匹配的文件夹（使用随机4位数的），您只需输入正确的LP号后4位即可自动修正。</p>
+                <p>✨ <strong>智能修正功能</strong>：根据当前数据库数据自动匹配文件夹名称。</p>
+                <p>📋 请先选择需要修正的日期文件夹，系统会扫描该日期下的未匹配文件夹，并根据数据库中的履约单号进行命名修正。</p>
+            </div>
+
+            <div style="margin-bottom:15px; padding:12px; background:#f8fafc; border:1px dashed #cbd5f5; border-radius:6px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                <label for="batchFixDateSelect" style="font-weight:600; color:#1e3a8a;">选择日期文件夹：</label>
+                <select id="batchFixDateSelect" onchange="handleBatchFixDateChange(this.value)" style="flex:1; min-width:200px; padding:8px 12px; border:1px solid #cbd5f5; border-radius:6px; font-size:14px;">
+                    <option value="">请选择日期</option>
+                </select>
+                <button class="btn btn-secondary" type="button" onclick="refreshBatchFixDates()">🔄 刷新列表</button>
             </div>
             
             <div id="batchFixSummary" style="padding:12px; background:#f0f9ff; border-left:4px solid #3b82f6; margin-bottom:15px; border-radius:4px;">
-                正在扫描未匹配文件夹...
+                请选择日期后开始扫描未匹配文件夹。
             </div>
             
             <div id="batchFixList" style="max-height:400px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; padding:10px; background:#fafafa;">
@@ -3634,6 +3642,9 @@
 
         // —— 批量修正未匹配文件夹（重要功能）——
         let batchFixData = [];  // 存储待修正的文件夹信息
+        let batchFixSelectedDate = '';
+        let batchFixAvailableDates = [];
+        const BATCH_FIX_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
         
         function openBatchFixModal() {
             if (databaseData.size === 0) {
@@ -3641,93 +3652,155 @@
                 return;
             }
             
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            const todayStr = `${year}${month}${day}`;
-            const yearMonth = `${year}-${month}`;
-            const yearMonthDay = `${year}-${month}-${day}`;
+            batchFixData = [];
+            batchFixSelectedDate = '';
+            batchFixAvailableDates = collectBatchFixDates();
             
-            console.log('📝 开始扫描今日未匹配文件夹...');
-            console.log('📅 今日日期:', todayStr);
+            populateBatchFixDateOptions('');
             
-            // 扫描所有今日上传的文件夹
-            const folderStats = new Map();  // folder -> {fileCount, suffix, files}
+            const summary = document.getElementById('batchFixSummary');
+            const list = document.getElementById('batchFixList');
+            if (summary) {
+                summary.innerHTML = batchFixAvailableDates.length > 0
+                    ? '请选择上方日期后，系统将扫描该日期的未匹配文件夹。'
+                    : '当前没有可供修正的日期文件夹，请先上传文件。';
+            }
+            if (list) {
+                list.innerHTML = '<div style="text-align:center; padding:30px; color:#64748b;">请选择日期以查看待修正文件夹。</div>';
+            }
             
-            for (const [key, file] of uploadedFiles.entries()) {
+            const modal = document.getElementById('batchFixModal');
+            if (modal) {
+                modal.style.display = 'block';
+            }
+        }
+        
+        function collectBatchFixDates() {
+            const dateSet = new Set();
+            for (const file of uploadedFiles.values()) {
                 if (!file || !file.folder) continue;
-                
-                // 检查是否是今日的文件夹
-                const pathParts = file.folder.split('/');
-                if (pathParts.length >= 3) {
-                    const folderYMD = pathParts[2];  // 例如: 2025-10-23
-                    const folderYMDStr = folderYMD.replace(/-/g, '');
-                    
-                    if (folderYMDStr === todayStr) {
-                        const folder = file.folder;
-                        if (!folderStats.has(folder)) {
-                            folderStats.set(folder, {
-                                fileCount: 0,
-                                suffix: '',
-                                files: [],
-                                folderName: pathParts[pathParts.length - 1]
-                            });
-                        }
-                        const stats = folderStats.get(folder);
-                        stats.fileCount++;
-                        stats.files.push(file);
-                        
-                        // 提取后缀（从文件夹名称中）
-                        const folderName = pathParts[pathParts.length - 1];
-                        const suffixMatch = folderName.match(/_(\d{4})$/);
-                        if (suffixMatch) {
-                            stats.suffix = suffixMatch[1];
-                        }
+                const parts = String(file.folder).split('/');
+                if (parts.length >= 3) {
+                    const datePart = parts[2];
+                    if (BATCH_FIX_DATE_REGEX.test(datePart)) {
+                        dateSet.add(datePart);
                     }
                 }
             }
+            return Array.from(dateSet).sort((a, b) => b.localeCompare(a));
+        }
+        
+        function populateBatchFixDateOptions(selectedDate) {
+            const selectEl = document.getElementById('batchFixDateSelect');
+            if (!selectEl) return;
+            const options = ['<option value="">请选择日期</option>'];
+            batchFixAvailableDates.forEach(dateStr => {
+                const selectedAttr = dateStr === selectedDate ? ' selected' : '';
+                options.push(`<option value="${dateStr}"${selectedAttr}>${dateStr}</option>`);
+            });
+            selectEl.innerHTML = options.join('');
+        }
+        
+        function refreshBatchFixDates() {
+            const previousSelection = batchFixSelectedDate;
+            batchFixAvailableDates = collectBatchFixDates();
+            const stillValidSelection = previousSelection && batchFixAvailableDates.includes(previousSelection)
+                ? previousSelection
+                : '';
+            batchFixSelectedDate = stillValidSelection;
+            populateBatchFixDateOptions(stillValidSelection);
+            scanBatchFixForDate(stillValidSelection);
+        }
+        
+        function handleBatchFixDateChange(dateStr) {
+            batchFixSelectedDate = dateStr;
+            scanBatchFixForDate(dateStr);
+        }
+        
+        function scanBatchFixForDate(dateStr) {
+            const summary = document.getElementById('batchFixSummary');
+            const list = document.getElementById('batchFixList');
             
-            console.log('📊 找到今日文件夹:', folderStats.size);
+            if (!dateStr) {
+                batchFixData = [];
+                if (summary) summary.innerHTML = '请选择上方日期后，系统将扫描该日期的未匹配文件夹。';
+                if (list) list.innerHTML = '<div style="text-align:center; padding:30px; color:#64748b;">请选择日期以查看待修正文件夹。</div>';
+                return;
+            }
             
-            // 识别未匹配的文件夹
+            if (!BATCH_FIX_DATE_REGEX.test(dateStr)) {
+                batchFixData = [];
+                if (summary) summary.innerHTML = '❌ 日期格式不正确，请重新选择。';
+                if (list) list.innerHTML = '<div style="text-align:center; padding:30px; color:#ef4444;">日期格式无效</div>';
+                return;
+            }
+            
+            console.log(`📝 开始扫描 ${dateStr} 的未匹配文件夹...`);
+            
+            const targetYMD = dateStr.replace(/-/g, '');
+            const folderStats = new Map();
+            
+            for (const file of uploadedFiles.values()) {
+                if (!file || !file.folder) continue;
+                const pathParts = String(file.folder).split('/');
+                if (pathParts.length < 3) continue;
+                const folderDate = pathParts[2];
+                if (folderDate.replace(/-/g, '') !== targetYMD) continue;
+                
+                const folder = file.folder;
+                if (!folderStats.has(folder)) {
+                    folderStats.set(folder, {
+                        fileCount: 0,
+                        suffix: '',
+                        files: [],
+                        folderName: pathParts[pathParts.length - 1]
+                    });
+                }
+                const stats = folderStats.get(folder);
+                stats.fileCount++;
+                stats.files.push(file);
+                
+                const folderName = stats.folderName;
+                const suffixMatch = folderName.match(/_(\d{4})$/);
+                if (suffixMatch) {
+                    stats.suffix = suffixMatch[1];
+                }
+            }
+            
+            console.log(`📊 找到 ${dateStr} 文件夹数:`, folderStats.size);
+            
             batchFixData = [];
             for (const [folder, stats] of folderStats.entries()) {
-                // 检查是否已经匹配（有contractNumber）
                 const firstFile = stats.files[0];
-                const contractNumber = firstFile.contractNumber || '';
-                
-                // 判断是否为未匹配：contractNumber为空，或者是4位数字（随机生成的）
+                const contractNumber = firstFile?.contractNumber || '';
                 const isUnmatched = !contractNumber || /^\d{4}$/.test(contractNumber);
                 
                 if (isUnmatched) {
                     batchFixData.push({
-                        folder: folder,
+                        folder,
                         folderName: stats.folderName,
                         suffix: stats.suffix,
                         fileCount: stats.fileCount,
-                        contractNumber: contractNumber,
-                        lpInput: ''  // 用户输入的LP号后4位
+                        contractNumber,
+                        lpInput: ''
                     });
                 }
             }
             
-            console.log('🔍 识别到未匹配文件夹:', batchFixData.length);
-            
-            // 显示结果
-            const modal = document.getElementById('batchFixModal');
-            const summary = document.getElementById('batchFixSummary');
-            const list = document.getElementById('batchFixList');
-            
             if (batchFixData.length === 0) {
-                summary.innerHTML = '✅ 太棒了！所有今日文件夹都已正确匹配，无需修正。';
-                list.innerHTML = '<div style="text-align:center; padding:30px; color:#10b981; font-size:16px;">✨ 所有文件夹已完美匹配！</div>';
-            } else {
+                if (summary) summary.innerHTML = `✅ ${dateStr} 的所有文件夹都已正确匹配，无需修正。`;
+                if (list) list.innerHTML = '<div style="text-align:center; padding:30px; color:#10b981; font-size:16px;">✨ 所选日期没有需要修正的文件夹。</div>';
+                return;
+            }
+            
+            if (summary) {
+                const totalFiles = batchFixData.reduce((sum, item) => sum + item.fileCount, 0);
                 summary.innerHTML = `
-                    📋 扫描完成：找到 <strong>${batchFixData.length}</strong> 个未匹配的文件夹，共 <strong>${batchFixData.reduce((sum, item) => sum + item.fileCount, 0)}</strong> 个文件需要修正。
+                    📋 扫描完成（${dateStr}）：找到 <strong>${batchFixData.length}</strong> 个未匹配的文件夹，共 <strong>${totalFiles}</strong> 个文件需要修正。
                 `;
-                
-                // 生成输入列表
+            }
+            
+            if (list) {
                 list.innerHTML = batchFixData.map((item, index) => `
                     <div style="padding:15px; margin-bottom:10px; background:white; border-radius:6px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -3760,24 +3833,27 @@
                         </div>
                     </div>
                 `).join('');
-                
-                // 自动填充已知的后缀
-                setTimeout(() => {
-                    batchFixData.forEach((item, index) => {
-                        if (item.suffix) {
-                            item.lpInput = item.suffix;
-                            checkLPMatch(index, item.suffix);
-                        }
-                    });
-                }, 100);
             }
             
-            modal.style.display = 'block';
+            setTimeout(() => {
+                batchFixData.forEach((item, index) => {
+                    if (item.suffix) {
+                        item.lpInput = item.suffix;
+                        checkLPMatch(index, item.suffix);
+                    }
+                });
+            }, 100);
         }
         
         function closeBatchFixModal() {
             document.getElementById('batchFixModal').style.display = 'none';
             batchFixData = [];
+            batchFixSelectedDate = '';
+            batchFixAvailableDates = [];
+            const selectEl = document.getElementById('batchFixDateSelect');
+            if (selectEl) {
+                selectEl.value = '';
+            }
         }
         
         function updateBatchFixInput(index, value) {
@@ -3827,6 +3903,15 @@
                 alert('没有需要修正的文件夹');
                 return;
             }
+            if (!batchFixSelectedDate) {
+                alert('请先选择需要修正的日期文件夹');
+                return;
+            }
+            
+            if (!BATCH_FIX_DATE_REGEX.test(batchFixSelectedDate)) {
+                alert('日期格式不正确，请重新选择');
+                return;
+            }
             
             console.log('🚀 开始批量修正...');
             
@@ -3837,12 +3922,9 @@
             let failCount = 0;
             const errors = [];
             
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
+            const [year, month, day] = batchFixSelectedDate.split('-');
             const yearMonth = `${year}-${month}`;
-            const yearMonthDay = `${year}-${month}-${day}`;
+            const yearMonthDay = batchFixSelectedDate;
             
             for (let i = 0; i < batchFixData.length; i++) {
                 const item = batchFixData[i];
