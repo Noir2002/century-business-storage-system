@@ -3921,6 +3921,7 @@
             let successCount = 0;
             let failCount = 0;
             const errors = [];
+            const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
             
             const [year, month, day] = batchFixSelectedDate.split('-');
             const yearMonth = `${year}-${month}`;
@@ -3970,55 +3971,89 @@
                 
                 // 收集需要移动的R2文件
                 const filesToMove = [];
-                let fileUpdated = 0;
+                const filesToUpdate = [];
                 
                 for (const [key, file] of uploadedFiles.entries()) {
-                    if (file && file.folder === item.folder) {
-                        // 构建R2文件的旧路径和新路径
-                        const oldR2Path = file.r2Path || `${item.folder}/${file.fileName || file.name}`;
-                        const newR2Path = `${newFolder}/${file.fileName || file.name}`;
-                        
-                        filesToMove.push({
-                            oldPath: oldR2Path,
-                            newPath: newR2Path
-                        });
-                        
-                        // 更新文件记录
-                        file.folder = newFolder;
-                        file.lpNumber = lpFull;
-                        file.contractNumber = contract;
-                        file.r2Path = newR2Path;
-                        uploadedFiles.set(key, file);
-                        fileUpdated++;
-                    }
+                    if (!file || file.folder !== item.folder) continue;
+                    
+                    const fileName = file.fileName || file.name;
+                    const oldR2Path = file.r2Path || `${item.folder}/${fileName}`;
+                    const newR2Path = `${newFolder}/${fileName}`;
+                    
+                    filesToMove.push({
+                        oldPath: oldR2Path,
+                        newPath: newR2Path
+                    });
+                    
+                    filesToUpdate.push({
+                        key,
+                        file,
+                        newFolder,
+                        newR2Path,
+                        fileName
+                    });
                 }
                 
-                // 调用R2 API批量移动文件
-                if (filesToMove.length > 0) {
-                    try {
-                        const baseURL = (typeof getBaseURL === 'function') ? getBaseURL() : '';
-                        const moveResponse = await fetch(`${baseURL}/api/r2/batch-move`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ moves: filesToMove })
-                        });
-                        
-                        const moveResult = await moveResponse.json();
-                        
-                        if (moveResult.success) {
-                            console.log(`✅ R2文件移动成功: ${filesToMove.length} 个文件`);
-                        } else {
-                            console.warn(`⚠️ R2文件移动部分失败:`, moveResult);
-                            if (moveResult.results && moveResult.results.failed.length > 0) {
-                                errors.push(`${item.folderName}: R2移动失败${moveResult.results.failed.length}个文件`);
-                            }
-                        }
-                    } catch (moveError) {
-                        console.error(`❌ R2文件移动失败:`, moveError);
-                        errors.push(`${item.folderName}: R2文件移动异常 - ${moveError.message}`);
+                if (filesToMove.length === 0) {
+                    errors.push(`${item.folderName}: 未找到需要移动的文件`);
+                    failCount++;
+                    continue;
+                }
+                
+                let moveSucceeded = true;
+                try {
+                    const moveResponse = await fetch(`${baseURL}/api/r2/batch-move`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ moves: filesToMove })
+                    });
+                    
+                    const moveResult = await moveResponse.json();
+                    
+                    if (!moveResponse.ok || !moveResult.success) {
+                        moveSucceeded = false;
+                        const failedCount = moveResult?.results?.failed?.length || filesToMove.length;
+                        errors.push(`${item.folderName}: R2移动失败${failedCount}个文件`);
+                    } else {
+                        console.log(`✅ R2文件移动成功: ${filesToMove.length} 个文件`);
                     }
+                } catch (moveError) {
+                    moveSucceeded = false;
+                    console.error(`❌ R2文件移动失败:`, moveError);
+                    errors.push(`${item.folderName}: R2文件移动异常 - ${moveError.message}`);
+                }
+                
+                if (!moveSucceeded) {
+                    failCount++;
+                    continue;
+                }
+                
+                let fileUpdated = 0;
+                for (const info of filesToUpdate) {
+                    const record = info.file;
+                    record.folder = newFolder;
+                    record.lpNumber = lpFull;
+                    record.contractNumber = contract;
+                    record.r2Path = info.newR2Path;
+                    
+                    const downloadUrl = `${baseURL}/api/r2/download/${encodeURIComponent(info.newR2Path)}`.replace(/%2F/g, '/');
+                    record.downloadUrl = downloadUrl;
+                    
+                    if (window.r2PackageStorage && typeof window.r2PackageStorage.getPublicUrl === 'function') {
+                        try {
+                            record.url = await window.r2PackageStorage.getPublicUrl(info.newR2Path);
+                        } catch (publicError) {
+                            console.warn('⚠️ 获取公共URL失败，使用下载地址备用:', publicError);
+                            record.url = downloadUrl;
+                        }
+                    } else {
+                        record.url = downloadUrl;
+                    }
+                    
+                    uploadedFiles.set(info.key, record);
+                    fileUpdated++;
                 }
                 
                 console.log(`✅ 已更新 ${fileUpdated} 个文件记录并移动R2文件`);
