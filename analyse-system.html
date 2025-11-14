@@ -456,9 +456,18 @@
                             const getSKU = () => {
                                 return row['SKU'] || row['sku'] || row['商品编码'] || row['编码'] || '';
                             };
-                            // 获取尺码
+                            // 获取尺码 - 统一格式化为1位小数
                             const getSize = () => {
-                                return row['尺码'] || row['size'] || row['规格'] || '';
+                                const sizeValue = row['尺码'] || row['size'] || row['规格'] || '';
+                                if (!sizeValue) return '';
+                                
+                                // 尝试转换为数字，如果是数字则保留1位小数
+                                const numSize = parseFloat(sizeValue);
+                                if (!isNaN(numSize)) {
+                                    return numSize.toFixed(1);
+                                }
+                                // 如果不是数字，直接返回原值
+                                return String(sizeValue);
                             };
                             // 获取数量 - 优先匹配"商品数量"
                             const getQuantity = () => {
@@ -654,9 +663,21 @@
                 const totalRevenue = filteredData.reduce((sum, item) => sum + item.revenue, 0);
                 const avgPrice = totalQuantity > 0 ? totalRevenue / totalQuantity : 0;
                 
-                const dates = filteredData.map(d => d.date.getTime());
-                const daysDiff = dates.length > 0 ? 
-                    (Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24) + 1 : 1;
+                let daysDiff = 1;
+                
+                // 如果筛选器中设置了开始日期和结束日期，使用筛选日期范围
+                if (filters.startDate && filters.endDate) {
+                    const startDate = new Date(filters.startDate);
+                    const endDate = new Date(filters.endDate);
+                    daysDiff = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1;
+                } else {
+                    // 默认情况：使用实际数据的日期范围（方案二）
+                    const dates = filteredData.map(d => d.date.getTime());
+                    if (dates.length > 0) {
+                        daysDiff = (Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24) + 1;
+                    }
+                }
+                
                 const velocity = totalQuantity / daysDiff;
 
                 return {
@@ -666,7 +687,7 @@
                     velocity,
                     orderCount: filteredData.length
                 };
-            }, [filteredData]);
+            }, [filteredData, filters.startDate, filters.endDate]);
 
             // 导出PDF
             const exportPDF = async () => {
