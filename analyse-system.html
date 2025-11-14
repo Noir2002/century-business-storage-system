@@ -72,7 +72,7 @@
                 const range = maxValue - minValue || 1;
                 
                 // 绘制网格
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
                 ctx.lineWidth = 1;
                 for (let i = 0; i <= 5; i++) {
                     const y = padding + (chartHeight / 5) * i;
@@ -91,9 +91,8 @@
                 ctx.lineTo(width - padding, height - padding);
                 ctx.stroke();
                 
-                // 绘制数据点和连线
+                // 绘制折线（不绘制点）
                 ctx.strokeStyle = color;
-                ctx.fillStyle = color;
                 ctx.lineWidth = 3;
                 ctx.beginPath();
                 
@@ -107,17 +106,12 @@
                     } else {
                         ctx.lineTo(x, y);
                     }
-                    
-                    // 绘制点
-                    ctx.beginPath();
-                    ctx.arc(x, y, 4, 0, Math.PI * 2);
-                    ctx.fill();
                 });
                 
                 ctx.stroke();
                 
                 // 绘制标签
-                ctx.fillStyle = '#94a3b8';
+                ctx.fillStyle = '#64748b';
                 ctx.font = '12px sans-serif';
                 ctx.textAlign = 'center';
                 data.forEach((item, index) => {
@@ -127,6 +121,7 @@
                 
                 // Y轴标签
                 ctx.textAlign = 'right';
+                ctx.fillStyle = '#64748b';
                 for (let i = 0; i <= 5; i++) {
                     const value = minValue + (range / 5) * (5 - i);
                     const y = padding + (chartHeight / 5) * i;
@@ -151,9 +146,14 @@
                 if (!canvas || !data || data.length === 0) return;
                 
                 const ctx = canvas.getContext('2d');
-                const padding = horizontal ? 100 : 60;
-                const chartWidth = width - padding * 2;
-                const chartHeight = height - padding * 2;
+                // 横向柱状图需要更多左侧空间来显示标题
+                const leftPadding = horizontal ? 200 : 60;
+                const rightPadding = 60;
+                const topPadding = 60;
+                const bottomPadding = 60;
+                const padding = horizontal ? leftPadding : 60;
+                const chartWidth = width - leftPadding - rightPadding;
+                const chartHeight = height - topPadding - bottomPadding;
                 
                 ctx.clearRect(0, 0, width, height);
                 
@@ -164,14 +164,14 @@
                 const actualBarWidth = barWidth - barSpacing;
                 
                 // 绘制网格
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
                 ctx.lineWidth = 1;
                 for (let i = 0; i <= 5; i++) {
                     if (horizontal) {
-                        const x = padding + (chartWidth / 5) * i;
+                        const x = leftPadding + (chartWidth / 5) * i;
                         ctx.beginPath();
-                        ctx.moveTo(x, padding);
-                        ctx.lineTo(x, height - padding);
+                        ctx.moveTo(x, topPadding);
+                        ctx.lineTo(x, height - bottomPadding);
                         ctx.stroke();
                     } else {
                         const y = padding + (chartHeight / 5) * i;
@@ -187,9 +187,9 @@
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 if (horizontal) {
-                    ctx.moveTo(padding, padding);
-                    ctx.lineTo(padding, height - padding);
-                    ctx.lineTo(width - padding, height - padding);
+                    ctx.moveTo(leftPadding, topPadding);
+                    ctx.lineTo(leftPadding, height - bottomPadding);
+                    ctx.lineTo(width - rightPadding, height - bottomPadding);
                 } else {
                     ctx.moveTo(padding, padding);
                     ctx.lineTo(padding, height - padding);
@@ -203,17 +203,22 @@
                     const barHeight = (value / maxValue) * chartHeight;
                     
                     if (horizontal) {
-                        const y = padding + barWidth * index + barSpacing / 2;
+                        const y = topPadding + barWidth * index + barSpacing / 2;
                         const barLength = (value / maxValue) * chartWidth;
                         
                         ctx.fillStyle = color;
-                        ctx.fillRect(padding, y, barLength, actualBarWidth);
+                        ctx.fillRect(leftPadding, y, barLength, actualBarWidth);
                         
-                        // 标签
-                        ctx.fillStyle = '#94a3b8';
+                        // 标签 - 截断过长的标题
+                        ctx.fillStyle = '#64748b';
                         ctx.font = '12px sans-serif';
                         ctx.textAlign = 'right';
-                        ctx.fillText(item.name || '', padding - 10, y + actualBarWidth / 2 + 4);
+                        let label = item.name || '';
+                        // 如果标题太长，截断并添加省略号
+                        if (label.length > 30) {
+                            label = label.substring(0, 27) + '...';
+                        }
+                        ctx.fillText(label, leftPadding - 10, y + actualBarWidth / 2 + 4);
                     } else {
                         const x = padding + barWidth * index + barSpacing / 2;
                         
@@ -235,14 +240,110 @@
                 for (let i = 0; i <= 5; i++) {
                     const value = (maxValue / 5) * (5 - i);
                     if (horizontal) {
-                        const x = padding + (chartWidth / 5) * i;
-                        ctx.fillText(Math.round(value).toString(), x - 10, height - padding + 4);
+                        const x = leftPadding + (chartWidth / 5) * i;
+                        ctx.fillText(Math.round(value).toString(), x - 10, height - bottomPadding + 4);
                     } else {
                         const y = padding + (chartHeight / 5) * i;
                         ctx.fillText(Math.round(value).toString(), padding - 10, y + 4);
                     }
                 }
             }, [data, width, height, color, horizontal]);
+            
+            return React.createElement('canvas', { 
+                ref: canvasRef, 
+                width: width, 
+                height: height,
+                style: { maxWidth: '100%', height: 'auto' }
+            });
+        };
+
+        // 饼状图组件
+        const CanvasPieChart = ({ data, width = 600, height = 400 }) => {
+            const { useRef, useEffect } = React;
+            const canvasRef = useRef(null);
+            
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas || !data || data.length === 0) return;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, width, height);
+                
+                // 计算总和
+                const total = data.reduce((sum, item) => sum + (item.quantity || 0), 0);
+                if (total === 0) return;
+                
+                // 饼图中心位置和半径
+                const centerX = width / 2;
+                const centerY = height / 2 - 20;
+                const radius = Math.min(width, height) / 2 - 80;
+                
+                // 颜色数组
+                const colors = [
+                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                    '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+                    '#14b8a6', '#a855f7', '#f43f5e', '#0ea5e9', '#22c55e'
+                ];
+                
+                let currentAngle = -Math.PI / 2; // 从顶部开始
+                
+                // 绘制饼图
+                data.forEach((item, index) => {
+                    const value = item.quantity || 0;
+                    const sliceAngle = (value / total) * 2 * Math.PI;
+                    
+                    // 绘制扇形
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+                    ctx.closePath();
+                    ctx.fillStyle = colors[index % colors.length];
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    // 绘制标签和数值
+                    const labelAngle = currentAngle + sliceAngle / 2;
+                    const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
+                    const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
+                    
+                    // 如果扇形足够大，在内部显示百分比
+                    if (sliceAngle > 0.1) {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 12px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        const percentage = ((value / total) * 100).toFixed(1);
+                        ctx.fillText(percentage + '%', labelX, labelY);
+                    }
+                    
+                    // 绘制图例
+                    const legendX = width / 2 - 100;
+                    const legendY = height - 60 + (index % 10) * 20;
+                    const legendColor = colors[index % colors.length];
+                    
+                    // 图例颜色块
+                    ctx.fillStyle = legendColor;
+                    ctx.fillRect(legendX, legendY - 8, 12, 12);
+                    ctx.strokeStyle = '#e2e8f0';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(legendX, legendY - 8, 12, 12);
+                    
+                    // 图例文字
+                    ctx.fillStyle = '#1e293b';
+                    ctx.font = '11px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    let label = item.name || '';
+                    if (label.length > 15) {
+                        label = label.substring(0, 12) + '...';
+                    }
+                    ctx.fillText(`${label} (${value})`, legendX + 18, legendY);
+                    
+                    currentAngle += sliceAngle;
+                });
+            }, [data, width, height]);
             
             return React.createElement('canvas', { 
                 ref: canvasRef, 
@@ -1117,21 +1218,18 @@
                                 className: 'chart-container',
                                 style: { 
                                     backdropFilter: 'blur(16px)', 
-                                    background: 'rgba(255, 255, 255, 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.9)', 
                                     borderRadius: '16px', 
-                                    border: '1px solid rgba(255, 255, 255, 0.2)', 
+                                    border: '1px solid rgba(0, 0, 0, 0.1)', 
                                     padding: '24px' 
                                 } 
                             },
-                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' } }, '颜色销量分布'),
+                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' } }, '颜色销量分布'),
                                 React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
-                                    React.createElement(CanvasBarChart, { 
+                                    React.createElement(CanvasPieChart, { 
                                         data: colorData, 
-                                        width: 800, 
-                                        height: 300, 
-                                        color: '#ec4899', 
-                                        label: '销量',
-                                        horizontal: false
+                                        width: 700, 
+                                        height: 500
                                     })
                                 )
                             ),
@@ -1141,21 +1239,18 @@
                                 className: 'chart-container',
                                 style: { 
                                     backdropFilter: 'blur(16px)', 
-                                    background: 'rgba(255, 255, 255, 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.9)', 
                                     borderRadius: '16px', 
-                                    border: '1px solid rgba(255, 255, 255, 0.2)', 
+                                    border: '1px solid rgba(0, 0, 0, 0.1)', 
                                     padding: '24px' 
                                 } 
                             },
-                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' } }, '尺码销量分布'),
+                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' } }, '尺码销量分布'),
                                 React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
-                                    React.createElement(CanvasBarChart, { 
+                                    React.createElement(CanvasPieChart, { 
                                         data: sizeData, 
-                                        width: 800, 
-                                        height: 300, 
-                                        color: '#f59e0b', 
-                                        label: '销量',
-                                        horizontal: false
+                                        width: 700, 
+                                        height: 500
                                     })
                                 )
                             )
