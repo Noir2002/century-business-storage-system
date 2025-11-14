@@ -8,10 +8,9 @@
     <!-- 依赖库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- React and Recharts for Analysis System -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/recharts@2.10.3/dist/Recharts.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/recharts@2.10.3/dist/Recharts.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
@@ -44,7 +43,6 @@
     <script>
         // 分析系统React组件
         const { useState, useMemo } = React;
-        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } = Recharts;
 
         // 颜色代码映射表
         const COLOR_MAP = {
@@ -54,7 +52,40 @@
             'BBLC': '黑蓝', 'WGRY': '白灰', 'RBLK': '红黑', 'BWHT': '蓝白', 'GBLK': '绿黑'
         };
 
+        // 获取 Recharts 组件的函数
+        function getRechartsComponents() {
+            const RechartsLib = window.Recharts || (typeof Recharts !== 'undefined' ? Recharts : null);
+            if (!RechartsLib) {
+                return null;
+            }
+            return {
+                LineChart: RechartsLib.LineChart,
+                Line: RechartsLib.Line,
+                XAxis: RechartsLib.XAxis,
+                YAxis: RechartsLib.YAxis,
+                CartesianGrid: RechartsLib.CartesianGrid,
+                Tooltip: RechartsLib.Tooltip,
+                Legend: RechartsLib.Legend,
+                ResponsiveContainer: RechartsLib.ResponsiveContainer,
+                BarChart: RechartsLib.BarChart,
+                Bar: RechartsLib.Bar
+            };
+        }
+
         const SalesAnalysisSystem = () => {
+            // 获取 Recharts 组件
+            const RechartsComponents = getRechartsComponents();
+            if (!RechartsComponents) {
+                return React.createElement('div', { 
+                    style: { padding: '50px', textAlign: 'center', color: 'white' } 
+                }, 
+                    React.createElement('h2', null, '加载错误'),
+                    React.createElement('p', null, 'Recharts 库未加载，请刷新页面')
+                );
+            }
+            
+            const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } = RechartsComponents;
+            
             const [data, setData] = useState([]);
             const [filters, setFilters] = useState({
                 style: '',
@@ -847,24 +878,76 @@
 
         // 初始化分析系统
         function initAnalysisSystem() {
+            // 检查依赖是否加载
+            if (typeof React === 'undefined') {
+                console.error('React 未加载');
+                document.getElementById('root').innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载错误</h2><p>React 库未加载，请检查网络连接</p></div>';
+                return;
+            }
+            
+            const RechartsLib = window.Recharts || (typeof Recharts !== 'undefined' ? Recharts : null);
+            if (!RechartsLib) {
+                console.error('Recharts 未加载');
+                document.getElementById('root').innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载错误</h2><p>Recharts 库未加载，请检查网络连接</p><p>请尝试刷新页面</p></div>';
+                return;
+            }
+
             const rootElement = document.getElementById('root');
-            if (rootElement) {
+            if (!rootElement) {
+                console.error('找不到 root 元素');
+                return;
+            }
+
+            try {
                 // React 18 使用 createRoot
                 if (ReactDOM.createRoot) {
                     const root = ReactDOM.createRoot(rootElement);
                     root.render(React.createElement(SalesAnalysisSystem));
-                } else {
+                } else if (ReactDOM.render) {
                     // 兼容旧版本
                     ReactDOM.render(React.createElement(SalesAnalysisSystem), rootElement);
+                } else {
+                    throw new Error('ReactDOM 方法不可用');
                 }
+            } catch (error) {
+                console.error('初始化失败:', error);
+                rootElement.innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>初始化错误</h2><p>' + error.message + '</p><p>请刷新页面重试</p></div>';
+            }
+        }
+
+        // 等待所有脚本加载完成后再初始化
+        function waitForDependencies() {
+            const hasReact = typeof React !== 'undefined';
+            const hasReactDOM = typeof ReactDOM !== 'undefined';
+            const hasRecharts = typeof Recharts !== 'undefined' || typeof window.Recharts !== 'undefined';
+            
+            if (hasReact && hasReactDOM && hasRecharts) {
+                initAnalysisSystem();
+            } else {
+                // 如果依赖未加载，等待一段时间后重试（最多等待10秒）
+                const maxWait = 10000; // 10秒
+                const startTime = Date.now();
+                const checkInterval = setInterval(() => {
+                    const hasReactNow = typeof React !== 'undefined';
+                    const hasReactDOMNow = typeof ReactDOM !== 'undefined';
+                    const hasRechartsNow = typeof Recharts !== 'undefined' || typeof window.Recharts !== 'undefined';
+                    
+                    if (hasReactNow && hasReactDOMNow && hasRechartsNow) {
+                        clearInterval(checkInterval);
+                        initAnalysisSystem();
+                    } else if (Date.now() - startTime > maxWait) {
+                        clearInterval(checkInterval);
+                        document.getElementById('root').innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载超时</h2><p>依赖库加载时间过长，请检查网络连接后刷新页面</p></div>';
+                    }
+                }, 100);
             }
         }
 
         // 页面加载完成后初始化
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initAnalysisSystem);
+            document.addEventListener('DOMContentLoaded', waitForDependencies);
         } else {
-            initAnalysisSystem();
+            waitForDependencies();
         }
     </script>
 </body>
