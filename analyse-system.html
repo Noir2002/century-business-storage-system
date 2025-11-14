@@ -347,26 +347,44 @@
                         console.log('第一行数据示例:', rawData[0]);
 
                         const processedData = rawData.map((row, index) => {
+                            // 获取商品名称 - 支持多种列名
                             const getName = () => {
-                                return row['商品名称'] || row['名称'] || row['product_name'] || row['name'] || row['商品名'] || '';
+                                return row['商品名称'] || row['名称'] || row['product_name'] || row['name'] || row['商品名'] || row['标题'] || row['title'] || '';
                             };
+                            // 获取SKU
                             const getSKU = () => {
                                 return row['SKU'] || row['sku'] || row['商品编码'] || row['编码'] || '';
                             };
+                            // 获取尺码
                             const getSize = () => {
                                 return row['尺码'] || row['size'] || row['规格'] || '';
                             };
+                            // 获取数量 - 支持多种列名
                             const getQuantity = () => {
-                                const qty = row['数量'] || row['quantity'] || row['销量'] || row['销售数量'] || 0;
+                                const qty = row['数量'] || row['quantity'] || row['销量'] || row['销售数量'] || row['商品数量'] || 0;
                                 return parseInt(qty) || 0;
                             };
+                            // 获取价格 - 支持多种列名
                             const getPrice = () => {
                                 const price = row['订单金额'] || row['price'] || row['单价'] || row['商品单价'] || row['金额'] || 0;
                                 return parseFloat(price) || 0;
                             };
+                            // 获取日期 - 支持Excel日期格式
                             const getDate = () => {
-                                const dateStr = row['店铺订单时间'] || row['订单时间'] || row['date'] || row['时间'] || row['日期'] || '';
+                                let dateStr = row['店铺订单时间'] || row['订单时间'] || row['date'] || row['时间'] || row['日期'] || '';
+                                
+                                // 如果是Excel日期数字格式（如 45965.5260532407）
+                                if (typeof dateStr === 'number') {
+                                    // Excel日期从1900年1月1日开始计算
+                                    const excelEpoch = new Date(1899, 11, 30);
+                                    const date = new Date(excelEpoch.getTime() + dateStr * 24 * 60 * 60 * 1000);
+                                    if (!isNaN(date.getTime())) {
+                                        return date;
+                                    }
+                                }
+                                
                                 if (dateStr) {
+                                    // 尝试解析日期字符串
                                     const date = new Date(dateStr);
                                     if (isNaN(date.getTime())) {
                                         console.warn('日期解析失败:', dateStr, '使用当前日期');
@@ -379,20 +397,22 @@
 
                             const name = getName();
                             const sku = getSKU();
+                            const quantity = getQuantity();
                             
                             return {
                                 style: name,
                                 sku: sku,
                                 color: parseColor(sku),
                                 size: String(getSize()),
-                                quantity: getQuantity(),
+                                quantity: quantity,
                                 price: getPrice(),
                                 date: getDate(),
-                                revenue: getQuantity() * getPrice()
+                                revenue: quantity * getPrice()
                             };
                         }).filter(item => {
+                            // 只要有商品名称（标题）和数量大于0就保留
                             const valid = item.style && item.quantity > 0;
-                            if (!valid && item.style) {
+                            if (!valid) {
                                 console.warn('过滤掉无效数据:', item);
                             }
                             return valid;
