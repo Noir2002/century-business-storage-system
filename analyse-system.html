@@ -10,7 +10,7 @@
     <!-- React and Recharts for Analysis System -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/recharts@2.10.3/dist/Recharts.js"></script>
+    <script src="https://unpkg.com/recharts@2.10.3/dist/Recharts.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
@@ -54,11 +54,34 @@
 
         // 获取 Recharts 组件的函数
         function getRechartsComponents() {
-            const RechartsLib = window.Recharts || (typeof Recharts !== 'undefined' ? Recharts : null);
+            console.log('获取 Recharts 组件...');
+            console.log('window.Recharts:', window.Recharts);
+            console.log('typeof Recharts:', typeof Recharts);
+            
+            // 尝试多种方式获取 Recharts
+            let RechartsLib = null;
+            
+            if (typeof window !== 'undefined' && window.Recharts) {
+                RechartsLib = window.Recharts;
+                console.log('从 window.Recharts 获取');
+            } else if (typeof Recharts !== 'undefined') {
+                RechartsLib = Recharts;
+                console.log('从全局 Recharts 获取');
+            } else if (typeof window !== 'undefined' && window.RechartsLib) {
+                RechartsLib = window.RechartsLib;
+                console.log('从 window.RechartsLib 获取');
+            }
+            
             if (!RechartsLib) {
+                console.error('Recharts 库未找到');
                 return null;
             }
-            return {
+            
+            console.log('Recharts 库找到:', RechartsLib);
+            console.log('Recharts 可用组件:', Object.keys(RechartsLib));
+            
+            // 检查组件是否存在
+            const components = {
                 LineChart: RechartsLib.LineChart,
                 Line: RechartsLib.Line,
                 XAxis: RechartsLib.XAxis,
@@ -70,20 +93,29 @@
                 BarChart: RechartsLib.BarChart,
                 Bar: RechartsLib.Bar
             };
+            
+            console.log('组件检查:', components);
+            return components;
         }
 
         const SalesAnalysisSystem = () => {
+            console.log('SalesAnalysisSystem 组件开始渲染');
+            
             // 获取 Recharts 组件
             const RechartsComponents = getRechartsComponents();
             if (!RechartsComponents) {
+                console.warn('Recharts 未加载，显示错误信息');
                 return React.createElement('div', { 
                     style: { padding: '50px', textAlign: 'center', color: 'white' } 
                 }, 
-                    React.createElement('h2', null, '加载错误'),
-                    React.createElement('p', null, 'Recharts 库未加载，请刷新页面')
+                    React.createElement('h2', null, '📊 商品销量分析系统'),
+                    React.createElement('p', { style: { marginTop: '20px' } }, 'Recharts 库未加载'),
+                    React.createElement('p', null, '请检查网络连接或刷新页面'),
+                    React.createElement('p', { style: { marginTop: '20px', fontSize: '14px', opacity: 0.8 } }, '如果问题持续，请打开浏览器控制台查看详细错误信息')
                 );
             }
             
+            console.log('Recharts 组件已获取，继续渲染');
             const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } = RechartsComponents;
             
             const [data, setData] = useState([]);
@@ -878,17 +910,28 @@
 
         // 初始化分析系统
         function initAnalysisSystem() {
+            console.log('开始初始化分析系统...');
+            
             // 检查依赖是否加载
+            console.log('检查 React:', typeof React !== 'undefined');
+            console.log('检查 ReactDOM:', typeof ReactDOM !== 'undefined');
+            console.log('检查 Recharts:', typeof Recharts !== 'undefined', typeof window.Recharts !== 'undefined');
+            
             if (typeof React === 'undefined') {
                 console.error('React 未加载');
-                document.getElementById('root').innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载错误</h2><p>React 库未加载，请检查网络连接</p></div>';
+                const rootEl = document.getElementById('root');
+                if (rootEl) {
+                    rootEl.innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载错误</h2><p>React 库未加载，请检查网络连接</p><p>请打开浏览器控制台查看详细错误</p></div>';
+                }
                 return;
             }
             
-            const RechartsLib = window.Recharts || (typeof Recharts !== 'undefined' ? Recharts : null);
-            if (!RechartsLib) {
-                console.error('Recharts 未加载');
-                document.getElementById('root').innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载错误</h2><p>Recharts 库未加载，请检查网络连接</p><p>请尝试刷新页面</p></div>';
+            if (typeof ReactDOM === 'undefined') {
+                console.error('ReactDOM 未加载');
+                const rootEl = document.getElementById('root');
+                if (rootEl) {
+                    rootEl.innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载错误</h2><p>ReactDOM 库未加载，请检查网络连接</p></div>';
+                }
                 return;
             }
 
@@ -899,45 +942,62 @@
             }
 
             try {
+                console.log('尝试渲染组件...');
                 // React 18 使用 createRoot
                 if (ReactDOM.createRoot) {
+                    console.log('使用 ReactDOM.createRoot');
                     const root = ReactDOM.createRoot(rootElement);
                     root.render(React.createElement(SalesAnalysisSystem));
+                    console.log('组件渲染完成');
                 } else if (ReactDOM.render) {
-                    // 兼容旧版本
+                    console.log('使用 ReactDOM.render');
                     ReactDOM.render(React.createElement(SalesAnalysisSystem), rootElement);
+                    console.log('组件渲染完成');
                 } else {
                     throw new Error('ReactDOM 方法不可用');
                 }
             } catch (error) {
                 console.error('初始化失败:', error);
-                rootElement.innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>初始化错误</h2><p>' + error.message + '</p><p>请刷新页面重试</p></div>';
+                console.error('错误堆栈:', error.stack);
+                rootElement.innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>初始化错误</h2><p>' + error.message + '</p><p>请打开浏览器控制台查看详细错误信息</p><p>请刷新页面重试</p></div>';
             }
         }
 
         // 等待所有脚本加载完成后再初始化
         function waitForDependencies() {
+            console.log('等待依赖加载...');
             const hasReact = typeof React !== 'undefined';
             const hasReactDOM = typeof ReactDOM !== 'undefined';
             const hasRecharts = typeof Recharts !== 'undefined' || typeof window.Recharts !== 'undefined';
             
-            if (hasReact && hasReactDOM && hasRecharts) {
+            console.log('依赖状态 - React:', hasReact, 'ReactDOM:', hasReactDOM, 'Recharts:', hasRecharts);
+            
+            // 只需要 React 和 ReactDOM，Recharts 可以在组件内部处理
+            if (hasReact && hasReactDOM) {
+                console.log('核心依赖已加载，开始初始化');
                 initAnalysisSystem();
             } else {
+                console.log('等待核心依赖加载...');
                 // 如果依赖未加载，等待一段时间后重试（最多等待10秒）
                 const maxWait = 10000; // 10秒
                 const startTime = Date.now();
                 const checkInterval = setInterval(() => {
                     const hasReactNow = typeof React !== 'undefined';
                     const hasReactDOMNow = typeof ReactDOM !== 'undefined';
-                    const hasRechartsNow = typeof Recharts !== 'undefined' || typeof window.Recharts !== 'undefined';
                     
-                    if (hasReactNow && hasReactDOMNow && hasRechartsNow) {
+                    console.log('检查依赖 - React:', hasReactNow, 'ReactDOM:', hasReactDOMNow);
+                    
+                    if (hasReactNow && hasReactDOMNow) {
                         clearInterval(checkInterval);
+                        console.log('核心依赖已加载，开始初始化');
                         initAnalysisSystem();
                     } else if (Date.now() - startTime > maxWait) {
                         clearInterval(checkInterval);
-                        document.getElementById('root').innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载超时</h2><p>依赖库加载时间过长，请检查网络连接后刷新页面</p></div>';
+                        console.error('加载超时');
+                        const rootEl = document.getElementById('root');
+                        if (rootEl) {
+                            rootEl.innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载超时</h2><p>React 或 ReactDOM 加载时间过长</p><p>请检查网络连接后刷新页面</p><p>请打开浏览器控制台查看详细错误</p></div>';
+                        }
                     }
                 }, 100);
             }
