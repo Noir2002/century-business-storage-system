@@ -51,36 +51,54 @@
                 }
 
                 console.log('开始加载 Recharts...');
-                const script = document.createElement('script');
                 
                 // 尝试多个 CDN 源
                 const cdnSources = [
                     'https://unpkg.com/recharts@2.10.3/dist/Recharts.js',
-                    'https://cdn.jsdelivr.net/npm/recharts@2.10.3/dist/Recharts.js',
-                    'https://cdnjs.cloudflare.com/ajax/libs/recharts/2.10.3/Recharts.js'
+                    'https://cdn.jsdelivr.net/npm/recharts@2.10.3/dist/Recharts.js'
                 ];
                 
                 let currentIndex = 0;
                 
                 function tryNextSource() {
                     if (currentIndex >= cdnSources.length) {
-                        reject(new Error('所有 CDN 源都加载失败'));
+                        console.error('所有 CDN 源都加载失败');
+                        reject(new Error('所有 CDN 源都加载失败，可能是浏览器跟踪防护阻止了加载'));
                         return;
                     }
                     
+                    // 每次创建新的 script 元素
+                    const script = document.createElement('script');
                     script.src = cdnSources[currentIndex];
+                    script.async = true;
+                    script.crossOrigin = 'anonymous';
+                    
                     console.log('尝试加载 Recharts 从:', script.src);
                     
                     script.onload = () => {
-                        console.log('Recharts 加载成功');
-                        resolve();
+                        console.log('Recharts 加载成功，等待初始化...');
+                        // 等待一下确保 Recharts 完全初始化
+                        setTimeout(() => {
+                            if (typeof Recharts !== 'undefined' || (typeof window !== 'undefined' && window.Recharts)) {
+                                console.log('Recharts 已可用');
+                                resolve();
+                            } else {
+                                console.warn('Recharts 加载但未找到全局变量，尝试下一个源');
+                                currentIndex++;
+                                tryNextSource();
+                            }
+                        }, 100);
                     };
                     
-                    script.onerror = () => {
-                        console.warn('CDN 源加载失败:', script.src);
+                    script.onerror = (error) => {
+                        console.warn('CDN 源加载失败:', script.src, error);
+                        // 移除失败的 script
+                        if (script.parentNode) {
+                            script.parentNode.removeChild(script);
+                        }
                         currentIndex++;
                         if (currentIndex < cdnSources.length) {
-                            tryNextSource();
+                            setTimeout(tryNextSource, 100);
                         } else {
                             reject(new Error('所有 CDN 源都加载失败'));
                         }
@@ -156,14 +174,63 @@
             // 获取 Recharts 组件
             const RechartsComponents = getRechartsComponents();
             if (!RechartsComponents) {
-                console.warn('Recharts 未加载，显示错误信息');
+                console.warn('Recharts 未加载，显示简化界面');
+                // 显示一个简化版本，不依赖 Recharts
                 return React.createElement('div', { 
-                    style: { padding: '50px', textAlign: 'center', color: 'white' } 
-                }, 
-                    React.createElement('h2', null, '📊 商品销量分析系统'),
-                    React.createElement('p', { style: { marginTop: '20px' } }, 'Recharts 库未加载'),
-                    React.createElement('p', null, '请检查网络连接或刷新页面'),
-                    React.createElement('p', { style: { marginTop: '20px', fontSize: '14px', opacity: 0.8 } }, '如果问题持续，请打开浏览器控制台查看详细错误信息')
+                    style: { 
+                        minHeight: '100vh', 
+                        background: 'linear-gradient(135deg, #1e293b 0%, #7c3aed 50%, #1e293b 100%)', 
+                        color: 'white', 
+                        padding: '32px' 
+                    } 
+                },
+                    React.createElement('div', { style: { maxWidth: '1280px', margin: '0 auto' } },
+                        React.createElement('div', { style: { marginBottom: '32px' } },
+                            React.createElement('h1', { 
+                                style: { 
+                                    fontSize: '2.25rem', 
+                                    fontWeight: 'bold', 
+                                    marginBottom: '8px',
+                                    background: 'linear-gradient(to right, #60a5fa, #a78bfa)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent'
+                                } 
+                            }, '📊 商品销量分析系统'),
+                            React.createElement('p', { style: { color: '#94a3b8' } }, '数据驱动决策，洞察销售趋势')
+                        ),
+                        React.createElement('div', { 
+                            style: { 
+                                backdropFilter: 'blur(16px)', 
+                                background: 'rgba(255, 255, 255, 0.1)', 
+                                borderRadius: '16px', 
+                                border: '1px solid rgba(255, 255, 255, 0.2)', 
+                                padding: '48px', 
+                                textAlign: 'center' 
+                            } 
+                        },
+                            React.createElement('h2', { style: { marginBottom: '20px' } }, '⚠️ 图表库加载失败'),
+                            React.createElement('p', { style: { marginBottom: '20px', color: '#94a3b8' } }, 'Recharts 图表库无法加载，可能是浏览器跟踪防护阻止了 CDN 资源。'),
+                            React.createElement('p', { style: { marginBottom: '30px', color: '#94a3b8' } }, '请尝试：'),
+                            React.createElement('ul', { style: { textAlign: 'left', display: 'inline-block', color: '#cbd5e1', marginBottom: '30px' } },
+                                React.createElement('li', { style: { marginBottom: '10px' } }, '1. 在浏览器设置中允许此网站的跟踪防护例外'),
+                                React.createElement('li', { style: { marginBottom: '10px' } }, '2. 刷新页面重试'),
+                                React.createElement('li', { style: { marginBottom: '10px' } }, '3. 检查网络连接')
+                            ),
+                            React.createElement('button', {
+                                onClick: () => window.location.reload(),
+                                style: {
+                                    padding: '12px 24px',
+                                    background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
+                                    borderRadius: '8px',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontWeight: '600',
+                                    fontSize: '16px'
+                                }
+                            }, '🔄 刷新页面')
+                        )
+                    )
                 );
             }
             
@@ -1055,11 +1122,16 @@
             
             // 尝试加载 Recharts（可选，如果失败会在组件内处理）
             try {
+                console.log('开始加载 Recharts...');
                 await loadRecharts();
                 console.log('Recharts 加载完成');
             } catch (error) {
-                console.warn('Recharts 加载失败，将在组件内处理:', error);
+                console.warn('Recharts 加载失败，将在组件内处理:', error.message);
+                // 即使失败也继续，组件会显示友好的错误信息
             }
+            
+            // 等待一下确保所有脚本都加载完成
+            await new Promise(resolve => setTimeout(resolve, 200));
             
             // 初始化系统
             console.log('开始初始化系统');
