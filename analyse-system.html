@@ -24,9 +24,9 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e293b 0%, #7c3aed 50%, #1e293b 100%);
+            background: #ffffff;
             min-height: 100vh;
-            color: white;
+            color: #1e293b;
         }
 
         #root {
@@ -449,10 +449,17 @@
 
             // 获取筛选选项
             const filterOptions = useMemo(() => {
+                if (!data || data.length === 0) {
+                    return {
+                        styles: [],
+                        colors: [],
+                        sizes: []
+                    };
+                }
                 return {
-                    styles: [...new Set(data.map(d => d.style))].sort(),
-                    colors: [...new Set(data.map(d => d.color))].sort(),
-                    sizes: [...new Set(data.map(d => d.size))].sort()
+                    styles: [...new Set(data.map(d => d.style).filter(s => s))].sort(),
+                    colors: [...new Set(data.map(d => d.color).filter(c => c))].sort(),
+                    sizes: [...new Set(data.map(d => d.size).filter(s => s))].sort()
                 };
             }, [data]);
 
@@ -572,8 +579,8 @@
                 pdf.setFontSize(12);
                 let yPos = 35;
                 pdf.text(`总销量: ${stats.totalQuantity} 件`, 20, yPos);
-                pdf.text(`总销售额: ¥${stats.totalRevenue.toFixed(2)}`, 20, yPos + 7);
-                pdf.text(`平均单价: ¥${stats.avgPrice.toFixed(2)}`, 20, yPos + 14);
+                pdf.text(`总销售额: €${stats.totalRevenue.toFixed(2)}`, 20, yPos + 7);
+                pdf.text(`平均单价: €${stats.avgPrice.toFixed(2)}`, 20, yPos + 14);
                 pdf.text(`销售流速: ${stats.velocity.toFixed(2)} 件/天`, 20, yPos + 21);
                 
                 const charts = document.querySelectorAll('.chart-container');
@@ -650,8 +657,8 @@
             return React.createElement('div', { 
                 style: { 
                     minHeight: '100vh', 
-                    background: 'linear-gradient(135deg, #1e293b 0%, #7c3aed 50%, #1e293b 100%)', 
-                    color: 'white', 
+                    background: '#ffffff', 
+                    color: '#1e293b', 
                     padding: '32px' 
                 } 
             },
@@ -663,12 +670,10 @@
                                 fontSize: '2.25rem', 
                                 fontWeight: 'bold', 
                                 marginBottom: '8px',
-                                background: 'linear-gradient(to right, #60a5fa, #a78bfa)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent'
+                                color: '#1e293b'
                             } 
                         }, '商品销量分析系统'),
-                        React.createElement('p', { style: { color: '#94a3b8' } }, '数据驱动决策，洞察销售趋势')
+                        React.createElement('p', { style: { color: '#64748b' } }, '数据驱动决策，洞察销售趋势')
                     ),
 
                     // 上传状态提示
@@ -691,7 +696,7 @@
                             display: 'flex',
                             alignItems: 'center',
                             gap: '12px',
-                            color: 'white'
+                            color: uploadStatus.type === 'error' ? '#dc2626' : uploadStatus.type === 'success' ? '#059669' : '#1e40af'
                         }
                     },
                         uploadStatus.type === 'loading' && React.createElement('div', {
@@ -721,9 +726,9 @@
                     data.length === 0 && React.createElement('div', { 
                         style: { 
                             backdropFilter: 'blur(16px)', 
-                            background: 'rgba(255, 255, 255, 0.1)', 
+                            background: 'rgba(255, 255, 255, 0.9)', 
                             borderRadius: '16px', 
-                            border: '1px solid rgba(255, 255, 255, 0.2)', 
+                            border: '1px solid rgba(0, 0, 0, 0.1)', 
                             padding: '48px', 
                             textAlign: 'center', 
                             marginBottom: '32px',
@@ -732,7 +737,7 @@
                     },
                         React.createElement(UploadIcon),
                         React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginTop: '16px', marginBottom: '8px' } }, '上传Excel文件'),
-                        React.createElement('p', { style: { color: '#94a3b8', marginBottom: '16px' } }, '支持 .xlsx, .xls 格式'),
+                        React.createElement('p', { style: { color: '#64748b', marginBottom: '16px' } }, '支持 .xlsx, .xls 格式'),
                         React.createElement('label', { style: { display: 'inline-block', cursor: 'pointer' } },
                             React.createElement('input', { 
                                 type: 'file', 
@@ -768,7 +773,7 @@
                                     background: 'rgba(255, 255, 255, 0.1)',
                                     borderRadius: '8px',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
-                                    color: 'white',
+                                    color: '#1e293b',
                                     cursor: 'pointer',
                                     transition: 'all 0.3s'
                                 }
@@ -782,7 +787,7 @@
                                     padding: '8px 16px',
                                     background: 'linear-gradient(to right, #10b981, #059669)',
                                     borderRadius: '8px',
-                                    color: 'white',
+                                    color: '#1e293b',
                                     border: 'none',
                                     cursor: 'pointer',
                                     transition: 'all 0.3s'
@@ -798,7 +803,7 @@
                                     background: 'rgba(255, 255, 255, 0.1)',
                                     borderRadius: '8px',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
-                                    color: 'white',
+                                    color: '#1e293b',
                                     cursor: 'pointer',
                                     transition: 'all 0.3s'
                                 }
@@ -832,7 +837,7 @@
                                     style: {
                                         background: 'transparent',
                                         border: 'none',
-                                        color: 'white',
+                                        color: '#1e293b',
                                         cursor: 'pointer',
                                         padding: '4px'
                                     }
@@ -847,10 +852,10 @@
                                         style: {
                                             width: '100%',
                                             padding: '8px 12px',
-                                            background: 'rgba(255, 255, 255, 0.05)',
-                                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
                                             borderRadius: '8px',
-                                            color: 'white',
+                                            color: '#1e293b',
                                             outline: 'none'
                                         }
                                     },
@@ -866,10 +871,10 @@
                                         style: {
                                             width: '100%',
                                             padding: '8px 12px',
-                                            background: 'rgba(255, 255, 255, 0.05)',
-                                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
                                             borderRadius: '8px',
-                                            color: 'white',
+                                            color: '#1e293b',
                                             outline: 'none'
                                         }
                                     },
@@ -885,10 +890,10 @@
                                         style: {
                                             width: '100%',
                                             padding: '8px 12px',
-                                            background: 'rgba(255, 255, 255, 0.05)',
-                                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
                                             borderRadius: '8px',
-                                            color: 'white',
+                                            color: '#1e293b',
                                             outline: 'none'
                                         }
                                     },
@@ -907,10 +912,10 @@
                                         style: {
                                             width: '100%',
                                             padding: '8px 12px',
-                                            background: 'rgba(255, 255, 255, 0.05)',
-                                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
                                             borderRadius: '8px',
-                                            color: 'white',
+                                            color: '#1e293b',
                                             outline: 'none'
                                         }
                                     })
@@ -924,10 +929,10 @@
                                         style: {
                                             width: '100%',
                                             padding: '8px 12px',
-                                            background: 'rgba(255, 255, 255, 0.05)',
-                                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
                                             borderRadius: '8px',
-                                            color: 'white',
+                                            color: '#1e293b',
                                             outline: 'none'
                                         }
                                     })
@@ -940,10 +945,10 @@
                                         style: {
                                             width: '100%',
                                             padding: '8px 12px',
-                                            background: 'rgba(255, 255, 255, 0.05)',
-                                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
                                             borderRadius: '8px',
-                                            color: 'white',
+                                            color: '#1e293b',
                                             outline: 'none'
                                         }
                                     },
@@ -961,7 +966,7 @@
                                     background: 'rgba(255, 255, 255, 0.1)',
                                     borderRadius: '8px',
                                     border: 'none',
-                                    color: 'white',
+                                    color: '#1e293b',
                                     cursor: 'pointer'
                                 }
                             }, '清除筛选')
@@ -980,10 +985,10 @@
                             },
                                 React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' } },
                                     React.createElement(PackageIcon),
-                                    React.createElement('h3', { style: { color: '#cbd5e1' } }, '总销量')
+                                    React.createElement('h3', { style: { color: '#64748b' } }, '总销量')
                                 ),
                                 React.createElement('p', { style: { fontSize: '1.875rem', fontWeight: 'bold' } }, stats.totalQuantity),
-                                React.createElement('p', { style: { fontSize: '0.875rem', color: '#94a3b8', marginTop: '4px' } }, '件')
+                                React.createElement('p', { style: { fontSize: '0.875rem', color: '#64748b', marginTop: '4px' } }, '件')
                             ),
                             React.createElement('div', { 
                                 style: { 
@@ -996,10 +1001,10 @@
                             },
                                 React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' } },
                                     React.createElement(DollarSignIcon),
-                                    React.createElement('h3', { style: { color: '#cbd5e1' } }, '总销售额')
+                                    React.createElement('h3', { style: { color: '#64748b' } }, '总销售额')
                                 ),
-                                React.createElement('p', { style: { fontSize: '1.875rem', fontWeight: 'bold' } }, `¥${stats.totalRevenue.toFixed(2)}`),
-                                React.createElement('p', { style: { fontSize: '0.875rem', color: '#94a3b8', marginTop: '4px' } }, '元')
+                                React.createElement('p', { style: { fontSize: '1.875rem', fontWeight: 'bold' } }, `€${stats.totalRevenue.toFixed(2)}`),
+                                React.createElement('p', { style: { fontSize: '0.875rem', color: '#64748b', marginTop: '4px' } }, '欧元')
                             ),
                             React.createElement('div', { 
                                 style: { 
@@ -1012,10 +1017,10 @@
                             },
                                 React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' } },
                                     React.createElement(TrendingUpIcon),
-                                    React.createElement('h3', { style: { color: '#cbd5e1' } }, '平均单价')
+                                    React.createElement('h3', { style: { color: '#64748b' } }, '平均单价')
                                 ),
-                                React.createElement('p', { style: { fontSize: '1.875rem', fontWeight: 'bold' } }, `¥${stats.avgPrice.toFixed(2)}`),
-                                React.createElement('p', { style: { fontSize: '0.875rem', color: '#94a3b8', marginTop: '4px' } }, '元/件')
+                                React.createElement('p', { style: { fontSize: '1.875rem', fontWeight: 'bold' } }, `€${stats.avgPrice.toFixed(2)}`),
+                                React.createElement('p', { style: { fontSize: '0.875rem', color: '#64748b', marginTop: '4px' } }, '欧元/件')
                             ),
                             React.createElement('div', { 
                                 style: { 
@@ -1028,10 +1033,10 @@
                             },
                                 React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' } },
                                     React.createElement(CalendarIcon),
-                                    React.createElement('h3', { style: { color: '#cbd5e1' } }, '销售流速')
+                                    React.createElement('h3', { style: { color: '#64748b' } }, '销售流速')
                                 ),
                                 React.createElement('p', { style: { fontSize: '1.875rem', fontWeight: 'bold' } }, stats.velocity.toFixed(2)),
-                                React.createElement('p', { style: { fontSize: '0.875rem', color: '#94a3b8', marginTop: '4px' } }, '件/天')
+                                React.createElement('p', { style: { fontSize: '0.875rem', color: '#64748b', marginTop: '4px' } }, '件/天')
                             )
                         ),
 
