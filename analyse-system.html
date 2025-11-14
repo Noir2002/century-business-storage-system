@@ -268,7 +268,7 @@
         };
 
         // 饼状图组件
-        const CanvasPieChart = ({ data, width = 600, height = 400 }) => {
+        const CanvasPieChart = ({ data, width = 600, height = 400, showRevenue = false }) => {
             const { useRef, useEffect } = React;
             const canvasRef = useRef(null);
             
@@ -279,8 +279,8 @@
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, width, height);
                 
-                // 计算总和
-                const total = data.reduce((sum, item) => sum + (item.quantity || 0), 0);
+                // 计算总和 - 根据showRevenue决定使用数量还是销售额
+                const total = data.reduce((sum, item) => sum + (showRevenue ? (item.revenue || 0) : (item.quantity || 0)), 0);
                 if (total === 0) return;
                 
                 // 饼图中心位置和半径 - 为图例留出更多空间
@@ -299,7 +299,7 @@
                 
                 // 绘制饼图
                 data.forEach((item, index) => {
-                    const value = item.quantity || 0;
+                    const value = showRevenue ? (item.revenue || 0) : (item.quantity || 0);
                     const sliceAngle = (value / total) * 2 * Math.PI;
                     
                     // 绘制扇形
@@ -344,17 +344,25 @@
                     ctx.lineWidth = 1;
                     ctx.strokeRect(legendX, legendY - 8, 12, 12);
                     
-                    // 图例文字 - 格式：尺码值 (数量)
+                    // 图例文字 - 根据showRevenue显示不同格式
                     ctx.fillStyle = '#1e293b';
                     ctx.font = '12px sans-serif';
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'middle';
                     const label = item.name || '';
-                    ctx.fillText(`${label} (${value})`, legendX + 18, legendY);
+                    let displayText = '';
+                    if (showRevenue) {
+                        // 显示品牌和销售额
+                        displayText = `${label} (€${value.toFixed(2)})`;
+                    } else {
+                        // 显示尺码/颜色和数量
+                        displayText = `${label} (${value})`;
+                    }
+                    ctx.fillText(displayText, legendX + 18, legendY);
                     
                     currentAngle += sliceAngle;
                 });
-            }, [data, width, height]);
+            }, [data, width, height, showRevenue]);
             
             return React.createElement('canvas', { 
                 ref: canvasRef, 
@@ -383,6 +391,7 @@
             const [data, setData] = useState([]);
             const [filters, setFilters] = useState({
                 style: '',
+                brand: '',
                 color: '',
                 size: '',
                 startDate: '',
@@ -463,6 +472,10 @@
                             const getName = () => {
                                 return row['商品名称'] || row['标题'] || row['名称'] || row['product_name'] || row['name'] || row['商品名'] || row['title'] || '';
                             };
+                            // 获取品牌名称
+                            const getBrand = () => {
+                                return row['品牌名称'] || row['品牌'] || row['brand'] || row['brand_name'] || '';
+                            };
                             // 获取SKU
                             const getSKU = () => {
                                 return row['SKU'] || row['sku'] || row['商品编码'] || row['编码'] || '';
@@ -517,11 +530,13 @@
                             };
 
                             const name = getName();
+                            const brand = getBrand();
                             const sku = getSKU();
                             const quantity = getQuantity();
                             
                             return {
                                 style: name,
+                                brand: brand,
                                 sku: sku,
                                 color: parseColor(sku),
                                 size: String(getSize()),
@@ -573,12 +588,14 @@
                 if (!data || data.length === 0) {
                     return {
                         styles: [],
+                        brands: [],
                         colors: [],
                         sizes: []
                     };
                 }
                 return {
                     styles: [...new Set(data.map(d => d.style).filter(s => s))].sort(),
+                    brands: [...new Set(data.map(d => d.brand).filter(b => b))].sort(),
                     colors: [...new Set(data.map(d => d.color).filter(c => c))].sort(),
                     sizes: [...new Set(data.map(d => d.size).filter(s => s))].sort()
                 };
@@ -588,6 +605,7 @@
             const filteredData = useMemo(() => {
                 return data.filter(item => {
                     if (filters.style && item.style !== filters.style) return false;
+                    if (filters.brand && item.brand !== filters.brand) return false;
                     if (filters.color && item.color !== filters.color) return false;
                     if (filters.size && item.size !== filters.size) return false;
                     if (filters.startDate && item.date < new Date(filters.startDate)) return false;
@@ -666,6 +684,20 @@
                     const bNum = parseFloat(b.name) || 0;
                     return aNum - bNum;
                 });
+            }, [filteredData]);
+
+            // 按品牌统计（用于饼状图，显示销售额）
+            const brandData = useMemo(() => {
+                const grouped = {};
+                filteredData.forEach(item => {
+                    if (!item.brand) return; // 跳过没有品牌的数据
+                    if (!grouped[item.brand]) {
+                        grouped[item.brand] = { name: item.brand, quantity: 0, revenue: 0 };
+                    }
+                    grouped[item.brand].quantity += item.quantity;
+                    grouped[item.brand].revenue += item.revenue;
+                });
+                return Object.values(grouped).sort((a, b) => b.revenue - a.revenue);
             }, [filteredData]);
 
             // 计算统计数据
@@ -997,6 +1029,25 @@
                                     )
                                 ),
                                 React.createElement('div', null,
+                                    React.createElement('label', { style: { display: 'block', fontSize: '0.875rem', marginBottom: '8px' } }, '品牌'),
+                                    React.createElement('select', {
+                                        value: filters.brand,
+                                        onChange: (e) => setFilters({...filters, brand: e.target.value}),
+                                        style: {
+                                            width: '100%',
+                                            padding: '8px 12px',
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
+                                            borderRadius: '8px',
+                                            color: '#1e293b',
+                                            outline: 'none'
+                                        }
+                                    },
+                                        React.createElement('option', { value: '' }, '全部品牌'),
+                                        ...filterOptions.brands.map(b => React.createElement('option', { key: b, value: b }, b))
+                                    )
+                                ),
+                                React.createElement('div', null,
                                     React.createElement('label', { style: { display: 'block', fontSize: '0.875rem', marginBottom: '8px' } }, '颜色'),
                                     React.createElement('select', {
                                         value: filters.color,
@@ -1092,7 +1143,7 @@
                                 )
                             ),
                             React.createElement('button', {
-                                onClick: () => setFilters({style: '', color: '', size: '', startDate: '', endDate: '', timeGranularity: 'day'}),
+                                onClick: () => setFilters({style: '', brand: '', color: '', size: '', startDate: '', endDate: '', timeGranularity: 'day'}),
                                 style: {
                                     marginTop: '16px',
                                     padding: '8px 16px',
@@ -1283,6 +1334,28 @@
                                         data: sizeData, 
                                         width: 700, 
                                         height: 500
+                                    })
+                                )
+                            ),
+
+                            // 品牌销量对比
+                            brandData.length > 0 && React.createElement('div', { 
+                                className: 'chart-container',
+                                style: { 
+                                    backdropFilter: 'blur(16px)', 
+                                    background: 'rgba(255, 255, 255, 0.9)', 
+                                    borderRadius: '16px', 
+                                    border: '1px solid rgba(0, 0, 0, 0.1)', 
+                                    padding: '24px' 
+                                } 
+                            },
+                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' } }, '品牌销量对比'),
+                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
+                                    React.createElement(CanvasPieChart, { 
+                                        data: brandData, 
+                                        width: 700, 
+                                        height: 500,
+                                        showRevenue: true
                                     })
                                 )
                             )
