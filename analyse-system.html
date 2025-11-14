@@ -347,9 +347,9 @@
                         console.log('第一行数据示例:', rawData[0]);
 
                         const processedData = rawData.map((row, index) => {
-                            // 获取商品名称 - 支持多种列名
+                            // 获取商品名称 - 优先匹配实际列名
                             const getName = () => {
-                                return row['商品名称'] || row['名称'] || row['product_name'] || row['name'] || row['商品名'] || row['标题'] || row['title'] || '';
+                                return row['商品名称'] || row['标题'] || row['名称'] || row['product_name'] || row['name'] || row['商品名'] || row['title'] || '';
                             };
                             // 获取SKU
                             const getSKU = () => {
@@ -359,14 +359,14 @@
                             const getSize = () => {
                                 return row['尺码'] || row['size'] || row['规格'] || '';
                             };
-                            // 获取数量 - 支持多种列名
+                            // 获取数量 - 优先匹配"商品数量"
                             const getQuantity = () => {
-                                const qty = row['数量'] || row['quantity'] || row['销量'] || row['销售数量'] || row['商品数量'] || 0;
+                                const qty = row['商品数量'] || row['数量'] || row['quantity'] || row['销量'] || row['销售数量'] || 0;
                                 return parseInt(qty) || 0;
                             };
-                            // 获取价格 - 支持多种列名
+                            // 获取价格 - 优先匹配"订单金额"
                             const getPrice = () => {
-                                const price = row['订单金额'] || row['price'] || row['单价'] || row['商品单价'] || row['金额'] || 0;
+                                const price = row['订单金额'] || row['金额'] || row['price'] || row['单价'] || row['商品单价'] || 0;
                                 return parseFloat(price) || 0;
                             };
                             // 获取日期 - 支持Excel日期格式
