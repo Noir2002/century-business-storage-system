@@ -42,6 +42,48 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* 响应式布局 */
+        @media (max-width: 1400px) {
+            #root {
+                padding: 24px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            #root {
+                padding: 16px;
+            }
+            
+            .chart-container {
+                padding: 16px !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            #root {
+                padding: 12px;
+            }
+            
+            .chart-container {
+                padding: 12px !important;
+            }
+        }
+
+        /* 图表容器优化 */
+        .chart-container {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .chart-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        /* 确保图表可以滚动 */
+        .chart-container > div {
+            max-width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -110,13 +152,25 @@
                 
                 ctx.stroke();
                 
-                // 绘制标签
+                // 绘制标签 - 当数据点多时，只显示部分标签避免重叠
                 ctx.fillStyle = '#64748b';
-                ctx.font = '12px sans-serif';
+                ctx.font = '11px sans-serif';
                 ctx.textAlign = 'center';
+                
+                // 计算标签间距，确保不重叠
+                const labelSpacing = 60; // 最小间距（像素）
+                const maxLabels = Math.floor(chartWidth / labelSpacing);
+                const labelInterval = data.length > maxLabels ? Math.ceil(data.length / maxLabels) : 1;
+                
                 data.forEach((item, index) => {
-                    const x = padding + (chartWidth / (data.length - 1 || 1)) * index;
-                    ctx.fillText(item.date || '', x, height - padding + 20);
+                    // 只显示部分标签，避免拥挤
+                    if (index % labelInterval === 0 || index === data.length - 1) {
+                        const x = padding + (chartWidth / (data.length - 1 || 1)) * index;
+                        const dateText = item.date || '';
+                        // 如果日期格式是 "MM/DD"，直接显示；如果是完整日期，只显示月日
+                        const shortDate = dateText.length > 5 ? dateText.split('/').slice(-2).join('/') : dateText;
+                        ctx.fillText(shortDate, x, height - padding + 20);
+                    }
                 });
                 
                 // Y轴标签
@@ -283,10 +337,12 @@
                 const total = data.reduce((sum, item) => sum + (showRevenue ? (item.revenue || 0) : (item.quantity || 0)), 0);
                 if (total === 0) return;
                 
-                // 饼图中心位置和半径 - 为图例留出更多空间
+                // 饼图中心位置和半径 - 根据数据量动态调整
                 const centerX = width / 2;
-                const centerY = height / 2 - 40;
-                const radius = Math.min(width, height) / 2 - 120;
+                const centerY = height / 2 - 60;
+                // 如果数据项多，减小半径，为图例留出更多空间
+                const legendSpace = Math.ceil(data.length / 3) * 25 + 40;
+                const radius = Math.min(width, height) / 2 - Math.max(legendSpace, 100);
                 
                 // 颜色数组
                 const colors = [
@@ -328,13 +384,15 @@
                         ctx.fillText(percentage + '%', labelX, labelY);
                     }
                     
-                    // 绘制图例 - 分两列显示
-                    const itemsPerColumn = Math.ceil(data.length / 2);
-                    const columnIndex = index < itemsPerColumn ? 0 : 1;
-                    const rowIndex = index < itemsPerColumn ? index : index - itemsPerColumn;
+                    // 绘制图例 - 分三列显示，避免拥挤
+                    const itemsPerColumn = Math.ceil(data.length / 3);
+                    const columnIndex = Math.floor(index / itemsPerColumn);
+                    const rowIndex = index % itemsPerColumn;
                     
-                    const legendX = columnIndex === 0 ? 50 : width / 2 + 20;
-                    const legendY = 60 + rowIndex * 25;
+                    // 计算每列的起始X位置和宽度
+                    const columnWidth = (width - 60) / 3;
+                    const legendX = 20 + columnIndex * columnWidth;
+                    const legendY = height - Math.ceil(data.length / 3) * 25 + rowIndex * 25;
                     const legendColor = colors[index % colors.length];
                     
                     // 图例颜色块
@@ -344,9 +402,9 @@
                     ctx.lineWidth = 1;
                     ctx.strokeRect(legendX, legendY - 8, 12, 12);
                     
-                    // 图例文字 - 根据showRevenue显示不同格式
+                    // 图例文字 - 根据showRevenue显示不同格式，并截断过长的文字
                     ctx.fillStyle = '#1e293b';
-                    ctx.font = '12px sans-serif';
+                    ctx.font = '11px sans-serif';
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'middle';
                     const label = item.name || '';
@@ -358,7 +416,23 @@
                         // 显示尺码/颜色和数量
                         displayText = `${label} (${value})`;
                     }
-                    ctx.fillText(displayText, legendX + 18, legendY);
+                    
+                    // 计算可显示的最大字符数（根据列宽）
+                    const maxTextWidth = columnWidth - 35; // 减去颜色块和间距
+                    ctx.font = '11px sans-serif';
+                    const metrics = ctx.measureText(displayText);
+                    let finalText = displayText;
+                    if (metrics.width > maxTextWidth) {
+                        // 文字太长，需要截断
+                        let truncated = label;
+                        let suffix = showRevenue ? ` (€${value.toFixed(2)})` : ` (${value})`;
+                        let availableWidth = maxTextWidth - ctx.measureText(suffix).width;
+                        while (ctx.measureText(truncated + '...').width > availableWidth && truncated.length > 0) {
+                            truncated = truncated.slice(0, -1);
+                        }
+                        finalText = truncated + '...' + suffix;
+                    }
+                    ctx.fillText(finalText, legendX + 18, legendY);
                     
                     currentAngle += sliceAngle;
                 });
@@ -658,7 +732,7 @@
                 return Object.values(grouped).sort((a, b) => b.quantity - a.quantity).slice(0, 10);
             }, [filteredData]);
 
-            // 按颜色统计
+            // 按颜色统计 - 只显示Top 15，避免图例过多
             const colorData = useMemo(() => {
                 const grouped = {};
                 filteredData.forEach(item => {
@@ -667,10 +741,21 @@
                     }
                     grouped[item.color].quantity += item.quantity;
                 });
-                return Object.values(grouped).sort((a, b) => b.quantity - a.quantity);
+                const sorted = Object.values(grouped).sort((a, b) => b.quantity - a.quantity);
+                // 只显示前15个，其他合并为"其他"
+                if (sorted.length > 15) {
+                    const top15 = sorted.slice(0, 15);
+                    const others = sorted.slice(15);
+                    const othersTotal = others.reduce((sum, item) => sum + item.quantity, 0);
+                    if (othersTotal > 0) {
+                        top15.push({ name: '其他', quantity: othersTotal });
+                    }
+                    return top15;
+                }
+                return sorted;
             }, [filteredData]);
 
-            // 按尺码统计
+            // 按尺码统计 - 只显示Top 15，避免图例过多
             const sizeData = useMemo(() => {
                 const grouped = {};
                 filteredData.forEach(item => {
@@ -679,11 +764,22 @@
                     }
                     grouped[item.size].quantity += item.quantity;
                 });
-                return Object.values(grouped).sort((a, b) => {
+                const sorted = Object.values(grouped).sort((a, b) => {
                     const aNum = parseFloat(a.name) || 0;
                     const bNum = parseFloat(b.name) || 0;
                     return aNum - bNum;
                 });
+                // 只显示前15个，其他合并为"其他"
+                if (sorted.length > 15) {
+                    const top15 = sorted.slice(0, 15);
+                    const others = sorted.slice(15);
+                    const othersTotal = others.reduce((sum, item) => sum + item.quantity, 0);
+                    if (othersTotal > 0) {
+                        top15.push({ name: '其他', quantity: othersTotal });
+                    }
+                    return top15;
+                }
+                return sorted;
             }, [filteredData]);
 
             // 按品牌统计（用于饼状图，显示销售额）
@@ -1224,70 +1320,91 @@
                             )
                         ),
 
-                        // 图表区域
-                        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '24px' } },
-                            // 销量趋势图
+                        // 图表区域 - 使用网格布局，更好的响应式
+                        React.createElement('div', { 
+                            style: { 
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(600px, 1fr))',
+                                gap: '32px',
+                                marginTop: '24px'
+                            } 
+                        },
+                            // 趋势图区域 - 并排显示
                             React.createElement('div', { 
-                                className: 'chart-container',
                                 style: { 
-                                    backdropFilter: 'blur(16px)', 
-                                    background: 'rgba(255, 255, 255, 0.1)', 
-                                    borderRadius: '16px', 
-                                    border: '1px solid rgba(255, 255, 255, 0.2)', 
-                                    padding: '24px' 
+                                    gridColumn: '1 / -1',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))',
+                                    gap: '24px'
                                 } 
                             },
-                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' } }, '销量趋势'),
-                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
-                                    React.createElement(CanvasLineChart, { 
-                                        data: trendData.map(d => ({ date: d.date, quantity: d.quantity })), 
-                                        width: 800, 
-                                        height: 300, 
-                                        color: '#3b82f6', 
-                                        label: '销量' 
-                                    })
+                                // 销量趋势图
+                                React.createElement('div', { 
+                                    className: 'chart-container',
+                                    style: { 
+                                        backdropFilter: 'blur(16px)', 
+                                        background: 'rgba(255, 255, 255, 0.9)', 
+                                        borderRadius: '16px', 
+                                        border: '1px solid rgba(0, 0, 0, 0.1)', 
+                                        padding: '24px',
+                                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
+                                    } 
+                                },
+                                    React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '20px', color: '#1e293b' } }, '销量趋势'),
+                                    React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center', overflowX: 'auto' } },
+                                        React.createElement(CanvasLineChart, { 
+                                            data: trendData.map(d => ({ date: d.date, quantity: d.quantity })), 
+                                            width: Math.max(600, trendData.length * 40), 
+                                            height: 300, 
+                                            color: '#3b82f6', 
+                                            label: '销量' 
+                                        })
+                                    )
+                                ),
+
+                                // 销售额趋势图
+                                React.createElement('div', { 
+                                    className: 'chart-container',
+                                    style: { 
+                                        backdropFilter: 'blur(16px)', 
+                                        background: 'rgba(255, 255, 255, 0.9)', 
+                                        borderRadius: '16px', 
+                                        border: '1px solid rgba(0, 0, 0, 0.1)', 
+                                        padding: '24px',
+                                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
+                                    } 
+                                },
+                                    React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '20px', color: '#1e293b' } }, '销售额趋势'),
+                                    React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center', overflowX: 'auto' } },
+                                        React.createElement(CanvasLineChart, { 
+                                            data: trendData.map(d => ({ date: d.date, revenue: d.revenue })), 
+                                            width: Math.max(600, trendData.length * 40), 
+                                            height: 300, 
+                                            color: '#10b981', 
+                                            label: '销售额' 
+                                        })
+                                    )
                                 )
                             ),
 
-                            // 销售额趋势图
+                            // 款式销量 - 全宽显示
                             React.createElement('div', { 
                                 className: 'chart-container',
                                 style: { 
+                                    gridColumn: '1 / -1',
                                     backdropFilter: 'blur(16px)', 
-                                    background: 'rgba(255, 255, 255, 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.9)', 
                                     borderRadius: '16px', 
-                                    border: '1px solid rgba(255, 255, 255, 0.2)', 
-                                    padding: '24px' 
+                                    border: '1px solid rgba(0, 0, 0, 0.1)', 
+                                    padding: '24px',
+                                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
                                 } 
                             },
-                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' } }, '销售额趋势'),
-                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
-                                    React.createElement(CanvasLineChart, { 
-                                        data: trendData.map(d => ({ date: d.date, revenue: d.revenue })), 
-                                        width: 800, 
-                                        height: 300, 
-                                        color: '#10b981', 
-                                        label: '销售额' 
-                                    })
-                                )
-                            ),
-
-                            // 款式销量
-                            React.createElement('div', { 
-                                className: 'chart-container',
-                                style: { 
-                                    backdropFilter: 'blur(16px)', 
-                                    background: 'rgba(255, 255, 255, 0.1)', 
-                                    borderRadius: '16px', 
-                                    border: '1px solid rgba(255, 255, 255, 0.2)', 
-                                    padding: '24px' 
-                                } 
-                            },
-                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' } }, '款式销量排行（Top 10）'),
+                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '20px', color: '#1e293b' } }, '款式销量排行（Top 10）'),
                                 React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center', overflowX: 'auto' } },
                                     React.createElement(CanvasBarChart, { 
                                         data: styleData, 
-                                        width: 1000, 
+                                        width: Math.max(1000, styleData.length * 120), 
                                         height: 400, 
                                         color: '#8b5cf6', 
                                         label: '销量',
@@ -1296,65 +1413,83 @@
                                 )
                             ),
 
-                            // 颜色销量
+                            // 饼状图区域 - 并排显示
                             React.createElement('div', { 
-                                className: 'chart-container',
                                 style: { 
-                                    backdropFilter: 'blur(16px)', 
-                                    background: 'rgba(255, 255, 255, 0.9)', 
-                                    borderRadius: '16px', 
-                                    border: '1px solid rgba(0, 0, 0, 0.1)', 
-                                    padding: '24px' 
+                                    gridColumn: '1 / -1',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))',
+                                    gap: '24px'
                                 } 
                             },
-                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' } }, '颜色销量分布'),
-                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
-                                    React.createElement(CanvasPieChart, { 
-                                        data: colorData, 
-                                        width: 700, 
-                                        height: 500
-                                    })
+                                // 颜色销量
+                                React.createElement('div', { 
+                                    className: 'chart-container',
+                                    style: { 
+                                        backdropFilter: 'blur(16px)', 
+                                        background: 'rgba(255, 255, 255, 0.9)', 
+                                        borderRadius: '16px', 
+                                        border: '1px solid rgba(0, 0, 0, 0.1)', 
+                                        padding: '24px',
+                                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
+                                    } 
+                                },
+                                    React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '20px', color: '#1e293b' } }, 
+                                        `颜色销量分布${colorData.length > 15 ? ' (Top 15)' : ''}`
+                                    ),
+                                    React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center', overflowX: 'auto' } },
+                                        React.createElement(CanvasPieChart, { 
+                                            data: colorData, 
+                                            width: Math.max(600, colorData.length * 30), 
+                                            height: Math.max(500, Math.ceil(colorData.length / 3) * 30 + 300)
+                                        })
+                                    )
+                                ),
+
+                                // 尺码销量
+                                React.createElement('div', { 
+                                    className: 'chart-container',
+                                    style: { 
+                                        backdropFilter: 'blur(16px)', 
+                                        background: 'rgba(255, 255, 255, 0.9)', 
+                                        borderRadius: '16px', 
+                                        border: '1px solid rgba(0, 0, 0, 0.1)', 
+                                        padding: '24px',
+                                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
+                                    } 
+                                },
+                                    React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '20px', color: '#1e293b' } }, 
+                                        `尺码销量分布${sizeData.length > 15 ? ' (Top 15)' : ''}`
+                                    ),
+                                    React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center', overflowX: 'auto' } },
+                                        React.createElement(CanvasPieChart, { 
+                                            data: sizeData, 
+                                            width: Math.max(600, sizeData.length * 30), 
+                                            height: Math.max(500, Math.ceil(sizeData.length / 3) * 30 + 300)
+                                        })
+                                    )
                                 )
                             ),
 
-                            // 尺码销量
-                            React.createElement('div', { 
-                                className: 'chart-container',
-                                style: { 
-                                    backdropFilter: 'blur(16px)', 
-                                    background: 'rgba(255, 255, 255, 0.9)', 
-                                    borderRadius: '16px', 
-                                    border: '1px solid rgba(0, 0, 0, 0.1)', 
-                                    padding: '24px' 
-                                } 
-                            },
-                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' } }, '尺码销量分布'),
-                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
-                                    React.createElement(CanvasPieChart, { 
-                                        data: sizeData, 
-                                        width: 700, 
-                                        height: 500
-                                    })
-                                )
-                            ),
-
-                            // 品牌销量对比
+                            // 品牌销量对比 - 全宽显示
                             brandData.length > 0 && React.createElement('div', { 
                                 className: 'chart-container',
                                 style: { 
+                                    gridColumn: '1 / -1',
                                     backdropFilter: 'blur(16px)', 
                                     background: 'rgba(255, 255, 255, 0.9)', 
                                     borderRadius: '16px', 
                                     border: '1px solid rgba(0, 0, 0, 0.1)', 
-                                    padding: '24px' 
+                                    padding: '24px',
+                                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
                                 } 
                             },
-                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' } }, '品牌销量对比'),
-                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
+                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '20px', color: '#1e293b' } }, '品牌销量对比'),
+                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center', overflowX: 'auto' } },
                                     React.createElement(CanvasPieChart, { 
                                         data: brandData, 
-                                        width: 700, 
-                                        height: 500,
+                                        width: Math.max(700, brandData.length * 30), 
+                                        height: Math.max(500, Math.ceil(brandData.length / 3) * 30 + 300),
                                         showRevenue: true
                                     })
                                 )
