@@ -147,7 +147,15 @@
                 
                 const ctx = canvas.getContext('2d');
                 // 横向柱状图需要更多左侧空间来显示标题
-                const leftPadding = horizontal ? 200 : 60;
+                // 根据数据中最长标题动态计算左侧padding
+                let maxLabelLength = 0;
+                if (horizontal && data.length > 0) {
+                    data.forEach(item => {
+                        const label = item.name || '';
+                        maxLabelLength = Math.max(maxLabelLength, label.length);
+                    });
+                }
+                const leftPadding = horizontal ? Math.min(Math.max(maxLabelLength * 7 + 20, 250), 400) : 60;
                 const rightPadding = 60;
                 const topPadding = 60;
                 const bottomPadding = 60;
@@ -209,16 +217,18 @@
                         ctx.fillStyle = color;
                         ctx.fillRect(leftPadding, y, barLength, actualBarWidth);
                         
-                        // 标签 - 截断过长的标题
+                        // 标签 - 显示完整标题，不截断
                         ctx.fillStyle = '#64748b';
                         ctx.font = '12px sans-serif';
                         ctx.textAlign = 'right';
-                        let label = item.name || '';
-                        // 如果标题太长，截断并添加省略号
-                        if (label.length > 30) {
-                            label = label.substring(0, 27) + '...';
+                        const label = item.name || '';
+                        // 计算可显示的最大字符数（根据左侧padding）
+                        const maxChars = Math.floor((leftPadding - 20) / 7);
+                        let displayLabel = label;
+                        if (label.length > maxChars) {
+                            displayLabel = label.substring(0, maxChars - 3) + '...';
                         }
-                        ctx.fillText(label, leftPadding - 10, y + actualBarWidth / 2 + 4);
+                        ctx.fillText(displayLabel, leftPadding - 10, y + actualBarWidth / 2 + 4);
                     } else {
                         const x = padding + barWidth * index + barSpacing / 2;
                         
@@ -273,10 +283,10 @@
                 const total = data.reduce((sum, item) => sum + (item.quantity || 0), 0);
                 if (total === 0) return;
                 
-                // 饼图中心位置和半径
+                // 饼图中心位置和半径 - 为图例留出更多空间
                 const centerX = width / 2;
-                const centerY = height / 2 - 20;
-                const radius = Math.min(width, height) / 2 - 80;
+                const centerY = height / 2 - 40;
+                const radius = Math.min(width, height) / 2 - 120;
                 
                 // 颜色数组
                 const colors = [
@@ -318,9 +328,13 @@
                         ctx.fillText(percentage + '%', labelX, labelY);
                     }
                     
-                    // 绘制图例
-                    const legendX = width / 2 - 100;
-                    const legendY = height - 60 + (index % 10) * 20;
+                    // 绘制图例 - 分两列显示
+                    const itemsPerColumn = Math.ceil(data.length / 2);
+                    const columnIndex = index < itemsPerColumn ? 0 : 1;
+                    const rowIndex = index < itemsPerColumn ? index : index - itemsPerColumn;
+                    
+                    const legendX = columnIndex === 0 ? 50 : width / 2 + 20;
+                    const legendY = 60 + rowIndex * 25;
                     const legendColor = colors[index % colors.length];
                     
                     // 图例颜色块
@@ -330,15 +344,12 @@
                     ctx.lineWidth = 1;
                     ctx.strokeRect(legendX, legendY - 8, 12, 12);
                     
-                    // 图例文字
+                    // 图例文字 - 格式：尺码值 (数量)
                     ctx.fillStyle = '#1e293b';
-                    ctx.font = '11px sans-serif';
+                    ctx.font = '12px sans-serif';
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'middle';
-                    let label = item.name || '';
-                    if (label.length > 15) {
-                        label = label.substring(0, 12) + '...';
-                    }
+                    const label = item.name || '';
                     ctx.fillText(`${label} (${value})`, legendX + 18, legendY);
                     
                     currentAngle += sliceAngle;
@@ -1221,11 +1232,11 @@
                                     padding: '24px' 
                                 } 
                             },
-                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' } }, '款式销量排行（Top 10）'),
-                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
+                                React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' } }, '款式销量排行（Top 10）'),
+                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center', overflowX: 'auto' } },
                                     React.createElement(CanvasBarChart, { 
                                         data: styleData, 
-                                        width: 800, 
+                                        width: 1000, 
                                         height: 400, 
                                         color: '#8b5cf6', 
                                         label: '销量',
