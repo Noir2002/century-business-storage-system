@@ -400,15 +400,18 @@
                 
                 const ctx = canvas.getContext('2d');
                 // 横向柱状图需要更多左侧空间来显示标题
-                // 根据数据中最长标题动态计算左侧padding
-                let maxLabelLength = 0;
+                // 根据数据中最长标题的实际宽度动态计算左侧padding
+                let maxLabelWidth = 0;
                 if (horizontal && data.length > 0) {
+                    ctx.font = '12px sans-serif';
                     data.forEach(item => {
                         const label = item.name || '';
-                        maxLabelLength = Math.max(maxLabelLength, label.length);
+                        const metrics = ctx.measureText(label);
+                        maxLabelWidth = Math.max(maxLabelWidth, metrics.width);
                     });
                 }
-                const leftPadding = horizontal ? Math.min(Math.max(maxLabelLength * 7 + 20, 250), 400) : 60;
+                // 为标签留出足够空间，至少300px，最多600px，加上一些边距
+                const leftPadding = horizontal ? Math.min(Math.max(maxLabelWidth + 40, 300), 600) : 60;
                 const rightPadding = 60;
                 const topPadding = 60;
                 const bottomPadding = 60;
@@ -470,18 +473,26 @@
                         ctx.fillStyle = color;
                         ctx.fillRect(leftPadding, y, barLength, actualBarWidth);
                         
-                        // 标签 - 显示完整标题，不截断
+                        // 标签 - 显示完整标题，使用计算好的leftPadding确保完全显示
                         ctx.fillStyle = '#64748b';
                         ctx.font = '12px sans-serif';
                         ctx.textAlign = 'right';
+                        ctx.textBaseline = 'middle';
                         const label = item.name || '';
-                        // 计算可显示的最大字符数（根据左侧padding）
-                        const maxChars = Math.floor((leftPadding - 20) / 7);
-                        let displayLabel = label;
-                        if (label.length > maxChars) {
-                            displayLabel = label.substring(0, maxChars - 3) + '...';
+                        // 如果标签太长，尝试多行显示或截断
+                        const maxWidth = leftPadding - 20;
+                        const metrics = ctx.measureText(label);
+                        if (metrics.width > maxWidth) {
+                            // 标签太长，尝试截断
+                            let truncated = label;
+                            while (ctx.measureText(truncated + '...').width > maxWidth && truncated.length > 0) {
+                                truncated = truncated.slice(0, -1);
+                            }
+                            ctx.fillText(truncated + '...', leftPadding - 10, y + actualBarWidth / 2);
+                        } else {
+                            // 标签可以完整显示
+                            ctx.fillText(label, leftPadding - 10, y + actualBarWidth / 2);
                         }
-                        ctx.fillText(displayLabel, leftPadding - 10, y + actualBarWidth / 2 + 4);
                     } else {
                         const x = padding + barWidth * index + barSpacing / 2;
                         
@@ -496,17 +507,20 @@
                     }
                 });
                 
-                // Y轴标签
+                // X轴标签（横向柱状图中，X轴在底部，显示数值）
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = '12px sans-serif';
-                ctx.textAlign = 'right';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
                 for (let i = 0; i <= 5; i++) {
-                    const value = (maxValue / 5) * (5 - i);
+                    // 从左到右：0 到 maxValue
+                    const value = (maxValue / 5) * i;
                     if (horizontal) {
                         const x = leftPadding + (chartWidth / 5) * i;
-                        ctx.fillText(Math.round(value).toString(), x - 10, height - bottomPadding + 4);
+                        ctx.fillText(Math.round(value).toString(), x, height - bottomPadding + 8);
                     } else {
                         const y = padding + (chartHeight / 5) * i;
+                        ctx.textAlign = 'right';
                         ctx.fillText(Math.round(value).toString(), padding - 10, y + 4);
                     }
                 }
@@ -1664,7 +1678,7 @@
                                 React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center', overflowX: 'auto' } },
                                     React.createElement(CanvasBarChart, { 
                                         data: styleData, 
-                                        width: Math.max(1000, styleData.length * 120), 
+                                        width: Math.max(1200, styleData.length * 150), 
                                         height: 400, 
                                         color: '#8b5cf6', 
                                         label: '销量',
