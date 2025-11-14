@@ -7,7 +7,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
     <!-- 依赖库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- React and Recharts for Analysis System -->
+    <!-- React for Analysis System -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -40,76 +40,209 @@
     <div id="root"></div>
 
     <script>
-        // 动态加载 Recharts
-        function loadRecharts() {
-            return new Promise((resolve, reject) => {
-                // 如果已经加载，直接返回
-                if (typeof Recharts !== 'undefined' || (typeof window !== 'undefined' && window.Recharts)) {
-                    console.log('Recharts 已存在');
-                    resolve();
-                    return;
+        // 原生 Canvas 图表组件
+        const CanvasLineChart = ({ data, width = 800, height = 300, color = '#3b82f6', label = '销量' }) => {
+            const { useRef, useEffect } = React;
+            const canvasRef = useRef(null);
+            
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas || !data || data.length === 0) return;
+                
+                const ctx = canvas.getContext('2d');
+                const padding = 60;
+                const chartWidth = width - padding * 2;
+                const chartHeight = height - padding * 2;
+                
+                // 清空画布
+                ctx.clearRect(0, 0, width, height);
+                
+                // 计算数据范围
+                const values = data.map(d => d.quantity || d.revenue || 0);
+                const maxValue = Math.max(...values, 1);
+                const minValue = Math.min(...values, 0);
+                const range = maxValue - minValue || 1;
+                
+                // 绘制网格
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 5; i++) {
+                    const y = padding + (chartHeight / 5) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(padding, y);
+                    ctx.lineTo(width - padding, y);
+                    ctx.stroke();
                 }
-
-                console.log('开始加载 Recharts...');
                 
-                // 尝试多个 CDN 源
-                const cdnSources = [
-                    'https://unpkg.com/recharts@2.10.3/dist/Recharts.js',
-                    'https://cdn.jsdelivr.net/npm/recharts@2.10.3/dist/Recharts.js'
-                ];
+                // 绘制坐标轴
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(padding, padding);
+                ctx.lineTo(padding, height - padding);
+                ctx.lineTo(width - padding, height - padding);
+                ctx.stroke();
                 
-                let currentIndex = 0;
+                // 绘制数据点和连线
+                ctx.strokeStyle = color;
+                ctx.fillStyle = color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
                 
-                function tryNextSource() {
-                    if (currentIndex >= cdnSources.length) {
-                        console.error('所有 CDN 源都加载失败');
-                        reject(new Error('所有 CDN 源都加载失败，可能是浏览器跟踪防护阻止了加载'));
-                        return;
+                data.forEach((item, index) => {
+                    const x = padding + (chartWidth / (data.length - 1 || 1)) * index;
+                    const value = item.quantity || item.revenue || 0;
+                    const y = height - padding - ((value - minValue) / range) * chartHeight;
+                    
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
                     }
                     
-                    // 每次创建新的 script 元素
-                    const script = document.createElement('script');
-                    script.src = cdnSources[currentIndex];
-                    script.async = true;
-                    script.crossOrigin = 'anonymous';
-                    
-                    console.log('尝试加载 Recharts 从:', script.src);
-                    
-                    script.onload = () => {
-                        console.log('Recharts 加载成功，等待初始化...');
-                        // 等待一下确保 Recharts 完全初始化
-                        setTimeout(() => {
-                            if (typeof Recharts !== 'undefined' || (typeof window !== 'undefined' && window.Recharts)) {
-                                console.log('Recharts 已可用');
-                                resolve();
-                            } else {
-                                console.warn('Recharts 加载但未找到全局变量，尝试下一个源');
-                                currentIndex++;
-                                tryNextSource();
-                            }
-                        }, 100);
-                    };
-                    
-                    script.onerror = (error) => {
-                        console.warn('CDN 源加载失败:', script.src, error);
-                        // 移除失败的 script
-                        if (script.parentNode) {
-                            script.parentNode.removeChild(script);
-                        }
-                        currentIndex++;
-                        if (currentIndex < cdnSources.length) {
-                            setTimeout(tryNextSource, 100);
-                        } else {
-                            reject(new Error('所有 CDN 源都加载失败'));
-                        }
-                    };
-                    
-                    document.head.appendChild(script);
+                    // 绘制点
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                ctx.stroke();
+                
+                // 绘制标签
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                data.forEach((item, index) => {
+                    const x = padding + (chartWidth / (data.length - 1 || 1)) * index;
+                    ctx.fillText(item.date || '', x, height - padding + 20);
+                });
+                
+                // Y轴标签
+                ctx.textAlign = 'right';
+                for (let i = 0; i <= 5; i++) {
+                    const value = minValue + (range / 5) * (5 - i);
+                    const y = padding + (chartHeight / 5) * i;
+                    ctx.fillText(Math.round(value).toString(), padding - 10, y + 4);
+                }
+            }, [data, width, height, color]);
+            
+            return React.createElement('canvas', { 
+                ref: canvasRef, 
+                width: width, 
+                height: height,
+                style: { maxWidth: '100%', height: 'auto' }
+            });
+        };
+        
+        const CanvasBarChart = ({ data, width = 800, height = 300, color = '#8b5cf6', label = '销量', horizontal = false }) => {
+            const { useRef, useEffect } = React;
+            const canvasRef = useRef(null);
+            
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas || !data || data.length === 0) return;
+                
+                const ctx = canvas.getContext('2d');
+                const padding = horizontal ? 100 : 60;
+                const chartWidth = width - padding * 2;
+                const chartHeight = height - padding * 2;
+                
+                ctx.clearRect(0, 0, width, height);
+                
+                const values = data.map(d => d.quantity || 0);
+                const maxValue = Math.max(...values, 1);
+                const barWidth = horizontal ? chartHeight / data.length : chartWidth / data.length;
+                const barSpacing = barWidth * 0.2;
+                const actualBarWidth = barWidth - barSpacing;
+                
+                // 绘制网格
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 5; i++) {
+                    if (horizontal) {
+                        const x = padding + (chartWidth / 5) * i;
+                        ctx.beginPath();
+                        ctx.moveTo(x, padding);
+                        ctx.lineTo(x, height - padding);
+                        ctx.stroke();
+                    } else {
+                        const y = padding + (chartHeight / 5) * i;
+                        ctx.beginPath();
+                        ctx.moveTo(padding, y);
+                        ctx.lineTo(width - padding, y);
+                        ctx.stroke();
+                    }
                 }
                 
-                tryNextSource();
+                // 绘制坐标轴
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                if (horizontal) {
+                    ctx.moveTo(padding, padding);
+                    ctx.lineTo(padding, height - padding);
+                    ctx.lineTo(width - padding, height - padding);
+                } else {
+                    ctx.moveTo(padding, padding);
+                    ctx.lineTo(padding, height - padding);
+                    ctx.lineTo(width - padding, height - padding);
+                }
+                ctx.stroke();
+                
+                // 绘制柱状图
+                data.forEach((item, index) => {
+                    const value = item.quantity || 0;
+                    const barHeight = (value / maxValue) * chartHeight;
+                    
+                    if (horizontal) {
+                        const y = padding + barWidth * index + barSpacing / 2;
+                        const barLength = (value / maxValue) * chartWidth;
+                        
+                        ctx.fillStyle = color;
+                        ctx.fillRect(padding, y, barLength, actualBarWidth);
+                        
+                        // 标签
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.font = '12px sans-serif';
+                        ctx.textAlign = 'right';
+                        ctx.fillText(item.name || '', padding - 10, y + actualBarWidth / 2 + 4);
+                    } else {
+                        const x = padding + barWidth * index + barSpacing / 2;
+                        
+                        ctx.fillStyle = color;
+                        ctx.fillRect(x, height - padding - barHeight, actualBarWidth, barHeight);
+                        
+                        // 标签
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.font = '12px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(item.name || '', x + actualBarWidth / 2, height - padding + 20);
+                    }
+                });
+                
+                // Y轴标签
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'right';
+                for (let i = 0; i <= 5; i++) {
+                    const value = (maxValue / 5) * (5 - i);
+                    if (horizontal) {
+                        const x = padding + (chartWidth / 5) * i;
+                        ctx.fillText(Math.round(value).toString(), x - 10, height - padding + 4);
+                    } else {
+                        const y = padding + (chartHeight / 5) * i;
+                        ctx.fillText(Math.round(value).toString(), padding - 10, y + 4);
+                    }
+                }
+            }, [data, width, height, color, horizontal]);
+            
+            return React.createElement('canvas', { 
+                ref: canvasRef, 
+                width: width, 
+                height: height,
+                style: { maxWidth: '100%', height: 'auto' }
             });
-        }
+        };
 
         // 分析系统React组件
         const { useState, useMemo } = React;
@@ -122,120 +255,10 @@
             'BBLC': '黑蓝', 'WGRY': '白灰', 'RBLK': '红黑', 'BWHT': '蓝白', 'GBLK': '绿黑'
         };
 
-        // 获取 Recharts 组件的函数
-        function getRechartsComponents() {
-            console.log('获取 Recharts 组件...');
-            console.log('window.Recharts:', window.Recharts);
-            console.log('typeof Recharts:', typeof Recharts);
-            
-            // 尝试多种方式获取 Recharts
-            let RechartsLib = null;
-            
-            if (typeof window !== 'undefined' && window.Recharts) {
-                RechartsLib = window.Recharts;
-                console.log('从 window.Recharts 获取');
-            } else if (typeof Recharts !== 'undefined') {
-                RechartsLib = Recharts;
-                console.log('从全局 Recharts 获取');
-            } else if (typeof window !== 'undefined' && window.RechartsLib) {
-                RechartsLib = window.RechartsLib;
-                console.log('从 window.RechartsLib 获取');
-            }
-            
-            if (!RechartsLib) {
-                console.error('Recharts 库未找到');
-                return null;
-            }
-            
-            console.log('Recharts 库找到:', RechartsLib);
-            console.log('Recharts 可用组件:', Object.keys(RechartsLib));
-            
-            // 检查组件是否存在
-            const components = {
-                LineChart: RechartsLib.LineChart,
-                Line: RechartsLib.Line,
-                XAxis: RechartsLib.XAxis,
-                YAxis: RechartsLib.YAxis,
-                CartesianGrid: RechartsLib.CartesianGrid,
-                Tooltip: RechartsLib.Tooltip,
-                Legend: RechartsLib.Legend,
-                ResponsiveContainer: RechartsLib.ResponsiveContainer,
-                BarChart: RechartsLib.BarChart,
-                Bar: RechartsLib.Bar
-            };
-            
-            console.log('组件检查:', components);
-            return components;
-        }
+        // 不再需要 Recharts，使用原生 Canvas 组件
 
         const SalesAnalysisSystem = () => {
             console.log('SalesAnalysisSystem 组件开始渲染');
-            
-            // 获取 Recharts 组件
-            const RechartsComponents = getRechartsComponents();
-            if (!RechartsComponents) {
-                console.warn('Recharts 未加载，显示简化界面');
-                // 显示一个简化版本，不依赖 Recharts
-                return React.createElement('div', { 
-                    style: { 
-                        minHeight: '100vh', 
-                        background: 'linear-gradient(135deg, #1e293b 0%, #7c3aed 50%, #1e293b 100%)', 
-                        color: 'white', 
-                        padding: '32px' 
-                    } 
-                },
-                    React.createElement('div', { style: { maxWidth: '1280px', margin: '0 auto' } },
-                        React.createElement('div', { style: { marginBottom: '32px' } },
-                            React.createElement('h1', { 
-                                style: { 
-                                    fontSize: '2.25rem', 
-                                    fontWeight: 'bold', 
-                                    marginBottom: '8px',
-                                    background: 'linear-gradient(to right, #60a5fa, #a78bfa)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent'
-                                } 
-                            }, '📊 商品销量分析系统'),
-                            React.createElement('p', { style: { color: '#94a3b8' } }, '数据驱动决策，洞察销售趋势')
-                        ),
-                        React.createElement('div', { 
-                            style: { 
-                                backdropFilter: 'blur(16px)', 
-                                background: 'rgba(255, 255, 255, 0.1)', 
-                                borderRadius: '16px', 
-                                border: '1px solid rgba(255, 255, 255, 0.2)', 
-                                padding: '48px', 
-                                textAlign: 'center' 
-                            } 
-                        },
-                            React.createElement('h2', { style: { marginBottom: '20px' } }, '⚠️ 图表库加载失败'),
-                            React.createElement('p', { style: { marginBottom: '20px', color: '#94a3b8' } }, 'Recharts 图表库无法加载，可能是浏览器跟踪防护阻止了 CDN 资源。'),
-                            React.createElement('p', { style: { marginBottom: '30px', color: '#94a3b8' } }, '请尝试：'),
-                            React.createElement('ul', { style: { textAlign: 'left', display: 'inline-block', color: '#cbd5e1', marginBottom: '30px' } },
-                                React.createElement('li', { style: { marginBottom: '10px' } }, '1. 在浏览器设置中允许此网站的跟踪防护例外'),
-                                React.createElement('li', { style: { marginBottom: '10px' } }, '2. 刷新页面重试'),
-                                React.createElement('li', { style: { marginBottom: '10px' } }, '3. 检查网络连接')
-                            ),
-                            React.createElement('button', {
-                                onClick: () => window.location.reload(),
-                                style: {
-                                    padding: '12px 24px',
-                                    background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
-                                    borderRadius: '8px',
-                                    color: 'white',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontWeight: '600',
-                                    fontSize: '16px'
-                                }
-                            }, '🔄 刷新页面')
-                        )
-                    )
-                );
-            }
-            
-            console.log('Recharts 组件已获取，继续渲染');
-            const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } = RechartsComponents;
             
             const [data, setData] = useState([]);
             const [filters, setFilters] = useState({
@@ -873,28 +896,14 @@
                                 } 
                             },
                                 React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' } }, '销量趋势'),
-                                React.createElement(ResponsiveContainer, { width: '100%', height: 300 },
-                                    React.createElement(LineChart, { data: trendData },
-                                        React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255, 255, 255, 0.2)' }),
-                                        React.createElement(XAxis, { dataKey: 'date', stroke: '#94a3b8' }),
-                                        React.createElement(YAxis, { stroke: '#94a3b8' }),
-                                        React.createElement(Tooltip, { 
-                                            contentStyle: { 
-                                                backgroundColor: '#1e293b', 
-                                                border: '1px solid #475569', 
-                                                borderRadius: '8px' 
-                                            } 
-                                        }),
-                                        React.createElement(Legend),
-                                        React.createElement(Line, { 
-                                            type: 'monotone', 
-                                            dataKey: 'quantity', 
-                                            stroke: '#3b82f6', 
-                                            strokeWidth: 3, 
-                                            name: '销量', 
-                                            dot: { fill: '#3b82f6', r: 4 } 
-                                        })
-                                    )
+                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
+                                    React.createElement(CanvasLineChart, { 
+                                        data: trendData.map(d => ({ date: d.date, quantity: d.quantity })), 
+                                        width: 800, 
+                                        height: 300, 
+                                        color: '#3b82f6', 
+                                        label: '销量' 
+                                    })
                                 )
                             ),
 
@@ -910,28 +919,14 @@
                                 } 
                             },
                                 React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' } }, '销售额趋势'),
-                                React.createElement(ResponsiveContainer, { width: '100%', height: 300 },
-                                    React.createElement(LineChart, { data: trendData },
-                                        React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255, 255, 255, 0.2)' }),
-                                        React.createElement(XAxis, { dataKey: 'date', stroke: '#94a3b8' }),
-                                        React.createElement(YAxis, { stroke: '#94a3b8' }),
-                                        React.createElement(Tooltip, { 
-                                            contentStyle: { 
-                                                backgroundColor: '#1e293b', 
-                                                border: '1px solid #475569', 
-                                                borderRadius: '8px' 
-                                            } 
-                                        }),
-                                        React.createElement(Legend),
-                                        React.createElement(Line, { 
-                                            type: 'monotone', 
-                                            dataKey: 'revenue', 
-                                            stroke: '#10b981', 
-                                            strokeWidth: 3, 
-                                            name: '销售额', 
-                                            dot: { fill: '#10b981', r: 4 } 
-                                        })
-                                    )
+                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
+                                    React.createElement(CanvasLineChart, { 
+                                        data: trendData.map(d => ({ date: d.date, revenue: d.revenue })), 
+                                        width: 800, 
+                                        height: 300, 
+                                        color: '#10b981', 
+                                        label: '销售额' 
+                                    })
                                 )
                             ),
 
@@ -947,20 +942,15 @@
                                 } 
                             },
                                 React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' } }, '款式销量排行（Top 10）'),
-                                React.createElement(ResponsiveContainer, { width: '100%', height: 400 },
-                                    React.createElement(BarChart, { data: styleData, layout: 'vertical' },
-                                        React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255, 255, 255, 0.2)' }),
-                                        React.createElement(XAxis, { type: 'number', stroke: '#94a3b8' }),
-                                        React.createElement(YAxis, { dataKey: 'name', type: 'category', width: 150, stroke: '#94a3b8' }),
-                                        React.createElement(Tooltip, { 
-                                            contentStyle: { 
-                                                backgroundColor: '#1e293b', 
-                                                border: '1px solid #475569', 
-                                                borderRadius: '8px' 
-                                            } 
-                                        }),
-                                        React.createElement(Bar, { dataKey: 'quantity', fill: '#8b5cf6', name: '销量' })
-                                    )
+                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
+                                    React.createElement(CanvasBarChart, { 
+                                        data: styleData, 
+                                        width: 800, 
+                                        height: 400, 
+                                        color: '#8b5cf6', 
+                                        label: '销量',
+                                        horizontal: true
+                                    })
                                 )
                             ),
 
@@ -976,20 +966,15 @@
                                 } 
                             },
                                 React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' } }, '颜色销量分布'),
-                                React.createElement(ResponsiveContainer, { width: '100%', height: 300 },
-                                    React.createElement(BarChart, { data: colorData },
-                                        React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255, 255, 255, 0.2)' }),
-                                        React.createElement(XAxis, { dataKey: 'name', stroke: '#94a3b8' }),
-                                        React.createElement(YAxis, { stroke: '#94a3b8' }),
-                                        React.createElement(Tooltip, { 
-                                            contentStyle: { 
-                                                backgroundColor: '#1e293b', 
-                                                border: '1px solid #475569', 
-                                                borderRadius: '8px' 
-                                            } 
-                                        }),
-                                        React.createElement(Bar, { dataKey: 'quantity', fill: '#ec4899', name: '销量' })
-                                    )
+                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
+                                    React.createElement(CanvasBarChart, { 
+                                        data: colorData, 
+                                        width: 800, 
+                                        height: 300, 
+                                        color: '#ec4899', 
+                                        label: '销量',
+                                        horizontal: false
+                                    })
                                 )
                             ),
 
@@ -1005,20 +990,15 @@
                                 } 
                             },
                                 React.createElement('h3', { style: { fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' } }, '尺码销量分布'),
-                                React.createElement(ResponsiveContainer, { width: '100%', height: 300 },
-                                    React.createElement(BarChart, { data: sizeData },
-                                        React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255, 255, 255, 0.2)' }),
-                                        React.createElement(XAxis, { dataKey: 'name', stroke: '#94a3b8' }),
-                                        React.createElement(YAxis, { stroke: '#94a3b8' }),
-                                        React.createElement(Tooltip, { 
-                                            contentStyle: { 
-                                                backgroundColor: '#1e293b', 
-                                                border: '1px solid #475569', 
-                                                borderRadius: '8px' 
-                                            } 
-                                        }),
-                                        React.createElement(Bar, { dataKey: 'quantity', fill: '#f59e0b', name: '销量' })
-                                    )
+                                React.createElement('div', { style: { width: '100%', display: 'flex', justifyContent: 'center' } },
+                                    React.createElement(CanvasBarChart, { 
+                                        data: sizeData, 
+                                        width: 800, 
+                                        height: 300, 
+                                        color: '#f59e0b', 
+                                        label: '销量',
+                                        horizontal: false
+                                    })
                                 )
                             )
                         )
@@ -1034,7 +1014,6 @@
             // 检查依赖是否加载
             console.log('检查 React:', typeof React !== 'undefined');
             console.log('检查 ReactDOM:', typeof ReactDOM !== 'undefined');
-            console.log('检查 Recharts:', typeof Recharts !== 'undefined', typeof window.Recharts !== 'undefined');
             
             if (typeof React === 'undefined') {
                 console.error('React 未加载');
@@ -1120,18 +1099,9 @@
                 });
             }
             
-            // 尝试加载 Recharts（可选，如果失败会在组件内处理）
-            try {
-                console.log('开始加载 Recharts...');
-                await loadRecharts();
-                console.log('Recharts 加载完成');
-            } catch (error) {
-                console.warn('Recharts 加载失败，将在组件内处理:', error.message);
-                // 即使失败也继续，组件会显示友好的错误信息
-            }
-            
+            // 不再需要加载 Recharts，使用原生 Canvas
             // 等待一下确保所有脚本都加载完成
-            await new Promise(resolve => setTimeout(resolve, 200));
+            await new Promise(resolve => setTimeout(resolve, 100));
             
             // 初始化系统
             console.log('开始初始化系统');
