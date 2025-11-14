@@ -10,7 +10,6 @@
     <!-- React and Recharts for Analysis System -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/recharts@2.10.3/dist/Recharts.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
@@ -41,6 +40,59 @@
     <div id="root"></div>
 
     <script>
+        // 动态加载 Recharts
+        function loadRecharts() {
+            return new Promise((resolve, reject) => {
+                // 如果已经加载，直接返回
+                if (typeof Recharts !== 'undefined' || (typeof window !== 'undefined' && window.Recharts)) {
+                    console.log('Recharts 已存在');
+                    resolve();
+                    return;
+                }
+
+                console.log('开始加载 Recharts...');
+                const script = document.createElement('script');
+                
+                // 尝试多个 CDN 源
+                const cdnSources = [
+                    'https://unpkg.com/recharts@2.10.3/dist/Recharts.js',
+                    'https://cdn.jsdelivr.net/npm/recharts@2.10.3/dist/Recharts.js',
+                    'https://cdnjs.cloudflare.com/ajax/libs/recharts/2.10.3/Recharts.js'
+                ];
+                
+                let currentIndex = 0;
+                
+                function tryNextSource() {
+                    if (currentIndex >= cdnSources.length) {
+                        reject(new Error('所有 CDN 源都加载失败'));
+                        return;
+                    }
+                    
+                    script.src = cdnSources[currentIndex];
+                    console.log('尝试加载 Recharts 从:', script.src);
+                    
+                    script.onload = () => {
+                        console.log('Recharts 加载成功');
+                        resolve();
+                    };
+                    
+                    script.onerror = () => {
+                        console.warn('CDN 源加载失败:', script.src);
+                        currentIndex++;
+                        if (currentIndex < cdnSources.length) {
+                            tryNextSource();
+                        } else {
+                            reject(new Error('所有 CDN 源都加载失败'));
+                        }
+                    };
+                    
+                    document.head.appendChild(script);
+                }
+                
+                tryNextSource();
+            });
+        }
+
         // 分析系统React组件
         const { useState, useMemo } = React;
 
@@ -964,43 +1016,54 @@
         }
 
         // 等待所有脚本加载完成后再初始化
-        function waitForDependencies() {
+        async function waitForDependencies() {
             console.log('等待依赖加载...');
             const hasReact = typeof React !== 'undefined';
             const hasReactDOM = typeof ReactDOM !== 'undefined';
-            const hasRecharts = typeof Recharts !== 'undefined' || typeof window.Recharts !== 'undefined';
             
-            console.log('依赖状态 - React:', hasReact, 'ReactDOM:', hasReactDOM, 'Recharts:', hasRecharts);
+            console.log('依赖状态 - React:', hasReact, 'ReactDOM:', hasReactDOM);
             
-            // 只需要 React 和 ReactDOM，Recharts 可以在组件内部处理
-            if (hasReact && hasReactDOM) {
-                console.log('核心依赖已加载，开始初始化');
-                initAnalysisSystem();
-            } else {
+            // 等待 React 和 ReactDOM 加载
+            if (!hasReact || !hasReactDOM) {
                 console.log('等待核心依赖加载...');
                 // 如果依赖未加载，等待一段时间后重试（最多等待10秒）
                 const maxWait = 10000; // 10秒
                 const startTime = Date.now();
-                const checkInterval = setInterval(() => {
-                    const hasReactNow = typeof React !== 'undefined';
-                    const hasReactDOMNow = typeof ReactDOM !== 'undefined';
-                    
-                    console.log('检查依赖 - React:', hasReactNow, 'ReactDOM:', hasReactDOMNow);
-                    
-                    if (hasReactNow && hasReactDOMNow) {
-                        clearInterval(checkInterval);
-                        console.log('核心依赖已加载，开始初始化');
-                        initAnalysisSystem();
-                    } else if (Date.now() - startTime > maxWait) {
-                        clearInterval(checkInterval);
-                        console.error('加载超时');
-                        const rootEl = document.getElementById('root');
-                        if (rootEl) {
-                            rootEl.innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载超时</h2><p>React 或 ReactDOM 加载时间过长</p><p>请检查网络连接后刷新页面</p><p>请打开浏览器控制台查看详细错误</p></div>';
+                await new Promise((resolve) => {
+                    const checkInterval = setInterval(() => {
+                        const hasReactNow = typeof React !== 'undefined';
+                        const hasReactDOMNow = typeof ReactDOM !== 'undefined';
+                        
+                        console.log('检查依赖 - React:', hasReactNow, 'ReactDOM:', hasReactDOMNow);
+                        
+                        if (hasReactNow && hasReactDOMNow) {
+                            clearInterval(checkInterval);
+                            console.log('核心依赖已加载');
+                            resolve();
+                        } else if (Date.now() - startTime > maxWait) {
+                            clearInterval(checkInterval);
+                            console.error('加载超时');
+                            const rootEl = document.getElementById('root');
+                            if (rootEl) {
+                                rootEl.innerHTML = '<div style="padding: 50px; text-align: center; color: white;"><h2>加载超时</h2><p>React 或 ReactDOM 加载时间过长</p><p>请检查网络连接后刷新页面</p><p>请打开浏览器控制台查看详细错误</p></div>';
+                            }
+                            resolve();
                         }
-                    }
-                }, 100);
+                    }, 100);
+                });
             }
+            
+            // 尝试加载 Recharts（可选，如果失败会在组件内处理）
+            try {
+                await loadRecharts();
+                console.log('Recharts 加载完成');
+            } catch (error) {
+                console.warn('Recharts 加载失败，将在组件内处理:', error);
+            }
+            
+            // 初始化系统
+            console.log('开始初始化系统');
+            initAnalysisSystem();
         }
 
         // 页面加载完成后初始化
