@@ -3,51 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataInsight V2 - 跨境电商分析看板</title>
+    <title>DataInsight Pro - 跨境电商智能分析 (已修复)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     
     <style>
-        body { background-color: #f8fafc; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
-        .chart-container { height: 400px; width: 100%; }
-        .card { @apply bg-white rounded-xl shadow-sm p-5 border border-slate-200 transition-all duration-300 hover:shadow-md; }
-        .upload-area { border: 2px dashed #cbd5e1; }
+        body { background-color: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .chart-container { height: 400px; width: 100%; position: relative; }
+        .card { @apply bg-white rounded-xl shadow-sm p-5 border border-slate-200 transition-all duration-300; }
+        .card:hover { @apply shadow-md border-blue-200; }
+        .upload-area { border: 2px dashed #cbd5e1; transition: all 0.2s; }
         .upload-area:hover { border-color: #3b82f6; background-color: #eff6ff; }
         
-        /* 粒度按钮样式 */
-        .grain-btn { @apply px-3 py-1 text-xs font-medium rounded-md border transition-colors; }
+        .grain-btn { @apply px-3 py-1 text-xs font-medium rounded-md border transition-colors cursor-pointer; }
         .grain-btn.active { @apply bg-blue-600 text-white border-blue-600; }
         .grain-btn.inactive { @apply bg-white text-gray-600 border-gray-300 hover:bg-gray-50; }
+
+        /* Loading Spinner */
+        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        [v-cloak] { display: none; }
     </style>
 </head>
 <body>
 
-<div id="app" class="min-h-screen pb-10">
-    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
+<div id="app" class="min-h-screen pb-10" v-cloak>
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center mr-2">
+                    <div class="w-8 h-8 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded flex items-center justify-center mr-2 shadow-lg shadow-blue-500/30">
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                         </svg>
                     </div>
-                    <span class="text-xl font-bold text-slate-800">DataInsight <span class="text-blue-600">Pro</span></span>
+                    <span class="text-xl font-bold text-slate-800 tracking-tight">DataInsight <span class="text-blue-600">Pro</span></span>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <div v-if="rawData.length > 0" class="text-sm text-gray-600">
-                        已分析 <span class="font-bold text-blue-600">{{ filteredData.length }}</span> / {{ rawData.length }} 条订单
+                    <div v-if="isLoading" class="flex items-center text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                        <div class="spinner mr-2 w-4 h-4 border-2"></div> 数据处理中...
                     </div>
-                    <button @click="resetData" v-if="rawData.length > 0" class="text-sm text-red-500 hover:text-red-700 font-medium flex items-center">
+                    <div v-else-if="rawData.length > 0" class="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                        已加载 <span class="font-bold text-slate-900">{{ rawData.length }}</span> 条数据
+                    </div>
+                    <button @click="resetData" v-if="rawData.length > 0" class="text-sm text-red-500 hover:text-red-700 font-medium flex items-center px-2 py-1 hover:bg-red-50 rounded transition">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                         </svg>
-                        清空数据
-                    </button>
-                    <button class="hidden md:inline-flex text-sm text-slate-500 hover:text-slate-700" onclick="window.location.href='index.html'">
-                        返回首页
+                        清空
                     </button>
                 </div>
             </div>
@@ -56,166 +62,174 @@
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         
-        <!-- 上传引导区域 -->
-        <div v-if="rawData.length === 0" class="flex flex-col items-center justify-center h-[500px] card upload-area cursor-pointer bg-slate-50" @drop.prevent="handleDrop" @dragover.prevent @click="$refs.fileInput.click()">
+        <div v-if="rawData.length === 0" class="flex flex-col items-center justify-center h-[500px] card upload-area cursor-pointer bg-slate-50 relative overflow-hidden" 
+             @drop.prevent="handleDrop" @dragover.prevent @click="$refs.fileInput.click()">
             <input type="file" ref="fileInput" class="hidden" accept=".xlsx, .xls" @change="handleFileUpload">
-            <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                </svg>
-            </div>
-            <h3 class="text-2xl font-semibold text-slate-700">导入 Excel 数据源</h3>
-            <p class="text-slate-500 mt-2">支持 .xlsx / .xls 格式，本地解析不上传服务器</p>
-            <div class="mt-8 text-sm text-slate-400 bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
-                <p class="font-bold text-slate-600 mb-2">必需表头 (Excel 第一行):</p>
-                <div class="flex flex-wrap gap-2">
-                    <span class="px-2 py-1 bg-slate-100 rounded text-xs border">店铺订单时间</span>
-                    <span class="px-2 py-1 bg-slate-100 rounded text-xs border">SKU</span>
-                    <span class="px-2 py-1 bg-slate-100 rounded text-xs border">尺码</span>
-                    <span class="px-2 py-1 bg-slate-100 rounded text-xs border">商品名称</span>
-                    <span class="px-2 py-1 bg-slate-100 rounded text-xs border">品牌名称</span>
-                    <span class="px-2 py-1 bg-slate-100 rounded text-xs border">商品数量</span>
-                    <span class="px-2 py-1 bg-slate-100 rounded text-xs border">订单金额</span>
+            
+            <div class="z-10 flex flex-col items-center">
+                <div class="w-24 h-24 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6 shadow-inner">
+                    <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-slate-700">点击或拖拽上传 Excel</h3>
+                <p class="text-slate-500 mt-2">完全本地解析，数据不上传服务器，安全无忧</p>
+                
+                <div class="mt-8 text-sm text-slate-500 bg-white border border-slate-200 p-5 rounded-lg shadow-sm max-w-lg">
+                    <p class="font-bold text-slate-700 mb-3 text-center">Excel **推荐/兼容** 以下表头 (首行)</p>
+                    <div class="flex flex-wrap gap-2 justify-center">
+                        <span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200 font-mono">店铺订单时间</span>
+                        <span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200 font-mono">SKU</span>
+                        <span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200 font-mono">尺码</span>
+                        <span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200 font-mono">商品名称/标题</span>
+                        <span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200 font-mono">品牌名称/品牌</span>
+                        <span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200 font-mono">商品数量</span>
+                        <span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200 font-mono">订单金额/商品单价</span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- 看板主体 -->
         <div v-else>
-            
-            <!-- 筛选器 -->
             <div class="card mb-6 bg-white border-blue-100">
-                <div class="flex items-center mb-3">
-                    <svg class="w-4 h-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="flex items-center mb-4 border-b border-gray-100 pb-2">
+                    <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                     </svg>
-                    <span class="text-sm font-bold text-slate-700">多维筛选器</span>
+                    <span class="text-base font-bold text-slate-800">全局筛选</span>
+                    <span class="ml-2 text-xs text-gray-400 font-normal">(筛选结果将影响所有图表)</span>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-                    <div class="lg:col-span-2 flex space-x-2">
-                        <div class="flex-1">
-                            <label class="block text-xs text-slate-500 mb-1">开始日期</label>
-                            <input type="date" v-model="filters.startDate" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                        </div>
-                        <div class="flex-1">
-                            <label class="block text-xs text-slate-500 mb-1">结束日期</label>
-                            <input type="date" v-model="filters.endDate" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs text-slate-500 mb-1">品牌</label>
-                        <select v-model="filters.brand" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                            <option value="ALL">全部品牌</option>
-                            <option v-for="b in uniqueOptions.brands" :key="b" :value="b">{{ b }}</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs text-slate-500 mb-1">尺码</label>
-                        <select v-model="filters.size" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                            <option value="ALL">全部尺码</option>
-                            <option v-for="s in uniqueOptions.sizes" :key="s" :value="s">{{ s }}</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs text-slate-500 mb-1">SKU 搜索</label>
-                        <input type="text" v-model="filters.sku" placeholder="输入SKU..." class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs text-slate-500 mb-1">品类</label>
-                        <select v-model="filters.category" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                            <option value="ALL">全部品类</option>
-                            <option v-for="c in uniqueOptions.categories" :key="c" :value="c">{{ c }}</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs text-slate-500 mb-1">性别</label>
-                        <select v-model="filters.gender" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                            <option value="ALL">全部</option>
-                            <option v-for="g in uniqueOptions.genders" :key="g" :value="g">{{ g }}</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- KPI 卡片 -->
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-                <div class="card bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-none shadow-lg">
-                    <p class="text-blue-100 text-xs font-medium uppercase tracking-wider">总销售额 (GMV)</p>
-                    <h2 class="text-2xl font-bold mt-1">€ {{ formatNumber(kpi.totalAmount) }}</h2>
-                </div>
-                <div class="card">
-                    <p class="text-gray-500 text-xs font-medium uppercase tracking-wider">总订单量</p>
-                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ kpi.totalOrders }}</h2>
-                </div>
-                <div class="card">
-                    <p class="text-gray-500 text-xs font-medium uppercase tracking-wider">销售商品总数</p>
-                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ kpi.totalItems }}</h2>
-                </div>
-                <div class="card">
-                    <p class="text-gray-500 text-xs font-medium uppercase tracking-wider">平均客单价 (AOV)</p>
-                    <h2 class="text-2xl font-bold text-slate-800 mt-1">€ {{ formatNumber(kpi.aov) }}</h2>
-                </div>
-                <div class="card border-l-4 border-orange-500">
-                    <div class="flex justify-between items-start">
-                        <p class="text-gray-500 text-xs font-medium uppercase tracking-wider">日均流速</p>
-                        <span class="text-[10px] bg-orange-100 text-orange-600 px-1 rounded">件/天</span>
-                    </div>
-                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ kpi.velocity }}</h2>
-                    <p class="text-xs text-gray-400 mt-1">在 {{ kpi.days }} 天内</p>
-                </div>
-            </div>
-
-            <!-- 图表区域 -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                <div class="card col-span-1 lg:col-span-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <div class="sm:col-span-2 flex space-x-2">
+                        <div class="w-1/2">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">开始日期</label>
+                            <input type="date" v-model="filters.startDate" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none focus:border-blue-500 transition">
+                        </div>
+                        <div class="w-1/2">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">结束日期</label>
+                            <input type="date" v-model="filters.endDate" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none focus:border-blue-500 transition">
+                        </div>
+                    </div>
+
+                    <div v-for="(label, key) in {brand: '品牌', size: '尺码', category: '品类', gender: '性别'}" :key="key">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">{{ label }}</label>
+                        <select v-model="filters[key]" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer hover:border-blue-400 transition">
+                            <option value="ALL">全部{{ label }}</option>
+                            <option v-for="opt in uniqueOptions[key + 's']" :key="opt" :value="opt">{{ opt }}</option>
+                        </select>
+                    </div>
+
+                    <div class="sm:col-span-2 lg:col-span-1"> <label class="block text-xs font-semibold text-slate-500 mb-1">SKU 搜索</label>
+                        <div class="relative">
+                            <input type="text" v-model="skuInput" @input="debouncedSkuSearch" placeholder="输入 SKU..." class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none pl-8">
+                            <svg class="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                <div class="card bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-none shadow-lg transform hover:-translate-y-1 transition duration-300">
+                    <p class="text-blue-100 text-xs font-bold uppercase tracking-wider opacity-80">总销售额 (GMV)</p>
+                    <h2 class="text-2xl lg:text-3xl font-bold mt-2 truncate" :title="'€ '+formatNumber(kpi.totalAmount)">
+                        € {{ formatNumber(kpi.totalAmount) }}
+                    </h2>
+                </div>
+                <div class="card transform hover:-translate-y-1 transition duration-300">
+                    <p class="text-gray-500 text-xs font-bold uppercase tracking-wider">总订单量</p>
+                    <h2 class="text-2xl lg:text-3xl font-bold text-slate-800 mt-2">{{ kpi.totalOrders.toLocaleString() }}</h2>
+                </div>
+                <div class="card transform hover:-translate-y-1 transition duration-300">
+                    <p class="text-gray-500 text-xs font-bold uppercase tracking-wider">销量 (件)</p>
+                    <h2 class="text-2xl lg:text-3xl font-bold text-slate-800 mt-2">{{ kpi.totalItems.toLocaleString() }}</h2>
+                </div>
+                <div class="card transform hover:-translate-y-1 transition duration-300">
+                    <p class="text-gray-500 text-xs font-bold uppercase tracking-wider">平均客单价 (AOV)</p>
+                    <h2 class="text-2xl lg:text-3xl font-bold text-slate-800 mt-2">€ {{ formatNumber(kpi.aov) }}</h2>
+                </div>
+                <div class="card border-l-4 border-orange-500 bg-orange-50/50 transform hover:-translate-y-1 transition duration-300">
+                    <div class="flex justify-between items-start">
+                        <p class="text-gray-500 text-xs font-bold uppercase tracking-wider">日均销量</p>
+                        <span class="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-medium">件/天</span>
+                    </div>
+                    <h2 class="text-2xl lg:text-3xl font-bold text-slate-800 mt-2">{{ kpi.velocity }}</h2>
+                    <p class="text-xs text-gray-400 mt-1">统计周期: {{ kpi.days }} 天</p>
+                </div>
+            </div>
+
+            <!-- 第一行：销售趋势，占满一行 -->
+            <div class="grid grid-cols-1 gap-6 mb-6">
+                <div class="card">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-bold text-slate-800 flex items-center">
-                            <span class="w-1 h-5 bg-blue-600 mr-2 rounded-full"></span>销售趋势
+                            <span class="w-1.5 h-5 bg-blue-600 mr-2 rounded-full"></span>销售趋势
                         </h3>
                         <div class="flex space-x-1 bg-slate-100 p-1 rounded-lg">
                             <button v-for="type in ['day', 'week', 'month']" 
                                 :key="type"
                                 @click="filters.timeGrain = type"
                                 :class="['grain-btn', filters.timeGrain === type ? 'active' : 'inactive']">
-                                {{ type === 'day' ? '按日' : (type === 'week' ? '按周' : '按月') }}
+                                {{ type === 'day' ? '日' : (type === 'week' ? '周' : '月') }}
                             </button>
                         </div>
                     </div>
-                    <div ref="trendChart" class="chart-container"></div>
+                    <div ref="trendChart" class="chart-container" style="height: 460px;"></div>
+                    <p class="text-xs text-gray-400 text-center mt-2">* 可拖动下方滑块或使用鼠标滚轮缩放查看细节</p>
                 </div>
+            </div>
 
+            <!-- 第二行：尺码分布，占满一行 -->
+            <div class="grid grid-cols-1 gap-6 mb-6">
                 <div class="card">
                     <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                        <span class="w-1 h-5 bg-purple-500 mr-2 rounded-full"></span>品牌销售占比
+                        <span class="w-1.5 h-5 bg-green-500 mr-2 rounded-full"></span>尺码销量分布
+                    </h3>
+                    <div ref="sizeChart" class="chart-container" style="height: 420px;"></div>
+                </div>
+            </div>
+
+            <!-- 第三行：品牌 + 品类，占据一行两列 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="card">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                        <span class="w-1.5 h-5 bg-purple-500 mr-2 rounded-full"></span>品牌销售额占比
                     </h3>
                     <div ref="brandChart" class="chart-container"></div>
                 </div>
 
                 <div class="card">
                     <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                        <span class="w-1 h-5 bg-green-500 mr-2 rounded-full"></span>尺码销售分布
-                    </h3>
-                    <div ref="sizeChart" class="chart-container"></div>
-                </div>
-
-                <div class="card">
-                    <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                        <span class="w-1 h-5 bg-pink-500 mr-2 rounded-full"></span>品类销售占比
+                        <span class="w-1.5 h-5 bg-pink-500 mr-2 rounded-full"></span>品类销售额占比
                     </h3>
                     <div ref="categoryChart" class="chart-container"></div>
                 </div>
+            </div>
 
-                <div class="card col-span-1 lg:col-span-2">
-                    <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                        <span class="w-1 h-5 bg-orange-500 mr-2 rounded-full"></span>TOP 10 热销商品 (按销售额)
-                    </h3>
-                    <div ref="topProductChart" class="chart-container" style="height: 500px;"></div>
+            <!-- 第四行：TOP 商品，占满一行，可切换销售额 / 销量 -->
+            <div class="grid grid-cols-1 gap-6">
+                <div class="card">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-slate-800 flex items-center">
+                            <span class="w-1.5 h-5 bg-orange-500 mr-2 rounded-full"></span>
+                            TOP 10 热销商品
+                            <span class="ml-2 text-xs text-gray-400" v-if="topMetric === 'amount'">(按销售额)</span>
+                            <span class="ml-2 text-xs text-gray-400" v-else>(按销量)</span>
+                        </h3>
+                        <div class="inline-flex rounded-md bg-slate-100 p-1">
+                            <button
+                                @click="topMetric = 'amount'"
+                                :class="['grain-btn text-xs px-2 py-1', topMetric === 'amount' ? 'active' : 'inactive']">
+                                销售额
+                            </button>
+                            <button
+                                @click="topMetric = 'quantity'"
+                                :class="['grain-btn text-xs px-2 py-1', topMetric === 'quantity' ? 'active' : 'inactive']">
+                                销量
+                            </button>
+                        </div>
+                    </div>
+                    <div ref="topProductChart" class="chart-container" style="height: 520px;"></div>
                 </div>
             </div>
         </div>
@@ -223,11 +237,15 @@
 </div>
 
 <script>
-    const { createApp, ref, computed, watch, nextTick } = Vue;
+     const { createApp, ref, computed, watch, nextTick, markRaw } = Vue;
 
     createApp({
         setup() {
+            const isLoading = ref(false);
             const rawData = ref([]);
+            const skuInput = ref(''); 
+            const topMetric = ref('amount'); // 'amount' | 'quantity'
+            
             const filters = ref({
                 brand: 'ALL',
                 size: 'ALL',
@@ -236,66 +254,72 @@
                 sku: '',
                 startDate: '',
                 endDate: '',
-                timeGrain: 'day' // day, week, month
+                timeGrain: 'day'
             });
 
-            // 图表 DOM
-            const trendChart = ref(null);
-            const brandChart = ref(null);
-            const sizeChart = ref(null);
-            const categoryChart = ref(null);
-            const topProductChart = ref(null);
-            
-            let chartInstances = { trend: null, brand: null, size: null, category: null, topProduct: null };
+             // 存放 ECharts 实例的引用（内部使用的 ref）
+             const chartRefs = {
+                 trend: ref(null),
+                 brand: ref(null),
+                 size: ref(null),
+                 category: ref(null),
+                 topProduct: ref(null)
+             };
+             // 对外暴露给模板使用的 ref（保持原有命名，避免模板找不到）
+             const trendChart = chartRefs.trend;
+             const brandChart = chartRefs.brand;
+             const sizeChart = chartRefs.size;
+             const categoryChart = chartRefs.category;
+             const topProductChart = chartRefs.topProduct;
+             
+             let chartInstances = {};
 
-            // 映射关系
+            // 增强版表头映射
             const KEY_MAP = {
-                '店铺订单时间': 'date',
-                'SKU': 'sku',
-                '尺码': 'size',
-                '商品名称': 'name',
-                '品牌名称': 'brand',
-                '商品数量': 'quantity',
-                '订单金额': 'amount'
+                '店铺订单时间': 'date', '订单时间': 'date', '日期': 'date',
+                'SKU': 'sku', 'sku': 'sku',
+                '尺码': 'size', 'Size': 'size',
+                '商品名称': 'name', '标题': 'name', '商品标题': 'name',
+                '品牌名称': 'brand', '品牌': 'brand', 'Brand': 'brand',
+                '商品数量': 'quantity', '数量': 'quantity', '件数': 'quantity',
+                '订单金额': 'amount', '商品单价': 'amount', '金额': 'amount', '销售额': 'amount'
             };
+
+            // 防抖
+            const debounce = (fn, delay) => {
+                let timer;
+                return function(...args) {
+                    clearTimeout(timer);
+                    timer = setTimeout(() => fn.apply(this, args), delay);
+                };
+            };
+            
+            const debouncedSkuSearch = debounce(() => {
+                filters.value.sku = skuInput.value;
+            }, 300);
 
             const handleFileUpload = (e) => processFile(e.target.files[0]);
             const handleDrop = (e) => processFile(e.dataTransfer.files[0]);
 
-            // 根据商品标题提取品类
             const getCategoryFromName = (name) => {
                 if (!name) return '其他';
-                const n = String(name);
-                // 先判断包
-                if (n.includes('包')) return '包';
-                // 配件：围巾，腰带，手套，头带，袜子
-                if (n.includes('围巾') || n.toLowerCase().includes('scarf') ||
-                    n.includes('腰带') || n.toLowerCase().includes('belt') ||
-                    n.includes('手套') || n.toLowerCase().includes('glove') ||
-                    n.includes('头带') || n.toLowerCase().includes('headband') ||
-                    n.includes('袜')   || n.toLowerCase().includes('sock')) {
-                    return '配件';
-                }
-                if (n.includes('鞋') || n.toLowerCase().includes('shoe') || n.toLowerCase().includes('sneaker')) return '鞋';
-                if (n.includes('夹克') || n.toLowerCase().includes('jacket')) return '夹克';
-                if (n.includes('大衣') || n.includes('外套') || n.toLowerCase().includes('coat') || n.toLowerCase().includes('parka')) return '大衣';
-                if (n.includes('T恤') || n.toUpperCase().includes('TEE') || n.toLowerCase().includes('t-shirt')) return 'T恤';
-                if (n.includes('背心') || n.toLowerCase().includes('tank')) return '背心';
-                if (n.includes('裤')) return '裤';
-                if (n.includes('连帽') || n.toLowerCase().includes('hoodie')) return '连帽衣';
-                if (n.includes('衫') || n.toLowerCase().includes('shirt')) return '衫';
+                const n = String(name).toLowerCase();
+                if (n.includes('包') || n.includes('bag') || n.includes('wallet')) return '包袋/钱包';
+                if (n.includes('鞋') || n.includes('shoe') || n.includes('sneaker') || n.includes('boot')) return '鞋履';
+                if (n.includes('夹克') || n.includes('jacket') || n.includes('大衣') || n.includes('外套') || n.includes('coat') || n.includes('parka')) return '外套/夹克';
+                if (n.includes('t恤') || n.includes('tee') || n.includes('t-shirt') || n.includes('短袖')) return 'T恤/短袖';
+                if (n.includes('卫衣') || n.includes('hoodie') || n.includes('sweatshirt')) return '卫衣/帽衫';
+                if (n.includes('衬衫') || n.includes('shirt')) return '衬衫';
+                if (n.includes('裤') || n.includes('pant') || n.includes('trousers') || n.includes('jeans')) return '裤装';
+                if (n.includes('裙') || n.includes('dress') || n.includes('skirt')) return '裙装';
                 return '其他';
             };
 
-            // 根据标题推断性别：男装 / 女装 / Unisex
             const getGenderFromName = (name) => {
                 if (!name) return 'Unisex';
-                const n = String(name);
-                const hasMen = n.includes('男') || /men/i.test(n) || /male/i.test(n);
-                const hasWomen = n.includes('女') || /women/i.test(n) || /female/i.test(n);
-                if ((n.includes('中性') || /unisex/i.test(n) || n.includes('男女')) && !(hasMen && !hasWomen) && !(hasWomen && !hasMen)) {
-                    return 'Unisex';
-                }
+                const n = String(name).toLowerCase();
+                const hasMen = n.includes('男') || /\bmen\b/.test(n) || /\bmale\b/.test(n);
+                const hasWomen = n.includes('女') || /\bwomen\b/.test(n) || /\bfemale\b/.test(n) || /\blady\b/.test(n);
                 if (hasMen && !hasWomen) return '男装';
                 if (hasWomen && !hasMen) return '女装';
                 return 'Unisex';
@@ -303,127 +327,124 @@
 
             const processFile = (file) => {
                 if(!file) return;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-                        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                isLoading.value = true;
+                
+                setTimeout(() => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
-                        if (!jsonData.length) { alert("文件数据为空"); return; }
+                            if (!jsonData.length) { throw new Error("Excel 数据为空"); }
 
-                        const cleanData = jsonData.map(row => {
-                            let newRow = {};
-                            Object.keys(row).forEach(k => {
-                                const cleanKey = k.trim();
-                                if (KEY_MAP[cleanKey]) newRow[KEY_MAP[cleanKey]] = row[k];
+                            const cleanData = jsonData.map(row => {
+                                let newRow = {};
+                                Object.keys(row).forEach(k => {
+                                    // 宽松匹配：去除空格，不区分大小写
+                                    const cleanKey = k.trim();
+                                    const targetKey = KEY_MAP[cleanKey] || Object.keys(KEY_MAP).find(mk => cleanKey.toLowerCase() === mk.toLowerCase());
+                                    if (targetKey) newRow[KEY_MAP[targetKey] || targetKey] = row[k];
+                                });
+
+                                if (newRow.amount === undefined || newRow.quantity === undefined) return null;
+                                
+                                newRow.amount = parseFloat(newRow.amount) || 0;
+                                newRow.quantity = parseInt(newRow.quantity) || 0;
+                                newRow.sku = newRow.sku ? String(newRow.sku).trim() : 'N/A';
+                                newRow.name = newRow.name ? String(newRow.name).trim() : 'Unknown Product';
+                                newRow.brand = newRow.brand ? String(newRow.brand).trim() : 'Unknown';
+                                
+                                let sizeVal = newRow.size;
+                                newRow.size = (sizeVal !== undefined && sizeVal !== null) ? String(sizeVal).trim() : '均码';
+                                
+                                try {
+                                    let d = newRow.date;
+                                    let dateObj = null;
+                                    if (d instanceof Date) {
+                                        dateObj = d;
+                                    } else if (typeof d === 'number') {
+                                        const dateInfo = XLSX.SSF.parse_date_code(d);
+                                        dateObj = new Date(dateInfo.y, dateInfo.m - 1, dateInfo.d);
+                                    } else if (typeof d === 'string') {
+                                        const normalizedDate = d.split(' ')[0].replace(/[./]/g, '-');
+                                        dateObj = new Date(normalizedDate);
+                                    }
+
+                                    if (dateObj && !isNaN(dateObj.getTime())) {
+                                        const year = dateObj.getFullYear();
+                                        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                        const day = String(dateObj.getDate()).padStart(2, '0');
+                                        newRow.dateStr = `${year}-${month}-${day}`;
+                                        newRow.dateObj = new Date(year, dateObj.getMonth(), dateObj.getDate());
+                                    } else {
+                                        return null; 
+                                    }
+                                } catch(e) { return null; }
+
+                                newRow.category = getCategoryFromName(newRow.name);
+                                newRow.gender = getGenderFromName(newRow.name);
+
+                                return newRow.dateStr && newRow.amount >= 0 ? newRow : null;
+                            }).filter(item => item !== null);
+
+                            if (!cleanData.length) { throw new Error("未找到有效数据，请检查表头是否正确"); }
+                            
+                            cleanData.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+                            rawData.value = cleanData;
+
+                            const dates = rawData.value.map(d => d.dateStr);
+                            filters.value.startDate = dates[0];
+                            filters.value.endDate = dates[dates.length - 1];
+                            
+                            // === 关键修复点：延时初始化 ===
+                            isLoading.value = false;
+                            nextTick(() => {
+                                setTimeout(() => {
+                                    initCharts();
+                                }, 200); // 延迟200ms等待DOM布局完成
                             });
 
-                            newRow.amount = parseFloat(newRow.amount) || 0;
-                            newRow.quantity = parseInt(newRow.quantity) || 0;
-                            newRow.brand = newRow.brand || 'Unknown';
-                            
-                            // 尺码格式化：如果是数字，则保留1位小数；如果是文本，保持原样
-                            let sizeVal = newRow.size;
-                            if (sizeVal !== undefined && sizeVal !== null) {
-                                if (!isNaN(sizeVal) && typeof sizeVal !== 'boolean') {
-                                    newRow.size = parseFloat(sizeVal).toFixed(1);
-                                } else {
-                                    newRow.size = String(sizeVal).trim();
-                                }
-                            } else {
-                                newRow.size = '均码';
-                            }
-                            
-                            // 日期标准化，统一为 yyyy-MM-dd，避免 input[type=date] 报错
-                            try {
-                                let d = newRow.date;
-                                if (d && !isNaN(d) && !(d instanceof Date)) {
-                                    // 可能是 Excel 序列号
-                                    d = XLSX.SSF.parse_date_code(d);
-                                }
-                                if (d && (d.y || d instanceof Date)) {
-                                    const dateObj = d instanceof Date ? d : new Date(d.y, d.m-1, d.d);
-                                    newRow.dateObj = dateObj; // 保留对象用于后续粒度计算
-                                    newRow.dateStr = dateObj.toISOString().split('T')[0]; // yyyy-MM-dd
-                                } else if (typeof newRow.date === 'string') {
-                                    // 直接来自字符串的日期，可能是 2025/09/16 或 2025.09.16 格式
-                                    let base = newRow.date.split(' ')[0].trim();
-                                    base = base.replace(/[./]/g, '-'); // 全部换成 -
-                                    // 如果是 yyyy/M/d 这种，补零
-                                    const parts = base.split('-');
-                                    if (parts.length === 3 && parts[0].length === 4) {
-                                        const m = parts[1].padStart(2, '0');
-                                        const d2 = parts[2].padStart(2, '0');
-                                        base = `${parts[0]}-${m}-${d2}`;
-                                    }
-                                    newRow.dateStr = base;
-                                    newRow.dateObj = new Date(base);
-                                }
-                            } catch(e) { 
-                                newRow.dateStr = null; 
-                            }
-
-                            // 品类与性别分类
-                            newRow.category = getCategoryFromName(newRow.name);
-                            newRow.gender = getGenderFromName(newRow.name);
-
-                            return newRow;
-                        }).filter(item => item.dateStr && item.amount >= 0);
-
-                        if (!cleanData.length) { alert("未找到有效数据"); return; }
-                        
-                        // 按日期排序，方便后续处理
-                        cleanData.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
-
-                        rawData.value = cleanData;
-
-                        // 初始化筛选器范围（格式为 yyyy-MM-dd，适配 input[type=date]）
-                        const dates = rawData.value.map(d => d.dateStr);
-                        filters.value.startDate = dates[0];
-                        filters.value.endDate = dates[dates.length - 1];
-                        
-                        nextTick(() => initCharts());
-
-                    } catch (error) {
-                        console.error(error);
-                        alert("解析失败，请检查文件格式");
-                    }
-                };
-                reader.readAsArrayBuffer(file);
+                        } catch (error) {
+                            console.error(error);
+                            alert(error.message || "解析失败");
+                            isLoading.value = false;
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                }, 100);
             };
 
-            // 联动筛选逻辑
             const filteredData = computed(() => {
+                const f = filters.value;
                 return rawData.value.filter(item => {
-                    const matchBrand = filters.value.brand === 'ALL' || item.brand === filters.value.brand;
-                    const matchSize = filters.value.size === 'ALL' || item.size === filters.value.size;
-                    const matchCategory = filters.value.category === 'ALL' || item.category === filters.value.category;
-                    const matchGender = filters.value.gender === 'ALL' || item.gender === filters.value.gender;
-                    const matchSku = !filters.value.sku || (item.sku && String(item.sku).toLowerCase().includes(filters.value.sku.toLowerCase()));
-                    const matchDate = (!filters.value.startDate || item.dateStr >= filters.value.startDate) &&
-                                      (!filters.value.endDate || item.dateStr <= filters.value.endDate);
-                    return matchBrand && matchSize && matchCategory && matchGender && matchSku && matchDate;
+                    if (f.brand !== 'ALL' && item.brand !== f.brand) return false;
+                    if (f.size !== 'ALL' && item.size !== f.size) return false;
+                    if (f.category !== 'ALL' && item.category !== f.category) return false;
+                    if (f.gender !== 'ALL' && item.gender !== f.gender) return false;
+                    if (f.sku && !String(item.sku).toLowerCase().includes(f.sku.toLowerCase())) return false;
+                    if (f.startDate && item.dateStr < f.startDate) return false;
+                    if (f.endDate && item.dateStr > f.endDate) return false;
+                    return true;
                 });
             });
 
-            // 动态生成下拉选项
             const uniqueOptions = computed(() => {
-                const brands = new Set();
-                const sizes = new Set();
-                const categories = new Set();
-                const genders = new Set();
+                const brands = new Set(), sizes = new Set(), categories = new Set(), genders = new Set();
                 rawData.value.forEach(item => {
-                    if(item.brand) brands.add(item.brand);
-                    if(item.size) sizes.add(item.size);
-                    if(item.category) categories.add(item.category);
-                    if(item.gender) genders.add(item.gender);
+                    brands.add(item.brand);
+                    sizes.add(item.size);
+                    categories.add(item.category);
+                    genders.add(item.gender);
                 });
-                // 尺码自定义排序：尝试数字排序，否则字母排序
+                
                 const sortedSizes = [...sizes].sort((a, b) => {
-                    const numA = parseFloat(a);
-                    const numB = parseFloat(b);
-                    if(!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                    const na = parseFloat(a), nb = parseFloat(b);
+                    const isNaNum = !isNaN(na), isNbNum = !isNaN(nb);
+                    if (isNaNum && isNbNum) return na - nb;
+                    if (isNaNum && !isNbNum) return -1;
+                    if (!isNaNum && isNbNum) return 1;
                     return String(a).localeCompare(String(b));
                 });
 
@@ -435,22 +456,17 @@
                 };
             });
 
-            // KPI 计算
             const kpi = computed(() => {
                 const data = filteredData.value;
                 const totalAmount = data.reduce((sum, item) => sum + item.amount, 0);
                 const totalOrders = data.length;
                 const totalItems = data.reduce((sum, item) => sum + item.quantity, 0);
                 
-                // 流速计算：总销量 / (结束日期 - 开始日期 + 1)
-                let velocity = 0;
                 let days = 1;
                 if (filters.value.startDate && filters.value.endDate) {
                     const start = new Date(filters.value.startDate);
                     const end = new Date(filters.value.endDate);
-                    const diffTime = Math.abs(end - start);
-                    days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // 包含当天
-                    velocity = days > 0 ? totalItems / days : 0;
+                    days = Math.max(1, Math.ceil((end - start) / (86400000)) + 1);
                 }
 
                 return {
@@ -458,12 +474,11 @@
                     totalOrders,
                     totalItems,
                     aov: totalOrders ? (totalAmount / totalOrders).toFixed(2) : 0,
-                    velocity: velocity.toFixed(1),
+                    velocity: (totalItems / days).toFixed(1),
                     days
                 };
             });
 
-            // 辅助函数：获取日期的周/月 Key
             const getDateKey = (dateObj, grain) => {
                 const y = dateObj.getFullYear();
                 const m = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -471,27 +486,22 @@
                 
                 if (grain === 'month') return `${y}-${m}`;
                 if (grain === 'week') {
-                    // 简单的按周一开始日期计算
                     const tmp = new Date(dateObj.getTime());
-                    const day = tmp.getDay() || 7; // getDay 0 is Sunday
+                    const day = tmp.getDay() || 7; 
                     if(day !== 1) tmp.setDate(tmp.getDate() - (day - 1));
-                    return `${tmp.toISOString().split('T')[0]} (周)`;
+                    return `${tmp.getFullYear()}-${String(tmp.getMonth() + 1).padStart(2, '0')}-${String(tmp.getDate()).padStart(2, '0')} (周)`;
                 }
                 return `${y}-${m}-${d}`;
             };
 
             const updateCharts = () => {
-                if (!chartInstances.trend) return;
                 const data = filteredData.value;
-                if (!data.length) {
-                    Object.values(chartInstances).forEach(c => c && c.clear());
-                    return;
-                }
+                if (!chartInstances.trend) return; 
 
-                // 1. 趋势分析 (支持粒度)
+                // 1. 趋势分析
                 const trendMap = {};
                 data.forEach(item => {
-                    const key = getDateKey(new Date(item.dateObj), filters.value.timeGrain);
+                    const key = getDateKey(item.dateObj, filters.value.timeGrain);
                     if (!trendMap[key]) trendMap[key] = { amount: 0, qty: 0 };
                     trendMap[key].amount += item.amount;
                     trendMap[key].qty += item.quantity;
@@ -499,147 +509,184 @@
                 const sortedKeys = Object.keys(trendMap).sort();
 
                 chartInstances.trend.setOption({
-                    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-                    legend: { data: ['销售额', '销量'] },
-                    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-                    xAxis: { type: 'category', data: sortedKeys },
+                    tooltip: { trigger: 'axis', axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } } },
+                    legend: { data: ['销售额', '销量'], bottom: 0 },
+                    dataZoom: [
+                        { type: 'slider', show: true, xAxisIndex: 0, start: 0, end: sortedKeys.length > 30 ? 30 : 100, height: 20, bottom: 30 },
+                        { type: 'inside', xAxisIndex: 0, start: 0, end: 100 }
+                    ],
+                    grid: { left: '3%', right: '3%', bottom: '15%', containLabel: true },
+                    xAxis: { type: 'category', boundaryGap: true, data: sortedKeys, axisLabel: { color: '#64748b' } },
                     yAxis: [
-                        { type: 'value', name: '销售额', axisLabel: { formatter: '€{value}' } },
-                        { type: 'value', name: '销量', splitLine: { show: false } }
+                        { type: 'value', name: '销售额', position: 'left', axisLabel: { formatter: '€{value}' }, splitLine: { lineStyle: { type: 'dashed' } } },
+                        { type: 'value', name: '销量', position: 'right', splitLine: { show: false } }
                     ],
                     series: [
                         { 
                             name: '销售额', type: 'line', smooth: true, 
                             data: sortedKeys.map(d => trendMap[d].amount.toFixed(2)),
-                            itemStyle: { color: '#2563eb' },
-                            areaStyle: { opacity: 0.1, color: '#2563eb' }
+                            itemStyle: { color: '#3b82f6' },
+                            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(59,130,246,0.3)' }, { offset: 1, color: 'rgba(59,130,246,0.01)' }]) }
                         },
                         { 
                             name: '销量', type: 'bar', yAxisIndex: 1,
                             data: sortedKeys.map(d => trendMap[d].qty),
-                            itemStyle: { color: '#94a3b8', borderRadius: [2, 2, 0, 0] },
-                            barMaxWidth: 40
+                            itemStyle: { color: '#cbd5e1', borderRadius: [2, 2, 0, 0] },
+                            barMaxWidth: 30
                         }
                     ]
                 });
 
-                // 2. 品牌 (Top 10 + 其他)
+                // 2. 品牌占比
                 const brandMap = {};
-                data.forEach(item => {
-                    const b = item.brand;
-                    brandMap[b] = (brandMap[b] || 0) + item.amount;
-                });
+                data.forEach(item => brandMap[item.brand] = (brandMap[item.brand] || 0) + item.amount);
                 let brandArr = Object.entries(brandMap).sort((a,b) => b[1] - a[1]);
                 if (brandArr.length > 8) {
                     const otherSum = brandArr.slice(8).reduce((sum, i) => sum + i[1], 0);
                     brandArr = brandArr.slice(0, 8);
                     brandArr.push(['其他', otherSum]);
                 }
-
                 chartInstances.brand.setOption({
-                    tooltip: { trigger: 'item', formatter: '{b}: €{c} ({d}%)' },
+                    tooltip: { trigger: 'item', formatter: '{b}<br/>€{c} ({d}%)' },
                     series: [{
-                        type: 'pie',
-                        radius: ['40%', '70%'],
-                        itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+                        type: 'pie', radius: ['45%', '70%'], center: ['50%', '50%'],
+                        itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
                         data: brandArr.map(i => ({ name: i[0], value: parseFloat(i[1].toFixed(2)) }))
                     }]
                 });
 
-                // 3. 尺码 (按数量排序)
+                // 3. 尺码分布
                 const sizeMap = {};
-                data.forEach(item => {
-                    sizeMap[item.size] = (sizeMap[item.size] || 0) + item.quantity;
-                });
-                const sizeArr = Object.entries(sizeMap).sort((a,b) => b[1] - a[1]); // 数量降序
-
+                data.forEach(item => sizeMap[item.size] = (sizeMap[item.size] || 0) + item.quantity);
+                const sizeArr = Object.entries(sizeMap).sort((a,b) => b[1] - a[1]); 
                 chartInstances.size.setOption({
                     tooltip: { trigger: 'axis' },
-                    grid: { bottom: '10%', top: '10%' },
-                    xAxis: { type: 'category', data: sizeArr.map(i => i[0]), axisLabel: { interval: 0 } },
+                    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+                    dataZoom: [
+                        { type: 'slider', show: true, xAxisIndex: 0, start: 0, end: sizeArr.length > 15 ? 50 : 100, height: 15, bottom: 5 },
+                        { type: 'inside', xAxisIndex: 0 }
+                    ],
+                    xAxis: { type: 'category', data: sizeArr.map(i => i[0]), axisLabel: { interval: 0, rotate: sizeArr.length > 10 ? 30 : 0 } },
                     yAxis: { type: 'value' },
                     series: [{
-                        type: 'bar',
-                        data: sizeArr.map(i => i[1]),
-                        itemStyle: { color: '#10b981' }
+                        type: 'bar', data: sizeArr.map(i => i[1]),
+                        itemStyle: { color: '#10b981', borderRadius: [3, 3, 0, 0] }
                     }]
                 });
 
-                // 4. 品类饼图（按销售额）
-                const categoryMap = {};
-                data.forEach(item => {
-                    const c = item.category || '其他';
-                    categoryMap[c] = (categoryMap[c] || 0) + item.amount;
-                });
-                const categoryArr = Object.entries(categoryMap).sort((a,b) => b[1] - a[1]);
-
+                // 4. 品类占比
+                const catMap = {};
+                data.forEach(item => catMap[item.category] = (catMap[item.category] || 0) + item.amount);
+                const catArr = Object.entries(catMap).sort((a,b) => b[1] - a[1]);
                 chartInstances.category.setOption({
-                    tooltip: { trigger: 'item', formatter: '{b}: €{c} ({d}%)' },
+                    tooltip: { trigger: 'item', formatter: '{b}<br/>€{c} ({d}%)' },
                     series: [{
-                        type: 'pie',
-                        radius: ['40%', '70%'],
-                        itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
-                        data: categoryArr.map(i => ({ name: i[0], value: parseFloat(i[1].toFixed(2)) }))
+                        type: 'pie', radius: ['45%', '70%'],
+                        itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
+                        data: catArr.map(i => ({ name: i[0], value: parseFloat(i[1].toFixed(2)) }))
                     }]
                 });
 
-                // 5. Top 商品
-                const productMap = {};
+                // 5. TOP 10 商品（支持按销售额 / 销量切换）
+                const amountMap = {};
+                const qtyMap = {};
                 data.forEach(item => {
-                    productMap[item.name] = (productMap[item.name] || 0) + item.amount;
+                    amountMap[item.name] = (amountMap[item.name] || 0) + item.amount;
+                    qtyMap[item.name] = (qtyMap[item.name] || 0) + item.quantity;
                 });
-                const topProducts = Object.entries(productMap)
-                    .sort((a,b) => b[1] - a[1])
-                    .slice(0, 10);
-
+                const topByAmount = Object.entries(amountMap).sort((a,b) => b[1] - a[1]).slice(0, 10);
+                const topByQty = Object.entries(qtyMap).sort((a,b) => b[1] - a[1]).slice(0, 10);
+                const useAmount = topMetric.value === 'amount';
+                const topProds = useAmount ? topByAmount : topByQty;
                 chartInstances.topProduct.setOption({
-                    tooltip: { trigger: 'axis', formatter: params => `${params[0].name}: €${Number(params[0].value).toFixed(2)}` },
-                    grid: { left: '3%', right: '5%', bottom: '3%', containLabel: true },
-                    xAxis: { type: 'value' },
+                    tooltip: { 
+                        trigger: 'axis', 
+                        formatter: (params) => {
+                            const p = params[0];
+                            if (useAmount) {
+                                return `<div style="max-width:300px; white-space:normal;"><b>${p.name}</b><br/>销售额: €${Number(p.value).toLocaleString('de-DE', { minimumFractionDigits: 2 })}</div>`;
+                            }
+                            return `<div style="max-width:300px; white-space:normal;"><b>${p.name}</b><br/>销量: ${Number(p.value).toLocaleString()} 件</div>`;
+                        }
+                    },
+                    grid: { left: '1%', right: '8%', bottom: '1%', top: '2%', containLabel: true },
+                    xAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed' } } },
                     yAxis: { 
-                        type: 'category', 
-                        data: topProducts.map(i => i[0].length > 20 ? i[0].substring(0,20)+'...' : i[0]) 
+                        type: 'category', inverse: true,
+                        data: topProds.map(i => i[0]),
+                        axisLabel: {
+                            formatter: function (value) { return value.length > 25 ? value.substring(0, 25) + '...' : value; },
+                            width: 180, overflow: 'truncate'
+                        }
                     },
                     series: [{
                         type: 'bar',
-                        data: topProducts.map(i => Number(i[1].toFixed(2))),
-                        itemStyle: { color: '#f97316' },
-                        label: { show: true, position: 'right', formatter: params => `€${Number(params.value).toFixed(2)}` }
+                        data: topProds.map(i => useAmount ? parseFloat(i[1].toFixed(2)) : i[1]),
+                        itemStyle: { color: '#f97316', borderRadius: [0, 4, 4, 0] },
+                        barMaxWidth: 30,
+                        label: { 
+                            show: true, 
+                            position: 'right', 
+                            formatter: (params) => useAmount 
+                                ? `€${Number(params.value).toFixed(2)}` 
+                                : `${Number(params.value).toLocaleString()} 件`
+                        }
                     }]
                 });
             };
 
             const initCharts = () => {
-                if(trendChart.value) {
-                    chartInstances.trend = echarts.init(trendChart.value);
-                    chartInstances.brand = echarts.init(brandChart.value);
-                    chartInstances.size = echarts.init(sizeChart.value);
-                    chartInstances.category = echarts.init(categoryChart.value);
-                    chartInstances.topProduct = echarts.init(topProductChart.value);
-                    updateCharts();
-                    window.addEventListener('resize', () => Object.values(chartInstances).forEach(c => c && c.resize()));
-                }
+                // 检查 DOM 是否真的存在
+                if (!chartRefs.trend.value) return;
+
+                // 初始化图表
+                if(chartRefs.trend.value) chartInstances.trend = markRaw(echarts.init(chartRefs.trend.value));
+                if(chartRefs.brand.value) chartInstances.brand = markRaw(echarts.init(chartRefs.brand.value));
+                if(chartRefs.size.value) chartInstances.size = markRaw(echarts.init(chartRefs.size.value));
+                if(chartRefs.category.value) chartInstances.category = markRaw(echarts.init(chartRefs.category.value));
+                if(chartRefs.topProduct.value) chartInstances.topProduct = markRaw(echarts.init(chartRefs.topProduct.value));
+                
+                // 渲染数据
+                updateCharts();
+
+                // === 关键修复点：强制重算尺寸 ===
+                // 防止因为容器初始尺寸为0导致的空白
+                Object.values(chartInstances).forEach(c => c && c.resize());
+
+                window.addEventListener('resize', resizeCharts);
+            };
+
+            const resizeCharts = () => {
+                Object.values(chartInstances).forEach(c => c && c.resize());
             };
 
             const resetData = () => {
                 rawData.value = [];
                 filters.value = { brand: 'ALL', size: 'ALL', category: 'ALL', gender: 'ALL', sku: '', startDate: '', endDate: '', timeGrain: 'day' };
-                chartInstances = { trend: null, brand: null, size: null, category: null, topProduct: null };
+                skuInput.value = '';
+                topMetric.value = 'amount';
+                Object.values(chartInstances).forEach(c => c && c.dispose());
+                chartInstances = {};
+                window.removeEventListener('resize', resizeCharts);
             };
 
-            const formatNumber = (num) => Number(num).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const formatNumber = (num) => {
+                return Number(num).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
 
-            watch(filters, updateCharts, { deep: true });
+            // 过滤条件或 TOP 统计维度变化，都需要重绘图表
+            watch([filters, topMetric], () => {
+                nextTick(updateCharts);
+            }, { deep: true });
 
             return {
-                rawData, filters, filteredData, uniqueOptions, kpi,
+                isLoading, rawData, filters, filteredData, uniqueOptions, kpi, skuInput, topMetric,
+                // 暴露给模板使用的 ref 名称（与 template 中的 ref 属性保持一致）
                 trendChart, brandChart, sizeChart, categoryChart, topProductChart,
-                handleFileUpload, handleDrop, resetData, formatNumber
+                handleFileUpload, handleDrop, resetData, formatNumber, debouncedSkuSearch
             };
         }
     }).mount('#app');
 </script>
 </body>
 </html>
-
-
