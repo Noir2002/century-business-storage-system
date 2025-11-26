@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.450.0",
+    "@tailwindcss/vite": "^4.1.17",
     "node-fetch": "^2.7.0",
+    "tailwindcss": "^4.1.17",
     "xlsx": "^0.18.5"
   },
   "keywords": [
