@@ -3,91 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataInsight Pro - 商品销量分析看板</title>
-    <!-- 使用预编译的 Tailwind CSS，而不是 cdn.tailwindcss.com 脚本，避免生产环境警告 -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+    <title>DataInsight V2 - 跨境电商分析看板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     
     <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-        }
-
-        body { 
-            background-color: #f8fafc; 
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-        }
-
-        .chart-container { 
-            height: 400px; 
-            width: 100%; 
-        }
-
-        /* 统一卡片样式，等价于原来的 @apply 组合 */
-        .card { 
-            background-color: #ffffff;
-            border-radius: 0.75rem; /* rounded-xl */
-            padding: 1.25rem;       /* p-5 */
-            border: 1px solid #e2e8f0; /* border-slate-200 */
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); /* shadow-sm */
-            transition: box-shadow 0.3s ease, transform 0.3s ease;
-        }
-
-        .card:hover {
-            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12); /* hover:shadow-md */
-            transform: translateY(-2px);
-        }
-
-        .upload-area { 
-            border: 2px dashed #cbd5e1; 
-        }
-
-        .upload-area:hover { 
-            border-color: #3b82f6; 
-            background-color: #eff6ff; 
-        }
+        body { background-color: #f8fafc; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        .chart-container { height: 400px; width: 100%; }
+        .card { @apply bg-white rounded-xl shadow-sm p-5 border border-slate-200 transition-all duration-300 hover:shadow-md; }
+        .upload-area { border: 2px dashed #cbd5e1; }
+        .upload-area:hover { border-color: #3b82f6; background-color: #eff6ff; }
         
-        /* 粒度按钮样式（替代 @apply） */
-        .grain-btn { 
-            padding: 0.25rem 0.75rem;           /* px-3 py-1 */
-            font-size: 0.75rem;                /* text-xs */
-            font-weight: 500;                  /* font-medium */
-            border-radius: 0.375rem;           /* rounded-md */
-            border: 1px solid #d1d5db;         /* border-gray-300 */
-            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-        }
-
-        .grain-btn.active { 
-            background-color: #2563eb;         /* bg-blue-600 */
-            color: #ffffff;                    /* text-white */
-            border-color: #2563eb;            /* border-blue-600 */
-        }
-
-        .grain-btn.inactive { 
-            background-color: #ffffff;         /* bg-white */
-            color: #4b5563;                    /* text-gray-600 */
-            border-color: #d1d5db;            /* border-gray-300 */
-        }
-
-        .grain-btn.inactive:hover {
-            background-color: #f9fafb;         /* hover:bg-gray-50 */
-        }
+        /* 粒度按钮样式 */
+        .grain-btn { @apply px-3 py-1 text-xs font-medium rounded-md border transition-colors; }
+        .grain-btn.active { @apply bg-blue-600 text-white border-blue-600; }
+        .grain-btn.inactive { @apply bg-white text-gray-600 border-gray-300 hover:bg-gray-50; }
     </style>
 </head>
 <body>
 
 <div id="app" class="min-h-screen pb-10">
-    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
                     <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center mr-2">
-                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                     </div>
                     <span class="text-xl font-bold text-slate-800">DataInsight <span class="text-blue-600">Pro</span></span>
                 </div>
@@ -96,13 +39,8 @@
                         已分析 <span class="font-bold text-blue-600">{{ filteredData.length }}</span> / {{ rawData.length }} 条订单
                     </div>
                     <button @click="resetData" v-if="rawData.length > 0" class="text-sm text-red-500 hover:text-red-700 font-medium flex items-center">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                         清空数据
-                    </button>
-                    <button class="hidden md:inline-flex text-sm text-slate-500 hover:text-slate-700" onclick="window.location.href='index.html'">
-                        返回首页
                     </button>
                 </div>
             </div>
@@ -111,13 +49,10 @@
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         
-        <!-- 上传引导区域 -->
         <div v-if="rawData.length === 0" class="flex flex-col items-center justify-center h-[500px] card upload-area cursor-pointer bg-slate-50" @drop.prevent="handleDrop" @dragover.prevent @click="$refs.fileInput.click()">
             <input type="file" ref="fileInput" class="hidden" accept=".xlsx, .xls" @change="handleFileUpload">
             <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                </svg>
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
             </div>
             <h3 class="text-2xl font-semibold text-slate-700">导入 Excel 数据源</h3>
             <p class="text-slate-500 mt-2">支持 .xlsx / .xls 格式，本地解析不上传服务器</p>
@@ -135,15 +70,11 @@
             </div>
         </div>
 
-        <!-- 看板主体 -->
         <div v-else>
             
-            <!-- 筛选器 -->
             <div class="card mb-6 bg-white border-blue-100">
                 <div class="flex items-center mb-3">
-                    <svg class="w-4 h-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
-                    </svg>
+                    <svg class="w-4 h-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
                     <span class="text-sm font-bold text-slate-700">多维筛选器</span>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -181,7 +112,6 @@
                 </div>
             </div>
 
-            <!-- KPI 卡片 -->
             <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                 <div class="card bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-none shadow-lg">
                     <p class="text-blue-100 text-xs font-medium uppercase tracking-wider">总销售额 (GMV)</p>
@@ -209,7 +139,6 @@
                 </div>
             </div>
 
-            <!-- 图表区域 -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
                 <div class="card col-span-1 lg:col-span-2">
@@ -316,43 +245,29 @@
                             // 尺码格式化：如果是数字，则保留1位小数；如果是文本，保持原样
                             let sizeVal = newRow.size;
                             if (sizeVal !== undefined && sizeVal !== null) {
+                                // 尝试转为数字
                                 if (!isNaN(sizeVal) && typeof sizeVal !== 'boolean') {
-                                    newRow.size = parseFloat(sizeVal).toFixed(1);
+                                     newRow.size = parseFloat(sizeVal).toFixed(1);
                                 } else {
-                                    newRow.size = String(sizeVal).trim();
+                                     newRow.size = String(sizeVal).trim();
                                 }
                             } else {
                                 newRow.size = '均码';
                             }
                             
-                            // 日期标准化，统一为 yyyy-MM-dd，避免 input[type=date] 报错
+                            // 日期标准化
                             try {
                                 let d = newRow.date;
-                                if (d && !isNaN(d) && !(d instanceof Date)) {
-                                    // 可能是 Excel 序列号
-                                    d = XLSX.SSF.parse_date_code(d);
-                                }
+                                if (d && !isNaN(d) && !(d instanceof Date)) d = XLSX.SSF.parse_date_code(d);
                                 if (d && (d.y || d instanceof Date)) {
                                     const dateObj = d instanceof Date ? d : new Date(d.y, d.m-1, d.d);
                                     newRow.dateObj = dateObj; // 保留对象用于后续粒度计算
-                                    newRow.dateStr = dateObj.toISOString().split('T')[0]; // yyyy-MM-dd
+                                    newRow.dateStr = dateObj.toISOString().split('T')[0];
                                 } else if (typeof newRow.date === 'string') {
-                                    // 直接来自字符串的日期，可能是 2025/09/16 或 2025.09.16 格式
-                                    let base = newRow.date.split(' ')[0].trim();
-                                    base = base.replace(/[./]/g, '-'); // 全部换成 -
-                                    // 如果是 yyyy/M/d 这种，补零
-                                    const parts = base.split('-');
-                                    if (parts.length === 3 && parts[0].length === 4) {
-                                        const m = parts[1].padStart(2, '0');
-                                        const d2 = parts[2].padStart(2, '0');
-                                        base = `${parts[0]}-${m}-${d2}`;
-                                    }
-                                    newRow.dateStr = base;
-                                    newRow.dateObj = new Date(base);
+                                    newRow.dateStr = newRow.date.split(' ')[0].trim();
+                                    newRow.dateObj = new Date(newRow.dateStr);
                                 }
-                            } catch(e) { 
-                                newRow.dateStr = null; 
-                            }
+                            } catch(e) { newRow.dateStr = null; }
 
                             return newRow;
                         }).filter(item => item.dateStr && item.amount >= 0);
@@ -364,7 +279,7 @@
 
                         rawData.value = cleanData;
 
-                        // 初始化筛选器范围（格式为 yyyy-MM-dd，适配 input[type=date]）
+                        // 初始化筛选器范围
                         const dates = rawData.value.map(d => d.dateStr);
                         filters.value.startDate = dates[0];
                         filters.value.endDate = dates[dates.length - 1];
@@ -385,8 +300,7 @@
                     const matchBrand = filters.value.brand === 'ALL' || item.brand === filters.value.brand;
                     const matchSize = filters.value.size === 'ALL' || item.size === filters.value.size;
                     const matchSku = !filters.value.sku || (item.sku && String(item.sku).toLowerCase().includes(filters.value.sku.toLowerCase()));
-                    const matchDate = (!filters.value.startDate || item.dateStr >= filters.value.startDate) &&
-                                      (!filters.value.endDate || item.dateStr <= filters.value.endDate);
+                    const matchDate = item.dateStr >= filters.value.startDate && item.dateStr <= filters.value.endDate;
                     return matchBrand && matchSize && matchSku && matchDate;
                 });
             });
@@ -395,6 +309,7 @@
             const uniqueOptions = computed(() => {
                 const brands = new Set();
                 const sizes = new Set();
+                // 这里的选项基于全部数据还是筛选后数据？通常基于全部数据体验较好
                 rawData.value.forEach(item => {
                     if(item.brand) brands.add(item.brand);
                     if(item.size) sizes.add(item.size);
@@ -420,7 +335,7 @@
                 const totalOrders = data.length;
                 const totalItems = data.reduce((sum, item) => sum + item.quantity, 0);
                 
-                // 流速计算：总销量 / (结束日期 - 开始日期 + 1)
+                // 流速计算
                 let velocity = 0;
                 let days = 1;
                 if (filters.value.startDate && filters.value.endDate) {
@@ -428,7 +343,7 @@
                     const end = new Date(filters.value.endDate);
                     const diffTime = Math.abs(end - start);
                     days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // 包含当天
-                    velocity = days > 0 ? totalItems / days : 0;
+                    velocity = totalItems / days;
                 }
 
                 return {
@@ -450,10 +365,9 @@
                 if (grain === 'month') return `${y}-${m}`;
                 if (grain === 'week') {
                     // 简单的按周一开始日期计算
-                    const tmp = new Date(dateObj.getTime());
-                    const day = tmp.getDay() || 7; // getDay 0 is Sunday
-                    if(day !== 1) tmp.setDate(tmp.getDate() - (day - 1));
-                    return `${tmp.toISOString().split('T')[0]} (周)`;
+                    const day = dateObj.getDay() || 7; // getDay 0 is Sunday
+                    if(day !== 1) dateObj.setHours(-24 * (day - 1));
+                    return `${dateObj.toISOString().split('T')[0]} (周)`;
                 }
                 return `${y}-${m}-${d}`;
             };
@@ -469,6 +383,7 @@
                 // 1. 趋势分析 (支持粒度)
                 const trendMap = {};
                 data.forEach(item => {
+                    // 克隆日期对象以免修改原数据
                     const key = getDateKey(new Date(item.dateObj), filters.value.timeGrain);
                     if (!trendMap[key]) trendMap[key] = { amount: 0, qty: 0 };
                     trendMap[key].amount += item.amount;
@@ -549,22 +464,19 @@
                     productMap[item.name] = (productMap[item.name] || 0) + item.amount;
                 });
                 const topProducts = Object.entries(productMap)
-                    .sort((a,b) => b[1] - a[1])
-                    .slice(0, 10);
+                    .sort((a,b) => a[1] - b[1])
+                    .slice(-10);
 
                 chartInstances.topProduct.setOption({
-                    tooltip: { trigger: 'axis', formatter: params => `${params[0].name}: €${Number(params[0].value).toFixed(2)}` },
+                    tooltip: { trigger: 'axis', formatter: '{b}: €{c}' },
                     grid: { left: '3%', right: '5%', bottom: '3%', containLabel: true },
                     xAxis: { type: 'value' },
-                    yAxis: { 
-                        type: 'category', 
-                        data: topProducts.map(i => i[0].length > 20 ? i[0].substring(0,20)+'...' : i[0]) 
-                    },
+                    yAxis: { type: 'category', data: topProducts.map(i => i[0].length > 12 ? i[0].substring(0,12)+'...' : i[0]) },
                     series: [{
                         type: 'bar',
-                        data: topProducts.map(i => Number(i[1].toFixed(2))),
+                        data: topProducts.map(i => i[1].toFixed(2)),
                         itemStyle: { color: '#f97316' },
-                        label: { show: true, position: 'right', formatter: params => `€${Number(params.value).toFixed(2)}` }
+                        label: { show: true, position: 'right', formatter: '€{@score}' }
                     }]
                 });
             };
@@ -600,5 +512,3 @@
 </script>
 </body>
 </html>
-
-
